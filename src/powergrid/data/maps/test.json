@@ -1,0 +1,51 @@
+{
+  "id": "test",
+  "name": "Test Map",
+  "regions": [
+    {
+      "id": "alpha",
+      "label": "Alpha",
+      "color": "#3366aa"
+    },
+    {
+      "id": "beta",
+      "label": "Beta",
+      "color": "#aa6633"
+    },
+    {
+      "id": "gamma",
+      "label": "Gamma",
+      "color": "#33aa66"
+    }
+  ],
+  "cities": [
+    {
+      "id": "amber_falls",
+      "name": "Amber Falls",
+      "region": "alpha"
+    },
+    {
+      "id": "brass_harbor",
+      "name": "Brass Harbor",
+      "region": "beta"
+    },
+    {
+      "id": "cinder_grove",
+      "name": "Cinder Grove",
+      "region": "gamma"
+    }
+  ],
+  "connections": [
+    {
+      "city_1": "amber_falls",
+      "city_2": "brass_harbor",
+      "cost": 4
+    },
+    {
+      "city_1": "brass_harbor",
+      "city_2": "cinder_grove",
+      "cost": 7
+    }
+  ],
+  "special_rules": []
+}

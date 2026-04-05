@@ -1,0 +1,235 @@
+{
+  "starting_money": 50,
+  "houses_per_player": 22,
+  "resource_supply": {
+    "coal": 24,
+    "oil": 24,
+    "garbage": 24,
+    "uranium": 12
+  },
+  "resource_market_tracks": {
+    "coal": {
+      "capacity_by_price": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3
+      },
+      "starting_prices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "oil": {
+      "capacity_by_price": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3
+      },
+      "starting_prices": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "garbage": {
+      "capacity_by_price": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3
+      },
+      "starting_prices": [
+        6,
+        7,
+        8
+      ]
+    },
+    "uranium": {
+      "capacity_by_price": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "10": 1,
+        "12": 1,
+        "14": 1,
+        "16": 1
+      },
+      "starting_prices": [
+        14,
+        16
+      ]
+    }
+  },
+  "payment_schedule": {
+    "0": 10,
+    "1": 22,
+    "2": 33,
+    "3": 44,
+    "4": 54,
+    "5": 64,
+    "6": 73,
+    "7": 82,
+    "8": 90,
+    "9": 98,
+    "10": 105,
+    "11": 112,
+    "12": 118,
+    "13": 124,
+    "14": 129,
+    "15": 134,
+    "16": 138,
+    "17": 142,
+    "18": 145,
+    "19": 148,
+    "20": 150
+  },
+  "player_count_rules": {
+    "3": {
+      "areas": 3,
+      "remove_plug_plants": 2,
+      "remove_socket_plants": 6,
+      "max_power_plants": 3,
+      "step_2_cities": 7,
+      "end_game_cities": 17,
+      "resource_refill": {
+        "step_1": {
+          "coal": 4,
+          "oil": 2,
+          "garbage": 1,
+          "uranium": 1
+        },
+        "step_2": {
+          "coal": 5,
+          "oil": 3,
+          "garbage": 2,
+          "uranium": 1
+        },
+        "step_3": {
+          "coal": 3,
+          "oil": 4,
+          "garbage": 3,
+          "uranium": 1
+        }
+      }
+    },
+    "4": {
+      "areas": 4,
+      "remove_plug_plants": 1,
+      "remove_socket_plants": 3,
+      "max_power_plants": 3,
+      "step_2_cities": 7,
+      "end_game_cities": 17,
+      "resource_refill": {
+        "step_1": {
+          "coal": 5,
+          "oil": 3,
+          "garbage": 2,
+          "uranium": 1
+        },
+        "step_2": {
+          "coal": 6,
+          "oil": 4,
+          "garbage": 3,
+          "uranium": 2
+        },
+        "step_3": {
+          "coal": 4,
+          "oil": 5,
+          "garbage": 4,
+          "uranium": 2
+        }
+      }
+    },
+    "5": {
+      "areas": 5,
+      "remove_plug_plants": 0,
+      "remove_socket_plants": 0,
+      "max_power_plants": 3,
+      "step_2_cities": 7,
+      "end_game_cities": 15,
+      "resource_refill": {
+        "step_1": {
+          "coal": 5,
+          "oil": 4,
+          "garbage": 3,
+          "uranium": 2
+        },
+        "step_2": {
+          "coal": 7,
+          "oil": 5,
+          "garbage": 3,
+          "uranium": 3
+        },
+        "step_3": {
+          "coal": 5,
+          "oil": 6,
+          "garbage": 5,
+          "uranium": 2
+        }
+      }
+    },
+    "6": {
+      "areas": 5,
+      "remove_plug_plants": 0,
+      "remove_socket_plants": 0,
+      "max_power_plants": 3,
+      "step_2_cities": 6,
+      "end_game_cities": 14,
+      "resource_refill": {
+        "step_1": {
+          "coal": 7,
+          "oil": 5,
+          "garbage": 3,
+          "uranium": 2
+        },
+        "step_2": {
+          "coal": 9,
+          "oil": 6,
+          "garbage": 5,
+          "uranium": 3
+        },
+        "step_3": {
+          "coal": 6,
+          "oil": 7,
+          "garbage": 6,
+          "uranium": 3
+        }
+      }
+    }
+  },
+  "setup": {
+    "current_market_size": 4,
+    "future_market_size": 4,
+    "starting_plug_market_count": 8,
+    "set_aside_plug_after_market": 1,
+    "step_3_card_count": 1
+  }
+}

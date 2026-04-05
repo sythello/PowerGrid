@@ -1,0 +1,453 @@
+[
+  {
+    "price": 3,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 4,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 5,
+    "resource_types": [
+      "coal",
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": true,
+    "is_ecological": false
+  },
+  {
+    "price": 6,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 1,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 7,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 3,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 8,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 3,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 9,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 1,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 10,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 11,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 12,
+    "resource_types": [
+      "oil",
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": true,
+    "is_ecological": false
+  },
+  {
+    "price": 13,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 1,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 14,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 2,
+    "output_cities": 2,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 15,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 3,
+    "deck_back": "plug",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 16,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 3,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 17,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 2,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 18,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 2,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 19,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 2,
+    "output_cities": 3,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 20,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 3,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 21,
+    "resource_types": [
+      "coal",
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": true,
+    "is_ecological": false
+  },
+  {
+    "price": 22,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 2,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 23,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 3,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 24,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 2,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 25,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 26,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 27,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 3,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 28,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 29,
+    "resource_types": [
+      "coal",
+      "oil"
+    ],
+    "resource_cost": 1,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": true,
+    "is_ecological": false
+  },
+  {
+    "price": 30,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 3,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 31,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 3,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 32,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 3,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 33,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 34,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 35,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 1,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 36,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 3,
+    "output_cities": 7,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 37,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 4,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 38,
+    "resource_types": [
+      "garbage"
+    ],
+    "resource_cost": 3,
+    "output_cities": 7,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 39,
+    "resource_types": [
+      "uranium"
+    ],
+    "resource_cost": 1,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 40,
+    "resource_types": [
+      "oil"
+    ],
+    "resource_cost": 2,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 42,
+    "resource_types": [
+      "coal"
+    ],
+    "resource_cost": 2,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": false
+  },
+  {
+    "price": 44,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 5,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  },
+  {
+    "price": 46,
+    "resource_types": [
+      "oil",
+      "coal"
+    ],
+    "resource_cost": 3,
+    "output_cities": 7,
+    "deck_back": "socket",
+    "is_hybrid": true,
+    "is_ecological": false
+  },
+  {
+    "price": 50,
+    "resource_types": [],
+    "resource_cost": 0,
+    "output_cities": 6,
+    "deck_back": "socket",
+    "is_hybrid": false,
+    "is_ecological": true
+  }
+]

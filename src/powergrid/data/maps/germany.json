@@ -1,0 +1,668 @@
+{
+  "id": "germany",
+  "name": "Germany",
+  "regions": [
+    {
+      "id": "blue",
+      "label": "Blue",
+      "color": "#0055ff"
+    },
+    {
+      "id": "magenta",
+      "label": "Magenta",
+      "color": "#ff55ff"
+    },
+    {
+      "id": "black",
+      "label": "Black",
+      "color": "#000000"
+    },
+    {
+      "id": "yellow",
+      "label": "Yellow",
+      "color": "#ffff00"
+    },
+    {
+      "id": "green",
+      "label": "Green",
+      "color": "#55aa00"
+    },
+    {
+      "id": "cyan",
+      "label": "Cyan",
+      "color": "#55aaff"
+    }
+  ],
+  "cities": [
+    {
+      "id": "aachen",
+      "name": "Aachen",
+      "region": "green"
+    },
+    {
+      "id": "augsburg",
+      "name": "Augsburg",
+      "region": "cyan"
+    },
+    {
+      "id": "berlin",
+      "name": "Berlin",
+      "region": "black"
+    },
+    {
+      "id": "bremen",
+      "name": "Bremen",
+      "region": "blue"
+    },
+    {
+      "id": "cuxhaven",
+      "name": "Cuxhaven",
+      "region": "blue"
+    },
+    {
+      "id": "dortmund",
+      "name": "Dortmund",
+      "region": "magenta"
+    },
+    {
+      "id": "dresden",
+      "name": "Dresden",
+      "region": "yellow"
+    },
+    {
+      "id": "duesseldorf",
+      "name": "Duesseldorf",
+      "region": "magenta"
+    },
+    {
+      "id": "duisburg",
+      "name": "Duisburg",
+      "region": "magenta"
+    },
+    {
+      "id": "erfurt",
+      "name": "Erfurt",
+      "region": "yellow"
+    },
+    {
+      "id": "essen",
+      "name": "Essen",
+      "region": "magenta"
+    },
+    {
+      "id": "flensburg",
+      "name": "Flensburg",
+      "region": "blue"
+    },
+    {
+      "id": "frankfurt_main",
+      "name": "Frankfurt-Main",
+      "region": "green"
+    },
+    {
+      "id": "frankfurt_oder",
+      "name": "Frankfurt-Oder",
+      "region": "black"
+    },
+    {
+      "id": "freiburg",
+      "name": "Freiburg",
+      "region": "cyan"
+    },
+    {
+      "id": "fulda",
+      "name": "Fulda",
+      "region": "yellow"
+    },
+    {
+      "id": "halle",
+      "name": "Halle",
+      "region": "yellow"
+    },
+    {
+      "id": "hamburg",
+      "name": "Hamburg",
+      "region": "blue"
+    },
+    {
+      "id": "hannover",
+      "name": "Hannover",
+      "region": "blue"
+    },
+    {
+      "id": "kassel",
+      "name": "Kassel",
+      "region": "magenta"
+    },
+    {
+      "id": "kiel",
+      "name": "Kiel",
+      "region": "blue"
+    },
+    {
+      "id": "koeln",
+      "name": "Koeln",
+      "region": "green"
+    },
+    {
+      "id": "konstanz",
+      "name": "Konstanz",
+      "region": "cyan"
+    },
+    {
+      "id": "leipzig",
+      "name": "Leipzig",
+      "region": "yellow"
+    },
+    {
+      "id": "luebeck",
+      "name": "Luebeck",
+      "region": "black"
+    },
+    {
+      "id": "magdeburg",
+      "name": "Magdeburg",
+      "region": "black"
+    },
+    {
+      "id": "mannheim",
+      "name": "Mannheim",
+      "region": "green"
+    },
+    {
+      "id": "muenchen",
+      "name": "Muenchen",
+      "region": "cyan"
+    },
+    {
+      "id": "muenster",
+      "name": "Muenster",
+      "region": "magenta"
+    },
+    {
+      "id": "nuernberg",
+      "name": "Nuernberg",
+      "region": "yellow"
+    },
+    {
+      "id": "osnabrueck",
+      "name": "Osnabrueck",
+      "region": "magenta"
+    },
+    {
+      "id": "passau",
+      "name": "Passau",
+      "region": "cyan"
+    },
+    {
+      "id": "regensburg",
+      "name": "Regensburg",
+      "region": "cyan"
+    },
+    {
+      "id": "rostock",
+      "name": "Rostock",
+      "region": "black"
+    },
+    {
+      "id": "saarbruecken",
+      "name": "Saarbruecken",
+      "region": "green"
+    },
+    {
+      "id": "schwerin",
+      "name": "Schwerin",
+      "region": "black"
+    },
+    {
+      "id": "stuttgart",
+      "name": "Stuttgart",
+      "region": "cyan"
+    },
+    {
+      "id": "torgelow",
+      "name": "Torgelow",
+      "region": "black"
+    },
+    {
+      "id": "trier",
+      "name": "Trier",
+      "region": "green"
+    },
+    {
+      "id": "wiesbaden",
+      "name": "Wiesbaden",
+      "region": "green"
+    },
+    {
+      "id": "wilhelmshaven",
+      "name": "Wilhelmshaven",
+      "region": "blue"
+    },
+    {
+      "id": "wuerzburg",
+      "name": "Wuerzburg",
+      "region": "yellow"
+    }
+  ],
+  "connections": [
+    {
+      "city_1": "aachen",
+      "city_2": "duesseldorf",
+      "cost": 9
+    },
+    {
+      "city_1": "aachen",
+      "city_2": "koeln",
+      "cost": 7
+    },
+    {
+      "city_1": "aachen",
+      "city_2": "trier",
+      "cost": 19
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "konstanz",
+      "cost": 17
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "muenchen",
+      "cost": 6
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "nuernberg",
+      "cost": 18
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "regensburg",
+      "cost": 13
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "stuttgart",
+      "cost": 15
+    },
+    {
+      "city_1": "augsburg",
+      "city_2": "wuerzburg",
+      "cost": 19
+    },
+    {
+      "city_1": "berlin",
+      "city_2": "frankfurt_oder",
+      "cost": 6
+    },
+    {
+      "city_1": "berlin",
+      "city_2": "halle",
+      "cost": 17
+    },
+    {
+      "city_1": "berlin",
+      "city_2": "magdeburg",
+      "cost": 10
+    },
+    {
+      "city_1": "berlin",
+      "city_2": "schwerin",
+      "cost": 18
+    },
+    {
+      "city_1": "berlin",
+      "city_2": "torgelow",
+      "cost": 15
+    },
+    {
+      "city_1": "bremen",
+      "city_2": "cuxhaven",
+      "cost": 8
+    },
+    {
+      "city_1": "bremen",
+      "city_2": "hamburg",
+      "cost": 11
+    },
+    {
+      "city_1": "bremen",
+      "city_2": "hannover",
+      "cost": 10
+    },
+    {
+      "city_1": "bremen",
+      "city_2": "osnabrueck",
+      "cost": 11
+    },
+    {
+      "city_1": "bremen",
+      "city_2": "wilhelmshaven",
+      "cost": 11
+    },
+    {
+      "city_1": "cuxhaven",
+      "city_2": "hamburg",
+      "cost": 11
+    },
+    {
+      "city_1": "dortmund",
+      "city_2": "essen",
+      "cost": 4
+    },
+    {
+      "city_1": "dortmund",
+      "city_2": "frankfurt_main",
+      "cost": 20
+    },
+    {
+      "city_1": "dortmund",
+      "city_2": "kassel",
+      "cost": 18
+    },
+    {
+      "city_1": "dortmund",
+      "city_2": "koeln",
+      "cost": 10
+    },
+    {
+      "city_1": "dortmund",
+      "city_2": "muenster",
+      "cost": 2
+    },
+    {
+      "city_1": "dresden",
+      "city_2": "erfurt",
+      "cost": 19
+    },
+    {
+      "city_1": "dresden",
+      "city_2": "frankfurt_oder",
+      "cost": 16
+    },
+    {
+      "city_1": "dresden",
+      "city_2": "leipzig",
+      "cost": 13
+    },
+    {
+      "city_1": "duesseldorf",
+      "city_2": "essen",
+      "cost": 2
+    },
+    {
+      "city_1": "duesseldorf",
+      "city_2": "koeln",
+      "cost": 4
+    },
+    {
+      "city_1": "duisburg",
+      "city_2": "essen",
+      "cost": 0
+    },
+    {
+      "city_1": "erfurt",
+      "city_2": "fulda",
+      "cost": 13
+    },
+    {
+      "city_1": "erfurt",
+      "city_2": "halle",
+      "cost": 6
+    },
+    {
+      "city_1": "erfurt",
+      "city_2": "hannover",
+      "cost": 19
+    },
+    {
+      "city_1": "erfurt",
+      "city_2": "kassel",
+      "cost": 15
+    },
+    {
+      "city_1": "erfurt",
+      "city_2": "nuernberg",
+      "cost": 21
+    },
+    {
+      "city_1": "essen",
+      "city_2": "muenster",
+      "cost": 6
+    },
+    {
+      "city_1": "flensburg",
+      "city_2": "kiel",
+      "cost": 4
+    },
+    {
+      "city_1": "frankfurt_main",
+      "city_2": "fulda",
+      "cost": 8
+    },
+    {
+      "city_1": "frankfurt_main",
+      "city_2": "kassel",
+      "cost": 13
+    },
+    {
+      "city_1": "frankfurt_main",
+      "city_2": "wiesbaden",
+      "cost": 0
+    },
+    {
+      "city_1": "frankfurt_main",
+      "city_2": "wuerzburg",
+      "cost": 13
+    },
+    {
+      "city_1": "frankfurt_oder",
+      "city_2": "leipzig",
+      "cost": 21
+    },
+    {
+      "city_1": "freiburg",
+      "city_2": "konstanz",
+      "cost": 14
+    },
+    {
+      "city_1": "freiburg",
+      "city_2": "stuttgart",
+      "cost": 16
+    },
+    {
+      "city_1": "fulda",
+      "city_2": "kassel",
+      "cost": 8
+    },
+    {
+      "city_1": "fulda",
+      "city_2": "wuerzburg",
+      "cost": 11
+    },
+    {
+      "city_1": "halle",
+      "city_2": "leipzig",
+      "cost": 0
+    },
+    {
+      "city_1": "halle",
+      "city_2": "magdeburg",
+      "cost": 11
+    },
+    {
+      "city_1": "hamburg",
+      "city_2": "hannover",
+      "cost": 17
+    },
+    {
+      "city_1": "hamburg",
+      "city_2": "kiel",
+      "cost": 8
+    },
+    {
+      "city_1": "hamburg",
+      "city_2": "luebeck",
+      "cost": 6
+    },
+    {
+      "city_1": "hamburg",
+      "city_2": "schwerin",
+      "cost": 8
+    },
+    {
+      "city_1": "hannover",
+      "city_2": "kassel",
+      "cost": 15
+    },
+    {
+      "city_1": "hannover",
+      "city_2": "magdeburg",
+      "cost": 15
+    },
+    {
+      "city_1": "hannover",
+      "city_2": "osnabrueck",
+      "cost": 16
+    },
+    {
+      "city_1": "hannover",
+      "city_2": "schwerin",
+      "cost": 19
+    },
+    {
+      "city_1": "kassel",
+      "city_2": "osnabrueck",
+      "cost": 20
+    },
+    {
+      "city_1": "kiel",
+      "city_2": "luebeck",
+      "cost": 4
+    },
+    {
+      "city_1": "koeln",
+      "city_2": "trier",
+      "cost": 20
+    },
+    {
+      "city_1": "koeln",
+      "city_2": "wiesbaden",
+      "cost": 21
+    },
+    {
+      "city_1": "konstanz",
+      "city_2": "stuttgart",
+      "cost": 16
+    },
+    {
+      "city_1": "luebeck",
+      "city_2": "schwerin",
+      "cost": 6
+    },
+    {
+      "city_1": "magdeburg",
+      "city_2": "schwerin",
+      "cost": 16
+    },
+    {
+      "city_1": "mannheim",
+      "city_2": "saarbruecken",
+      "cost": 11
+    },
+    {
+      "city_1": "mannheim",
+      "city_2": "stuttgart",
+      "cost": 6
+    },
+    {
+      "city_1": "mannheim",
+      "city_2": "wiesbaden",
+      "cost": 11
+    },
+    {
+      "city_1": "mannheim",
+      "city_2": "wuerzburg",
+      "cost": 10
+    },
+    {
+      "city_1": "muenchen",
+      "city_2": "passau",
+      "cost": 14
+    },
+    {
+      "city_1": "muenchen",
+      "city_2": "regensburg",
+      "cost": 10
+    },
+    {
+      "city_1": "muenster",
+      "city_2": "osnabrueck",
+      "cost": 7
+    },
+    {
+      "city_1": "nuernberg",
+      "city_2": "regensburg",
+      "cost": 12
+    },
+    {
+      "city_1": "nuernberg",
+      "city_2": "wuerzburg",
+      "cost": 8
+    },
+    {
+      "city_1": "osnabrueck",
+      "city_2": "wilhelmshaven",
+      "cost": 14
+    },
+    {
+      "city_1": "passau",
+      "city_2": "regensburg",
+      "cost": 12
+    },
+    {
+      "city_1": "rostock",
+      "city_2": "schwerin",
+      "cost": 6
+    },
+    {
+      "city_1": "rostock",
+      "city_2": "torgelow",
+      "cost": 19
+    },
+    {
+      "city_1": "saarbruecken",
+      "city_2": "stuttgart",
+      "cost": 17
+    },
+    {
+      "city_1": "saarbruecken",
+      "city_2": "trier",
+      "cost": 11
+    },
+    {
+      "city_1": "saarbruecken",
+      "city_2": "wiesbaden",
+      "cost": 10
+    },
+    {
+      "city_1": "schwerin",
+      "city_2": "torgelow",
+      "cost": 19
+    },
+    {
+      "city_1": "stuttgart",
+      "city_2": "wuerzburg",
+      "cost": 12
+    },
+    {
+      "city_1": "trier",
+      "city_2": "wiesbaden",
+      "cost": 18
+    }
+  ],
+  "special_rules": [
+    "germany_no_uranium_resupply_after_plant_39"
+  ]
+}

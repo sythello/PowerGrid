@@ -1,0 +1,1745 @@
+from __future__ import annotations
+
+from itertools import combinations
+import random
+from dataclasses import dataclass, field, replace
+from typing import Any
+
+from .rules_data import (
+    CityDefinition,
+    ConnectionDefinition,
+    MapDefinition,
+    PowerPlantDefinition,
+    RegionDefinition,
+    RuleTables,
+    load_map,
+    load_power_plants,
+    load_rule_tables,
+)
+
+
+RESOURCE_TYPES = ("coal", "oil", "garbage", "uranium")
+CONTROLLER_TYPES = ("human", "ai")
+GAME_PHASES = ("setup", "determine_order", "auction", "buy_resources", "build_houses", "bureaucracy")
+ROUND_PHASES = ("determine_order", "auction", "buy_resources", "build_houses", "bureaucracy")
+PLAYER_COLORS = ("black", "purple", "green", "blue", "yellow", "red")
+HOUSES_PER_PLAYER = 22
+
+
+class ModelValidationError(ValueError):
+    """Raised when a model object is internally inconsistent."""
+
+
+@dataclass
+class SeatConfig:
+    player_id: str
+    name: str
+    controller: str = "human"
+
+    def __post_init__(self) -> None:
+        if not self.player_id:
+            raise ModelValidationError("player_id must be non-empty")
+        if not self.name:
+            raise ModelValidationError("player name must be non-empty")
+        if self.controller not in CONTROLLER_TYPES:
+            raise ModelValidationError(
+                f"controller must be one of {CONTROLLER_TYPES}, got {self.controller!r}"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "player_id": self.player_id,
+            "name": self.name,
+            "controller": self.controller,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "SeatConfig":
+        return cls(
+            player_id=payload["player_id"],
+            name=payload["name"],
+            controller=payload["controller"],
+        )
+
+
+@dataclass
+class GameConfig:
+    map_id: str
+    players: tuple[SeatConfig, ...]
+    seed: int = 0
+    selected_regions: tuple[str, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        self.players = tuple(self.players)
+        self.selected_regions = tuple(self.selected_regions)
+        if not self.map_id:
+            raise ModelValidationError("map_id must be non-empty")
+        if not 3 <= len(self.players) <= 6:
+            raise ModelValidationError("Power Grid v1 supports 3-6 players")
+        player_ids = [player.player_id for player in self.players]
+        if len(player_ids) != len(set(player_ids)):
+            raise ModelValidationError("player ids must be unique")
+        if len(self.selected_regions) != len(set(self.selected_regions)):
+            raise ModelValidationError("selected regions must be unique")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "map_id": self.map_id,
+            "players": [player.to_dict() for player in self.players],
+            "seed": self.seed,
+            "selected_regions": list(self.selected_regions),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "GameConfig":
+        return cls(
+            map_id=payload["map_id"],
+            players=tuple(SeatConfig.from_dict(player) for player in payload["players"]),
+            seed=int(payload["seed"]),
+            selected_regions=tuple(payload.get("selected_regions", [])),
+        )
+
+
+@dataclass
+class PowerPlantCard:
+    price: int
+    resource_types: tuple[str, ...]
+    resource_cost: int
+    output_cities: int
+    deck_back: str
+    is_hybrid: bool
+    is_ecological: bool
+
+    def __post_init__(self) -> None:
+        self.resource_types = tuple(self.resource_types)
+        if self.price <= 0:
+            raise ModelValidationError("power plant price must be positive")
+        if self.resource_cost < 0:
+            raise ModelValidationError("power plant resource cost cannot be negative")
+        if self.output_cities <= 0:
+            raise ModelValidationError("power plant output must be positive")
+        if self.deck_back not in {"plug", "socket"}:
+            raise ModelValidationError("deck_back must be 'plug' or 'socket'")
+        if self.is_ecological != (len(self.resource_types) == 0):
+            raise ModelValidationError("ecological flag must match resource types")
+        if self.is_hybrid and set(self.resource_types) != {"coal", "oil"}:
+            raise ModelValidationError("hybrid plants must use coal and oil")
+        if not self.is_hybrid and len(self.resource_types) > 1:
+            raise ModelValidationError("non-hybrid plants may only use one resource type")
+        if any(resource not in RESOURCE_TYPES for resource in self.resource_types):
+            raise ModelValidationError("unknown power plant resource type")
+
+    @property
+    def max_storage(self) -> int:
+        return self.resource_cost * 2
+
+    @classmethod
+    def from_definition(cls, definition: PowerPlantDefinition) -> "PowerPlantCard":
+        return cls(
+            price=definition.price,
+            resource_types=definition.resource_types,
+            resource_cost=definition.resource_cost,
+            output_cities=definition.output_cities,
+            deck_back=definition.deck_back,
+            is_hybrid=definition.is_hybrid,
+            is_ecological=definition.is_ecological,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "price": self.price,
+            "resource_types": list(self.resource_types),
+            "resource_cost": self.resource_cost,
+            "output_cities": self.output_cities,
+            "deck_back": self.deck_back,
+            "is_hybrid": self.is_hybrid,
+            "is_ecological": self.is_ecological,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PowerPlantCard":
+        return cls(
+            price=int(payload["price"]),
+            resource_types=tuple(payload["resource_types"]),
+            resource_cost=int(payload["resource_cost"]),
+            output_cities=int(payload["output_cities"]),
+            deck_back=payload["deck_back"],
+            is_hybrid=bool(payload["is_hybrid"]),
+            is_ecological=bool(payload["is_ecological"]),
+        )
+
+
+@dataclass
+class ResourceStorage:
+    coal: int = 0
+    oil: int = 0
+    hybrid_coal: int = 0
+    hybrid_oil: int = 0
+    garbage: int = 0
+    uranium: int = 0
+
+    def __post_init__(self) -> None:
+        self.coal = int(self.coal)
+        self.oil = int(self.oil)
+        self.hybrid_coal = int(self.hybrid_coal)
+        self.hybrid_oil = int(self.hybrid_oil)
+        self.garbage = int(self.garbage)
+        self.uranium = int(self.uranium)
+        if min(
+            self.coal,
+            self.oil,
+            self.hybrid_coal,
+            self.hybrid_oil,
+            self.garbage,
+            self.uranium,
+        ) < 0:
+            raise ModelValidationError("resource storage values cannot be negative")
+
+    @property
+    def hybrid_used(self) -> int:
+        return self.hybrid_coal + self.hybrid_oil
+
+    def total(self, resource: str) -> int:
+        _validate_resource_name(resource)
+        if resource == "coal":
+            return self.coal + self.hybrid_coal
+        if resource == "oil":
+            return self.oil + self.hybrid_oil
+        return getattr(self, resource)
+
+    def resource_totals(self) -> dict[str, int]:
+        return {resource: self.total(resource) for resource in RESOURCE_TYPES}
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "coal": self.coal,
+            "oil": self.oil,
+            "hybrid_coal": self.hybrid_coal,
+            "hybrid_oil": self.hybrid_oil,
+            "garbage": self.garbage,
+            "uranium": self.uranium,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ResourceStorage":
+        return cls(
+            coal=int(payload.get("coal", 0)),
+            oil=int(payload.get("oil", 0)),
+            hybrid_coal=int(payload.get("hybrid_coal", 0)),
+            hybrid_oil=int(payload.get("hybrid_oil", 0)),
+            garbage=int(payload.get("garbage", 0)),
+            uranium=int(payload.get("uranium", 0)),
+        )
+
+
+@dataclass
+class PreparedDeck:
+    current_market: tuple[PowerPlantCard, ...]
+    future_market: tuple[PowerPlantCard, ...]
+    draw_stack: tuple[PowerPlantCard, ...]
+    step_3_card_pending: bool
+    removed_plant_prices: tuple[int, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        self.current_market = tuple(self.current_market)
+        self.future_market = tuple(self.future_market)
+        self.draw_stack = tuple(self.draw_stack)
+        self.removed_plant_prices = tuple(self.removed_plant_prices)
+        if len(self.current_market) != 4 or len(self.future_market) != 4:
+            raise ModelValidationError("prepared deck must expose 4 current and 4 future plants")
+        if not self.draw_stack:
+            raise ModelValidationError("prepared deck draw stack cannot be empty")
+        all_prices = (
+            [plant.price for plant in self.current_market]
+            + [plant.price for plant in self.future_market]
+            + [plant.price for plant in self.draw_stack]
+        )
+        if len(all_prices) != len(set(all_prices)):
+            raise ModelValidationError("prepared deck may not duplicate visible or draw-stack plants")
+        if [plant.price for plant in self.current_market] != sorted(
+            plant.price for plant in self.current_market
+        ):
+            raise ModelValidationError("current market must be sorted by price")
+        if [plant.price for plant in self.future_market] != sorted(
+            plant.price for plant in self.future_market
+        ):
+            raise ModelValidationError("future market must be sorted by price")
+
+
+@dataclass
+class ResourceMarket:
+    market: dict[str, dict[int, int]]
+    supply: dict[str, int]
+
+    def __post_init__(self) -> None:
+        self.market = {
+            resource: {int(price): int(amount) for price, amount in price_bands.items()}
+            for resource, price_bands in self.market.items()
+        }
+        self.supply = {resource: int(amount) for resource, amount in self.supply.items()}
+        if set(self.market) != set(RESOURCE_TYPES):
+            raise ModelValidationError("resource market must cover coal, oil, garbage, and uranium")
+        if set(self.supply) != set(RESOURCE_TYPES):
+            raise ModelValidationError("resource supply must cover coal, oil, garbage, and uranium")
+        for resource in RESOURCE_TYPES:
+            if any(amount < 0 for amount in self.market[resource].values()):
+                raise ModelValidationError(f"{resource} market counts cannot be negative")
+            if self.supply[resource] < 0:
+                raise ModelValidationError(f"{resource} supply cannot be negative")
+
+    @classmethod
+    def from_rule_tables(cls, rules: RuleTables) -> "ResourceMarket":
+        market: dict[str, dict[int, int]] = {}
+        supply: dict[str, int] = {}
+        for resource in RESOURCE_TYPES:
+            track = rules.resource_market_tracks[resource]
+            capacities = {int(price): int(amount) for price, amount in track["capacity_by_price"].items()}
+            starting_prices = {int(price) for price in track["starting_prices"]}
+            market[resource] = {
+                price: capacity if price in starting_prices else 0
+                for price, capacity in sorted(capacities.items())
+            }
+            supply[resource] = int(rules.resource_supply[resource]) - sum(market[resource].values())
+        return cls(market=market, supply=supply)
+
+    def total_in_market(self, resource: str) -> int:
+        return sum(self.market[resource].values())
+
+    def available_unit_prices(self, resource: str) -> tuple[int, ...]:
+        _validate_resource_name(resource)
+        prices: list[int] = []
+        for price, amount in sorted(self.market[resource].items()):
+            prices.extend([price] * amount)
+        return tuple(prices)
+
+    def quote_purchase_cost(self, resource: str, amount: int) -> int:
+        _validate_resource_name(resource)
+        if amount < 0:
+            raise ModelValidationError("resource purchase amount cannot be negative")
+        available_prices = self.available_unit_prices(resource)
+        if amount > len(available_prices):
+            raise ModelValidationError(f"not enough {resource} available in the market")
+        return sum(available_prices[:amount])
+
+    def remove_from_market(self, resource: str, amount: int) -> "ResourceMarket":
+        _validate_resource_name(resource)
+        if amount < 0:
+            raise ModelValidationError("resource removal amount cannot be negative")
+        if amount == 0:
+            return self
+        if amount > self.total_in_market(resource):
+            raise ModelValidationError(f"not enough {resource} available in the market")
+        updated_market = {
+            name: dict(price_bands) for name, price_bands in self.market.items()
+        }
+        remaining = amount
+        for price in sorted(updated_market[resource]):
+            if remaining == 0:
+                break
+            available = updated_market[resource][price]
+            if available == 0:
+                continue
+            removed = min(available, remaining)
+            updated_market[resource][price] -= removed
+            remaining -= removed
+        return ResourceMarket(market=updated_market, supply=dict(self.supply))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "market": {
+                resource: {str(price): amount for price, amount in price_bands.items()}
+                for resource, price_bands in self.market.items()
+            },
+            "supply": dict(self.supply),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ResourceMarket":
+        return cls(
+            market={
+                resource: {int(price): int(amount) for price, amount in price_bands.items()}
+                for resource, price_bands in payload["market"].items()
+            },
+            supply={resource: int(amount) for resource, amount in payload["supply"].items()},
+        )
+
+
+@dataclass
+class PlayerState:
+    player_id: str
+    name: str
+    controller: str
+    color: str
+    elektro: int
+    houses_in_supply: int
+    network_city_ids: tuple[str, ...] = field(default_factory=tuple)
+    power_plants: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
+    resource_storage: ResourceStorage = field(default_factory=ResourceStorage)
+    turn_order_position: int = 0
+
+    def __post_init__(self) -> None:
+        self.network_city_ids = tuple(self.network_city_ids)
+        self.power_plants = tuple(self.power_plants)
+        if not isinstance(self.resource_storage, ResourceStorage):
+            self.resource_storage = ResourceStorage.from_dict(dict(self.resource_storage))
+        if self.controller not in CONTROLLER_TYPES:
+            raise ModelValidationError("player controller must be human or ai")
+        if self.elektro < 0:
+            raise ModelValidationError("player elektro cannot be negative")
+        if self.houses_in_supply < 0:
+            raise ModelValidationError("player houses_in_supply cannot be negative")
+        if self.houses_in_supply + len(self.network_city_ids) != HOUSES_PER_PLAYER:
+            raise ModelValidationError("player houses must add up to 22")
+        if len(set(self.network_city_ids)) != len(self.network_city_ids):
+            raise ModelValidationError("player network cannot contain duplicate cities")
+        plant_prices = [plant.price for plant in self.power_plants]
+        if len(plant_prices) != len(set(plant_prices)):
+            raise ModelValidationError("player power plants must be unique by price")
+        if self.turn_order_position < 0:
+            raise ModelValidationError("turn order position cannot be negative")
+        if not _resource_storage_fits_power_plants(self.resource_storage, self.power_plants):
+            raise ModelValidationError("player resource storage exceeds available storage spaces")
+
+    @property
+    def connected_city_count(self) -> int:
+        return len(self.network_city_ids)
+
+    @property
+    def largest_power_plant(self) -> int:
+        return max((plant.price for plant in self.power_plants), default=0)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "player_id": self.player_id,
+            "name": self.name,
+            "controller": self.controller,
+            "color": self.color,
+            "elektro": self.elektro,
+            "houses_in_supply": self.houses_in_supply,
+            "network_city_ids": list(self.network_city_ids),
+            "power_plants": [plant.to_dict() for plant in self.power_plants],
+            "resource_storage": self.resource_storage.to_dict(),
+            "turn_order_position": self.turn_order_position,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PlayerState":
+        return cls(
+            player_id=payload["player_id"],
+            name=payload["name"],
+            controller=payload["controller"],
+            color=payload["color"],
+            elektro=int(payload["elektro"]),
+            houses_in_supply=int(payload["houses_in_supply"]),
+            network_city_ids=tuple(payload.get("network_city_ids", [])),
+            power_plants=tuple(
+                PowerPlantCard.from_dict(plant) for plant in payload.get("power_plants", [])
+            ),
+            resource_storage=ResourceStorage.from_dict(payload.get("resource_storage", {})),
+            turn_order_position=int(payload["turn_order_position"]),
+        )
+
+
+@dataclass
+class Action:
+    action_type: str
+    player_id: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.action_type:
+            raise ModelValidationError("action_type must be non-empty")
+        if not self.player_id:
+            raise ModelValidationError("player_id must be non-empty")
+        self.payload = dict(self.payload)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action_type": self.action_type,
+            "player_id": self.player_id,
+            "payload": dict(self.payload),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "Action":
+        return cls(
+            action_type=payload["action_type"],
+            player_id=payload["player_id"],
+            payload=dict(payload.get("payload", {})),
+        )
+
+
+@dataclass
+class DecisionRequest:
+    player_id: str
+    decision_type: str
+    prompt: str
+    legal_actions: tuple[Action, ...] = field(default_factory=tuple)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.legal_actions = tuple(self.legal_actions)
+        self.metadata = dict(self.metadata)
+        if not self.player_id:
+            raise ModelValidationError("decision request player_id must be non-empty")
+        if not self.decision_type:
+            raise ModelValidationError("decision_type must be non-empty")
+        if not self.prompt:
+            raise ModelValidationError("decision prompt must be non-empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "player_id": self.player_id,
+            "decision_type": self.decision_type,
+            "prompt": self.prompt,
+            "legal_actions": [action.to_dict() for action in self.legal_actions],
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "DecisionRequest":
+        return cls(
+            player_id=payload["player_id"],
+            decision_type=payload["decision_type"],
+            prompt=payload["prompt"],
+            legal_actions=tuple(Action.from_dict(action) for action in payload.get("legal_actions", [])),
+            metadata=dict(payload.get("metadata", {})),
+        )
+
+
+@dataclass
+class AuctionState:
+    current_chooser_id: str | None = None
+    discount_token_plant_price: int | None = None
+    players_with_plants: tuple[str, ...] = field(default_factory=tuple)
+    players_passed_phase: tuple[str, ...] = field(default_factory=tuple)
+    active_plant_price: int | None = None
+    current_bid: int | None = None
+    highest_bidder_id: str | None = None
+    active_bidders: tuple[str, ...] = field(default_factory=tuple)
+    next_bidder_id: str | None = None
+
+    def __post_init__(self) -> None:
+        self.players_with_plants = tuple(self.players_with_plants)
+        self.players_passed_phase = tuple(self.players_passed_phase)
+        self.active_bidders = tuple(self.active_bidders)
+        if len(set(self.players_with_plants)) != len(self.players_with_plants):
+            raise ModelValidationError("auction buyers must be unique")
+        if len(set(self.players_passed_phase)) != len(self.players_passed_phase):
+            raise ModelValidationError("auction phase passes must be unique")
+        if set(self.players_with_plants) & set(self.players_passed_phase):
+            raise ModelValidationError("auction buyers and phase passes may not overlap")
+        has_active_auction = self.active_plant_price is not None
+        if has_active_auction:
+            if self.current_bid is None or self.highest_bidder_id is None:
+                raise ModelValidationError("active auction must define a bid and highest bidder")
+            if self.current_bid < 1:
+                raise ModelValidationError("active auction bid must be positive")
+            if len(self.active_bidders) < 1:
+                raise ModelValidationError("active auction must have at least one bidder")
+            if self.highest_bidder_id not in self.active_bidders:
+                raise ModelValidationError("highest bidder must still be active in the auction")
+            if len(self.active_bidders) > 1 and self.next_bidder_id is None:
+                raise ModelValidationError("multi-player auction must define the next bidder")
+            if self.next_bidder_id is not None and self.next_bidder_id not in self.active_bidders:
+                raise ModelValidationError("next bidder must still be active in the auction")
+        else:
+            if any(
+                value is not None
+                for value in (self.current_bid, self.highest_bidder_id, self.next_bidder_id)
+            ):
+                raise ModelValidationError("inactive auction may not define bid or bidder metadata")
+            if self.active_bidders:
+                raise ModelValidationError("inactive auction may not carry active bidders")
+
+    @property
+    def has_active_auction(self) -> bool:
+        return self.active_plant_price is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "current_chooser_id": self.current_chooser_id,
+            "discount_token_plant_price": self.discount_token_plant_price,
+            "players_with_plants": list(self.players_with_plants),
+            "players_passed_phase": list(self.players_passed_phase),
+            "active_plant_price": self.active_plant_price,
+            "current_bid": self.current_bid,
+            "highest_bidder_id": self.highest_bidder_id,
+            "active_bidders": list(self.active_bidders),
+            "next_bidder_id": self.next_bidder_id,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "AuctionState":
+        return cls(
+            current_chooser_id=payload.get("current_chooser_id"),
+            discount_token_plant_price=payload.get("discount_token_plant_price"),
+            players_with_plants=tuple(payload.get("players_with_plants", [])),
+            players_passed_phase=tuple(payload.get("players_passed_phase", [])),
+            active_plant_price=payload.get("active_plant_price"),
+            current_bid=payload.get("current_bid"),
+            highest_bidder_id=payload.get("highest_bidder_id"),
+            active_bidders=tuple(payload.get("active_bidders", [])),
+            next_bidder_id=payload.get("next_bidder_id"),
+        )
+
+
+@dataclass
+class GameState:
+    config: GameConfig
+    game_map: MapDefinition
+    rules: RuleTables
+    players: tuple[PlayerState, ...]
+    player_order: tuple[str, ...]
+    resource_market: ResourceMarket
+    current_market: tuple[PowerPlantCard, ...]
+    future_market: tuple[PowerPlantCard, ...]
+    power_plant_draw_stack: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
+    step_3_card_pending: bool = True
+    round_number: int = 0
+    step: int = 1
+    phase: str = "setup"
+    selected_regions: tuple[str, ...] = field(default_factory=tuple)
+    auction_state: AuctionState | None = None
+    pending_decision: DecisionRequest | None = None
+
+    def __post_init__(self) -> None:
+        self.players = tuple(self.players)
+        self.player_order = tuple(self.player_order)
+        self.current_market = tuple(self.current_market)
+        self.future_market = tuple(self.future_market)
+        self.power_plant_draw_stack = tuple(self.power_plant_draw_stack)
+        self.selected_regions = tuple(self.selected_regions)
+        if self.phase not in GAME_PHASES:
+            raise ModelValidationError(f"phase must be one of {GAME_PHASES}")
+        if self.step not in {1, 2, 3}:
+            raise ModelValidationError("step must be 1, 2, or 3")
+        if self.round_number < 0:
+            raise ModelValidationError("round number cannot be negative")
+        player_ids = [player.player_id for player in self.players]
+        if len(player_ids) != len(set(player_ids)):
+            raise ModelValidationError("game state player ids must be unique")
+        if tuple(sorted(self.player_order)) != tuple(sorted(player_ids)):
+            raise ModelValidationError("player_order must contain each player exactly once")
+        order_positions = {player_id: index + 1 for index, player_id in enumerate(self.player_order)}
+        for player in self.players:
+            if player.turn_order_position != order_positions[player.player_id]:
+                raise ModelValidationError("player turn_order_position must match player_order")
+        region_ids = {region.id for region in self.game_map.regions}
+        if any(region not in region_ids for region in self.selected_regions):
+            raise ModelValidationError("selected regions must exist on the chosen map")
+        required_regions = self.rules.player_count_rules[len(self.players)]["areas"]
+        if self.selected_regions and len(self.selected_regions) != required_regions:
+            raise ModelValidationError("selected regions must match the required area count")
+        if len(self.current_market) != 4 or len(self.future_market) != 4:
+            raise ModelValidationError("initial game state must contain 4 current and 4 future plants")
+        current_prices = [plant.price for plant in self.current_market]
+        future_prices = [plant.price for plant in self.future_market]
+        if current_prices != sorted(current_prices) or future_prices != sorted(future_prices):
+            raise ModelValidationError("power plant markets must be sorted by price")
+        if set(current_prices) & set(future_prices):
+            raise ModelValidationError("current and future markets may not overlap")
+        stack_prices = [plant.price for plant in self.power_plant_draw_stack]
+        if (set(current_prices) | set(future_prices)) & set(stack_prices):
+            raise ModelValidationError("draw stack may not overlap with visible markets")
+        if self.auction_state is not None:
+            if (
+                self.auction_state.discount_token_plant_price is not None
+                and self.auction_state.discount_token_plant_price not in current_prices
+            ):
+                raise ModelValidationError("auction discount token must mark a current-market plant")
+            known_ids = set(player_ids)
+            referenced_ids = set(self.auction_state.players_with_plants) | set(
+                self.auction_state.players_passed_phase
+            )
+            if self.auction_state.current_chooser_id is not None:
+                referenced_ids.add(self.auction_state.current_chooser_id)
+            if self.auction_state.highest_bidder_id is not None:
+                referenced_ids.add(self.auction_state.highest_bidder_id)
+            if self.auction_state.next_bidder_id is not None:
+                referenced_ids.add(self.auction_state.next_bidder_id)
+            referenced_ids.update(self.auction_state.active_bidders)
+            if not referenced_ids <= known_ids:
+                raise ModelValidationError("auction state may only reference known players")
+        if self.pending_decision and self.pending_decision.player_id not in player_ids:
+            raise ModelValidationError("pending decision must belong to a known player")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "config": self.config.to_dict(),
+            "game_map": _serialize_map_definition(self.game_map),
+            "rules": _serialize_rule_tables(self.rules),
+            "players": [player.to_dict() for player in self.players],
+            "player_order": list(self.player_order),
+            "resource_market": self.resource_market.to_dict(),
+            "current_market": [plant.to_dict() for plant in self.current_market],
+            "future_market": [plant.to_dict() for plant in self.future_market],
+            "power_plant_draw_stack": [plant.to_dict() for plant in self.power_plant_draw_stack],
+            "step_3_card_pending": self.step_3_card_pending,
+            "round_number": self.round_number,
+            "step": self.step,
+            "phase": self.phase,
+            "selected_regions": list(self.selected_regions),
+            "auction_state": self.auction_state.to_dict() if self.auction_state is not None else None,
+            "pending_decision": (
+                self.pending_decision.to_dict() if self.pending_decision is not None else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "GameState":
+        return cls(
+            config=GameConfig.from_dict(payload["config"]),
+            game_map=_deserialize_map_definition(payload["game_map"]),
+            rules=_deserialize_rule_tables(payload["rules"]),
+            players=tuple(PlayerState.from_dict(player) for player in payload["players"]),
+            player_order=tuple(payload["player_order"]),
+            resource_market=ResourceMarket.from_dict(payload["resource_market"]),
+            current_market=tuple(
+                PowerPlantCard.from_dict(plant) for plant in payload["current_market"]
+            ),
+            future_market=tuple(
+                PowerPlantCard.from_dict(plant) for plant in payload["future_market"]
+            ),
+            power_plant_draw_stack=tuple(
+                PowerPlantCard.from_dict(plant)
+                for plant in payload.get("power_plant_draw_stack", [])
+            ),
+            step_3_card_pending=bool(payload.get("step_3_card_pending", True)),
+            round_number=int(payload["round_number"]),
+            step=int(payload["step"]),
+            phase=payload["phase"],
+            selected_regions=tuple(payload.get("selected_regions", [])),
+            auction_state=(
+                AuctionState.from_dict(payload["auction_state"])
+                if payload.get("auction_state") is not None
+                else None
+            ),
+            pending_decision=(
+                DecisionRequest.from_dict(payload["pending_decision"])
+                if payload.get("pending_decision") is not None
+                else None
+            ),
+        )
+
+
+def create_initial_state(
+    config: GameConfig,
+    data_root: str | None = None,
+) -> GameState:
+    game_map = load_map(config.map_id, data_root=data_root)
+    rules = load_rule_tables(data_root=data_root)
+    selected_regions = select_play_areas(
+        game_map,
+        len(config.players),
+        chosen_region_ids=config.selected_regions or None,
+        data_root=data_root,
+    )
+
+    rng = random.Random(config.seed)
+    player_order = [player.player_id for player in config.players]
+    rng.shuffle(player_order)
+    turn_order_positions = {player_id: index + 1 for index, player_id in enumerate(player_order)}
+
+    players = tuple(
+        PlayerState(
+            player_id=seat.player_id,
+            name=seat.name,
+            controller=seat.controller,
+            color=PLAYER_COLORS[index],
+            elektro=rules.starting_money,
+            houses_in_supply=rules.houses_per_player,
+            network_city_ids=(),
+            power_plants=(),
+            turn_order_position=turn_order_positions[seat.player_id],
+        )
+        for index, seat in enumerate(config.players)
+    )
+
+    resource_market = ResourceMarket.from_rule_tables(rules)
+    prepared_deck = prepare_plant_deck(len(config.players), config.seed, data_root=data_root)
+
+    return GameState(
+        config=config,
+        game_map=game_map,
+        rules=rules,
+        players=players,
+        player_order=tuple(player_order),
+        resource_market=resource_market,
+        current_market=prepared_deck.current_market,
+        future_market=prepared_deck.future_market,
+        power_plant_draw_stack=prepared_deck.draw_stack,
+        step_3_card_pending=prepared_deck.step_3_card_pending,
+        round_number=0,
+        step=1,
+        phase="setup",
+        selected_regions=selected_regions,
+        pending_decision=None,
+    )
+
+
+def make_default_seat_configs(player_count: int, ai_players: int = 0) -> tuple[SeatConfig, ...]:
+    if player_count < 1:
+        raise ModelValidationError("player_count must be positive")
+    if not 0 <= ai_players <= player_count:
+        raise ModelValidationError("ai_players must be between 0 and player_count")
+    seats = []
+    for index in range(player_count):
+        controller = "ai" if index < ai_players else "human"
+        seats.append(
+            SeatConfig(
+                player_id=f"p{index + 1}",
+                name=f"Player {index + 1}",
+                controller=controller,
+            )
+        )
+    return tuple(seats)
+
+
+def prepare_plant_deck(
+    player_count: int,
+    seed: int,
+    data_root: str | None = None,
+) -> PreparedDeck:
+    if not 3 <= player_count <= 6:
+        raise ModelValidationError("prepare_plant_deck supports 3-6 players")
+
+    rules = load_rule_tables(data_root=data_root)
+    definitions = load_power_plants(data_root=data_root)
+    rng = random.Random(seed)
+
+    plug_plants = [
+        PowerPlantCard.from_definition(definition)
+        for definition in definitions
+        if definition.deck_back == "plug"
+    ]
+    socket_plants = [
+        PowerPlantCard.from_definition(definition)
+        for definition in definitions
+        if definition.deck_back == "socket"
+    ]
+
+    rng.shuffle(plug_plants)
+    opening_market = tuple(sorted(plug_plants[:8], key=lambda plant: plant.price))
+    set_aside_top_card = plug_plants[8]
+    remaining_plugs = plug_plants[9:]
+
+    rng.shuffle(socket_plants)
+    player_rules = rules.player_count_rules[player_count]
+    removed_plugs = remaining_plugs[: player_rules["remove_plug_plants"]]
+    remaining_plugs = remaining_plugs[player_rules["remove_plug_plants"] :]
+    removed_sockets = socket_plants[: player_rules["remove_socket_plants"]]
+    remaining_sockets = socket_plants[player_rules["remove_socket_plants"] :]
+
+    shuffled_tail = list(remaining_plugs + remaining_sockets)
+    rng.shuffle(shuffled_tail)
+
+    return PreparedDeck(
+        current_market=opening_market[:4],
+        future_market=opening_market[4:8],
+        draw_stack=tuple([set_aside_top_card] + shuffled_tail),
+        step_3_card_pending=True,
+        removed_plant_prices=tuple(
+            sorted(plant.price for plant in (*removed_plugs, *removed_sockets))
+        ),
+    )
+
+
+def select_play_areas(
+    game_map: MapDefinition,
+    player_count: int,
+    chosen_region_ids: tuple[str, ...] | list[str] | None = None,
+    data_root: str | None = None,
+) -> tuple[str, ...]:
+    if not 3 <= player_count <= 6:
+        raise ModelValidationError("select_play_areas supports 3-6 players")
+    rules = load_rule_tables(data_root=data_root)
+    required_count = rules.player_count_rules[player_count]["areas"]
+    available_regions = tuple(sorted(region.id for region in game_map.regions))
+
+    if chosen_region_ids is not None:
+        selected = tuple(chosen_region_ids)
+        _validate_play_areas(game_map, selected, required_count)
+        return tuple(sorted(selected))
+
+    for candidate in combinations(available_regions, required_count):
+        if _are_regions_contiguous(game_map, candidate):
+            return tuple(candidate)
+    raise ModelValidationError("no contiguous playing zone could be selected for this map")
+
+
+def initialize_game(
+    config: GameConfig,
+    controllers: dict[str, Any] | None,
+    data_root: str | None = None,
+) -> GameState:
+    expected_player_ids = {seat.player_id for seat in config.players}
+    if controllers is not None:
+        controller_ids = set(controllers)
+        if controller_ids != expected_player_ids:
+            raise ModelValidationError("controllers must match the configured player ids exactly")
+        if any(controller is None for controller in controllers.values()):
+            raise ModelValidationError("controllers may not contain None values")
+    return create_initial_state(config, data_root=data_root)
+
+
+def list_auctionable_plants(state: GameState) -> tuple[PowerPlantCard, ...]:
+    if state.step == 3:
+        return tuple(sorted((*state.current_market, *state.future_market), key=lambda plant: plant.price))
+    return state.current_market
+
+
+def start_auction(
+    state: GameState,
+    player_id: str,
+    plant_id: int,
+    bid: int,
+) -> GameState:
+    state = _require_auction_phase(state)
+    auction_state = state.auction_state
+    assert auction_state is not None
+    if state.pending_decision is not None:
+        raise ModelValidationError("resolve the pending decision before starting a new auction")
+    if auction_state.has_active_auction:
+        raise ModelValidationError("an auction is already in progress")
+    if player_id != auction_state.current_chooser_id:
+        raise ModelValidationError("only the current chooser may start an auction")
+    if player_id in auction_state.players_with_plants:
+        raise ModelValidationError("a player may buy only one power plant per round")
+    if player_id in auction_state.players_passed_phase:
+        raise ModelValidationError("a player who passed the phase may not start an auction")
+
+    plant = _get_auctionable_plant(state, plant_id)
+    minimum_bid = _minimum_opening_bid(state, plant)
+    if bid < minimum_bid:
+        raise ModelValidationError(
+            f"opening bid must be at least {minimum_bid} for power plant {plant.price}"
+        )
+    player = _get_player(state, player_id)
+    if bid > player.elektro:
+        raise ModelValidationError("opening bid may not exceed the player's Elektro")
+
+    eligible_bidders = _eligible_auction_participants(state, auction_state)
+    bidder_order = _rotate_player_order(eligible_bidders, player_id)
+    if len(bidder_order) == 1:
+        return _award_auction_purchase(
+            state,
+            winner_id=player_id,
+            plant=plant,
+            price_paid=bid,
+            chooser_id=player_id,
+        )
+
+    updated_auction = replace(
+        auction_state,
+        active_plant_price=plant.price,
+        current_bid=bid,
+        highest_bidder_id=player_id,
+        active_bidders=bidder_order,
+        next_bidder_id=_next_player_in_sequence(bidder_order, player_id),
+    )
+    return replace(state, auction_state=updated_auction)
+
+
+def raise_bid(state: GameState, player_id: str, amount: int) -> GameState:
+    state = _require_auction_phase(state)
+    auction_state = state.auction_state
+    assert auction_state is not None
+    if state.pending_decision is not None:
+        raise ModelValidationError("resolve the pending decision before raising the bid")
+    if not auction_state.has_active_auction:
+        raise ModelValidationError("there is no active auction to bid in")
+    if player_id != auction_state.next_bidder_id:
+        raise ModelValidationError("it is not this player's turn to bid")
+    if amount <= int(auction_state.current_bid):
+        raise ModelValidationError("bid raises must exceed the current bid")
+    player = _get_player(state, player_id)
+    if amount > player.elektro:
+        raise ModelValidationError("bid raises may not exceed the player's Elektro")
+
+    updated_auction = replace(
+        auction_state,
+        current_bid=amount,
+        highest_bidder_id=player_id,
+        next_bidder_id=_next_player_in_sequence(auction_state.active_bidders, player_id),
+    )
+    return replace(state, auction_state=updated_auction)
+
+
+def pass_auction(state: GameState, player_id: str) -> GameState:
+    state = _require_auction_phase(state)
+    auction_state = state.auction_state
+    assert auction_state is not None
+    if state.pending_decision is not None:
+        raise ModelValidationError("resolve the pending decision before passing")
+
+    if not auction_state.has_active_auction:
+        if player_id != auction_state.current_chooser_id:
+            raise ModelValidationError("only the current chooser may pass the auction phase")
+        if state.round_number == 1:
+            raise ModelValidationError("players must buy a power plant in the first round")
+        updated_auction = replace(
+            auction_state,
+            players_passed_phase=tuple((*auction_state.players_passed_phase, player_id)),
+            current_chooser_id=_next_auction_chooser(
+                state.player_order,
+                player_id,
+                players_with_plants=auction_state.players_with_plants,
+                players_passed_phase=tuple((*auction_state.players_passed_phase, player_id)),
+            ),
+        )
+        updated_state = replace(state, auction_state=updated_auction)
+        return _maybe_finish_auction_phase(updated_state)
+
+    if player_id != auction_state.next_bidder_id:
+        raise ModelValidationError("only the next bidder may pass in an active auction")
+
+    remaining_bidders = tuple(
+        bidder_id for bidder_id in auction_state.active_bidders if bidder_id != player_id
+    )
+    if len(remaining_bidders) == 1:
+        winning_plant = _get_plant_from_visible_market(state, int(auction_state.active_plant_price))
+        return _award_auction_purchase(
+            state,
+            winner_id=str(auction_state.highest_bidder_id),
+            plant=winning_plant,
+            price_paid=int(auction_state.current_bid),
+            chooser_id=str(auction_state.current_chooser_id),
+        )
+
+    updated_auction = replace(
+        auction_state,
+        active_bidders=remaining_bidders,
+        next_bidder_id=_next_remaining_player(auction_state.active_bidders, player_id, remaining_bidders),
+    )
+    return replace(state, auction_state=updated_auction)
+
+
+def resolve_auction_round(state: GameState) -> GameState:
+    state = _require_auction_phase(state)
+    auction_state = state.auction_state
+    assert auction_state is not None
+    if state.pending_decision is not None:
+        raise ModelValidationError("resolve the pending decision before ending the auction phase")
+    if auction_state.has_active_auction:
+        raise ModelValidationError("cannot end the auction phase while an auction is active")
+
+    eligible = _eligible_auction_participants(state, auction_state)
+    if eligible:
+        raise ModelValidationError("the auction phase is not complete yet")
+
+    visible_market_state = state
+    if auction_state.discount_token_plant_price is not None:
+        visible_market_state = _remove_visible_plant_and_refill(
+            state,
+            auction_state.discount_token_plant_price,
+            clear_discount_before_refill=True,
+        )
+
+    completed_state = replace(
+        visible_market_state,
+        phase="buy_resources",
+        auction_state=None,
+        pending_decision=None,
+    )
+    if completed_state.round_number == 1:
+        completed_state = _recalculate_player_order(completed_state)
+    return completed_state
+
+
+def replace_plant_if_needed(
+    state: GameState,
+    player_id: str,
+    discard_choice: int,
+) -> GameState:
+    if state.pending_decision is None:
+        raise ModelValidationError("there is no pending plant replacement decision")
+    if state.pending_decision.player_id != player_id:
+        raise ModelValidationError("the pending replacement decision belongs to another player")
+
+    player = _get_player(state, player_id)
+    max_plants = state.rules.player_count_rules[len(state.players)]["max_power_plants"]
+    if len(player.power_plants) <= max_plants:
+        return replace(state, pending_decision=None)
+    if discard_choice not in {plant.price for plant in player.power_plants}:
+        raise ModelValidationError("discard choice must be one of the player's power plants")
+
+    kept_plants = tuple(
+        sorted(
+            (plant for plant in player.power_plants if plant.price != discard_choice),
+            key=lambda plant: plant.price,
+        )
+    )
+    updated_player = replace(
+        player,
+        power_plants=kept_plants,
+        resource_storage=_normalize_resource_storage(player.resource_storage, kept_plants),
+    )
+    updated_state = _replace_player_on_state(state, updated_player)
+    updated_state = replace(updated_state, pending_decision=None)
+    if updated_state.phase == "auction" and updated_state.auction_state is not None:
+        return _maybe_finish_auction_phase(updated_state)
+    return updated_state
+
+
+def plant_storage_capacity(plant: PowerPlantCard) -> int:
+    return plant.max_storage
+
+
+def can_store_resources(player: PlayerState, mix: dict[str, int]) -> bool:
+    try:
+        normalized = _normalize_resource_mix(mix)
+    except ModelValidationError:
+        return False
+    if not normalized:
+        return True
+    totals = player.resource_storage.resource_totals()
+    for resource, amount in normalized.items():
+        totals[resource] += amount
+    normalized_storage = _normalize_resource_totals_into_storage(
+        totals,
+        _storage_space_capacities(player.power_plants),
+    )
+    return normalized_storage.resource_totals() == totals
+
+
+def legal_resource_purchases(state: GameState, player_id: str) -> tuple[Action, ...]:
+    player = _get_player(state, player_id)
+    actions: list[Action] = []
+    for resource in RESOURCE_TYPES:
+        market_prices = state.resource_market.available_unit_prices(resource)
+        if not market_prices:
+            continue
+        max_units = 0
+        for amount in range(1, len(market_prices) + 1):
+            if not can_store_resources(player, {resource: amount}):
+                break
+            max_units = amount
+        if max_units == 0:
+            continue
+        unit_prices = market_prices[:max_units]
+        max_affordable = 0
+        running_cost = 0
+        for index, price in enumerate(unit_prices, start=1):
+            running_cost += price
+            if running_cost <= player.elektro:
+                max_affordable = index
+            else:
+                break
+        if max_affordable == 0:
+            continue
+        actions.append(
+            Action(
+                action_type="buy_resource",
+                player_id=player_id,
+                payload={
+                    "resource": resource,
+                    "max_units": max_units,
+                    "max_affordable_units": max_affordable,
+                    "unit_prices": list(unit_prices),
+                },
+            )
+        )
+    return tuple(actions)
+
+
+def purchase_resources(
+    state: GameState,
+    player_id: str,
+    basket: dict[str, int] | dict[int | str, dict[str, int]],
+) -> GameState:
+    player = _get_player(state, player_id)
+    normalized_purchase = _normalize_purchase_request(basket)
+    if not normalized_purchase:
+        raise ModelValidationError("resource purchase basket cannot be empty")
+    if not can_store_resources(player, normalized_purchase):
+        raise ModelValidationError("player cannot store the requested resources")
+
+    total_cost = 0
+    updated_market = state.resource_market
+    for resource, amount in normalized_purchase.items():
+        if amount == 0:
+            continue
+        total_cost += updated_market.quote_purchase_cost(resource, amount)
+        updated_market = updated_market.remove_from_market(resource, amount)
+    if total_cost > player.elektro:
+        raise ModelValidationError("player cannot afford the requested resources")
+
+    updated_totals = player.resource_storage.resource_totals()
+    for resource, amount in normalized_purchase.items():
+        updated_totals[resource] += amount
+    updated_storage = _normalize_resource_totals_into_storage(
+        updated_totals,
+        _storage_space_capacities(player.power_plants),
+    )
+    updated_player = replace(
+        player,
+        elektro=player.elektro - total_cost,
+        resource_storage=updated_storage,
+    )
+    updated_state = _replace_player_on_state(state, updated_player)
+    return replace(updated_state, resource_market=updated_market)
+
+
+def refill_resource_market(
+    resource_market: ResourceMarket,
+    rules: RuleTables,
+    step: int,
+    player_count: int,
+) -> ResourceMarket:
+    if step not in {1, 2, 3}:
+        raise ModelValidationError("resource refill step must be 1, 2, or 3")
+    if player_count not in rules.player_count_rules:
+        raise ModelValidationError("unknown player count for resource refill")
+
+    refill_key = f"step_{step}"
+    refill_amounts = rules.player_count_rules[player_count]["resource_refill"][refill_key]
+    updated_market = {resource: dict(price_bands) for resource, price_bands in resource_market.market.items()}
+    updated_supply = dict(resource_market.supply)
+
+    for resource in RESOURCE_TYPES:
+        capacities = {
+            int(price): int(amount)
+            for price, amount in rules.resource_market_tracks[resource]["capacity_by_price"].items()
+        }
+        to_add = min(int(refill_amounts[resource]), updated_supply[resource])
+        for price in sorted(capacities, reverse=True):
+            if to_add == 0:
+                break
+            open_slots = capacities[price] - updated_market[resource].get(price, 0)
+            if open_slots <= 0:
+                continue
+            added = min(open_slots, to_add)
+            updated_market[resource][price] = updated_market[resource].get(price, 0) + added
+            updated_supply[resource] -= added
+            to_add -= added
+
+    return ResourceMarket(market=updated_market, supply=updated_supply)
+
+
+def advance_phase(state: GameState) -> GameState:
+    if state.phase == "setup":
+        auction_state = _create_auction_state(state, state.player_order[0])
+        return replace(
+            state,
+            phase="auction",
+            round_number=max(1, state.round_number or 1),
+            auction_state=auction_state,
+            pending_decision=None,
+        )
+    if state.phase == "determine_order":
+        auction_state = _create_auction_state(state, state.player_order[0])
+        return replace(state, phase="auction", auction_state=auction_state, pending_decision=None)
+    if state.phase == "auction":
+        return resolve_auction_round(state)
+    if state.phase == "buy_resources":
+        return replace(state, phase="build_houses")
+    if state.phase == "build_houses":
+        return replace(state, phase="bureaucracy")
+    if state.phase == "bureaucracy":
+        return advance_round(state)
+    raise ModelValidationError(f"cannot advance unknown phase {state.phase!r}")
+
+
+def advance_round(state: GameState) -> GameState:
+    if state.phase == "setup":
+        auction_state = _create_auction_state(state, state.player_order[0])
+        return replace(
+            state,
+            phase="auction",
+            round_number=1,
+            auction_state=auction_state,
+            pending_decision=None,
+        )
+    if state.phase != "bureaucracy":
+        raise ModelValidationError("advance_round may only be called from setup or bureaucracy")
+    return replace(
+        state,
+        phase="determine_order",
+        round_number=state.round_number + 1,
+        auction_state=None,
+        pending_decision=None,
+    )
+
+
+def _require_auction_phase(state: GameState) -> GameState:
+    if state.phase != "auction":
+        raise ModelValidationError("auction actions may only be used during the auction phase")
+    if state.auction_state is not None:
+        return state
+    return replace(state, auction_state=_create_auction_state(state, state.player_order[0]))
+
+
+def _get_player(state: GameState, player_id: str) -> PlayerState:
+    for player in state.players:
+        if player.player_id == player_id:
+            return player
+    raise ModelValidationError(f"unknown player {player_id!r}")
+
+
+def _validate_resource_name(resource: str) -> None:
+    if resource not in RESOURCE_TYPES:
+        raise ModelValidationError(f"unknown resource type {resource!r}")
+
+
+def _create_auction_state(state: GameState, chooser_id: str | None) -> AuctionState:
+    return AuctionState(
+        current_chooser_id=chooser_id,
+        discount_token_plant_price=min(
+            (plant.price for plant in state.current_market),
+            default=None,
+        ),
+    )
+
+
+def _replace_player_on_state(state: GameState, updated_player: PlayerState) -> GameState:
+    players = tuple(
+        updated_player if player.player_id == updated_player.player_id else player
+        for player in state.players
+    )
+    return replace(state, players=players)
+
+
+def _normalize_resource_mix(mix: dict[str, int]) -> dict[str, int]:
+    normalized: dict[str, int] = {}
+    for resource, amount in mix.items():
+        _validate_resource_name(resource)
+        normalized_amount = int(amount)
+        if normalized_amount < 0:
+            raise ModelValidationError("resource amounts cannot be negative")
+        if normalized_amount:
+            normalized[resource] = normalized_amount
+    return normalized
+
+
+def _storage_space_capacities(power_plants: tuple[PowerPlantCard, ...]) -> dict[str, int]:
+    capacities = {
+        "coal": 0,
+        "oil": 0,
+        "hybrid": 0,
+        "garbage": 0,
+        "uranium": 0,
+    }
+    for plant in power_plants:
+        contribution = plant_storage_capacity(plant)
+        if plant.is_ecological or contribution == 0:
+            continue
+        if plant.is_hybrid:
+            capacities["hybrid"] += contribution
+        else:
+            capacities[plant.resource_types[0]] += contribution
+    return capacities
+
+
+def _normalize_resource_totals_into_storage(
+    totals: dict[str, int],
+    capacities: dict[str, int],
+) -> ResourceStorage:
+    normalized = _normalize_resource_mix(totals)
+    coal_total = normalized.get("coal", 0)
+    oil_total = normalized.get("oil", 0)
+    garbage_total = normalized.get("garbage", 0)
+    uranium_total = normalized.get("uranium", 0)
+
+    coal_spaces = min(coal_total, capacities["coal"])
+    oil_spaces = min(oil_total, capacities["oil"])
+    garbage_spaces = min(garbage_total, capacities["garbage"])
+    uranium_spaces = min(uranium_total, capacities["uranium"])
+
+    remaining_coal = coal_total - coal_spaces
+    remaining_oil = oil_total - oil_spaces
+    hybrid_remaining = capacities["hybrid"]
+    hybrid_coal = min(remaining_coal, hybrid_remaining)
+    hybrid_remaining -= hybrid_coal
+    hybrid_oil = min(remaining_oil, hybrid_remaining)
+
+    return ResourceStorage(
+        coal=coal_spaces,
+        oil=oil_spaces,
+        hybrid_coal=hybrid_coal,
+        hybrid_oil=hybrid_oil,
+        garbage=garbage_spaces,
+        uranium=uranium_spaces,
+    )
+
+
+def _normalize_resource_storage(
+    storage: ResourceStorage,
+    power_plants: tuple[PowerPlantCard, ...],
+) -> ResourceStorage:
+    return _normalize_resource_totals_into_storage(
+        storage.resource_totals(),
+        _storage_space_capacities(power_plants),
+    )
+
+
+def _resource_storage_fits_power_plants(
+    storage: ResourceStorage,
+    power_plants: tuple[PowerPlantCard, ...],
+) -> bool:
+    return storage == _normalize_resource_storage(storage, power_plants)
+
+
+def _normalize_purchase_request(
+    basket: dict[str, int] | dict[int | str, dict[str, int]],
+) -> dict[str, int]:
+    if not basket:
+        return {}
+    first_value = next(iter(basket.values()))
+    if isinstance(first_value, dict):
+        aggregated = {resource: 0 for resource in RESOURCE_TYPES}
+        for mix in basket.values():
+            normalized = _normalize_resource_mix(mix)
+            for resource, amount in normalized.items():
+                aggregated[resource] += amount
+        return {resource: amount for resource, amount in aggregated.items() if amount}
+    return _normalize_resource_mix(basket)  # type: ignore[arg-type]
+
+
+def _get_auctionable_plant(state: GameState, plant_id: int) -> PowerPlantCard:
+    for plant in list_auctionable_plants(state):
+        if plant.price == int(plant_id):
+            return plant
+    raise ModelValidationError(f"power plant {plant_id} is not currently auctionable")
+
+
+def _get_plant_from_visible_market(state: GameState, plant_price: int) -> PowerPlantCard:
+    for plant in (*state.current_market, *state.future_market):
+        if plant.price == plant_price:
+            return plant
+    raise ModelValidationError(f"power plant {plant_price} is not visible in the market")
+
+
+def _minimum_opening_bid(state: GameState, plant: PowerPlantCard) -> int:
+    if (
+        state.auction_state is not None
+        and state.auction_state.discount_token_plant_price == plant.price
+    ):
+        return 1
+    return plant.price
+
+
+def _eligible_auction_participants(
+    state: GameState,
+    auction_state: AuctionState,
+) -> tuple[str, ...]:
+    excluded = set(auction_state.players_with_plants) | set(auction_state.players_passed_phase)
+    return tuple(player_id for player_id in state.player_order if player_id not in excluded)
+
+
+def _rotate_player_order(player_ids: tuple[str, ...], start_player_id: str) -> tuple[str, ...]:
+    if start_player_id not in player_ids:
+        raise ModelValidationError("rotation start player must be in the provided order")
+    start_index = player_ids.index(start_player_id)
+    return tuple((*player_ids[start_index:], *player_ids[:start_index]))
+
+
+def _next_player_in_sequence(player_ids: tuple[str, ...], current_player_id: str) -> str | None:
+    if len(player_ids) <= 1:
+        return None
+    if current_player_id not in player_ids:
+        raise ModelValidationError("current player must be in the bidder order")
+    current_index = player_ids.index(current_player_id)
+    return player_ids[(current_index + 1) % len(player_ids)]
+
+
+def _next_remaining_player(
+    prior_order: tuple[str, ...],
+    current_player_id: str,
+    remaining_players: tuple[str, ...],
+) -> str | None:
+    if not remaining_players:
+        return None
+    if current_player_id not in prior_order:
+        raise ModelValidationError("current player must be in the prior bidder order")
+    start_index = prior_order.index(current_player_id)
+    for offset in range(1, len(prior_order) + 1):
+        candidate = prior_order[(start_index + offset) % len(prior_order)]
+        if candidate in remaining_players:
+            return candidate
+    return None
+
+
+def _next_auction_chooser(
+    player_order: tuple[str, ...],
+    current_player_id: str | None,
+    players_with_plants: tuple[str, ...],
+    players_passed_phase: tuple[str, ...],
+) -> str | None:
+    excluded = set(players_with_plants) | set(players_passed_phase)
+    eligible = tuple(player_id for player_id in player_order if player_id not in excluded)
+    if not eligible:
+        return None
+    if current_player_id is None:
+        return eligible[0]
+    for offset in range(1, len(player_order) + 1):
+        candidate = player_order[(player_order.index(current_player_id) + offset) % len(player_order)]
+        if candidate not in excluded:
+            return candidate
+    return None
+
+
+def _award_auction_purchase(
+    state: GameState,
+    winner_id: str,
+    plant: PowerPlantCard,
+    price_paid: int,
+    chooser_id: str,
+) -> GameState:
+    player = _get_player(state, winner_id)
+    purchased_plant = PowerPlantCard.from_dict(plant.to_dict())
+    updated_power_plants = tuple(
+        sorted((*player.power_plants, purchased_plant), key=lambda card: card.price)
+    )
+    updated_player = replace(
+        player,
+        elektro=player.elektro - price_paid,
+        power_plants=updated_power_plants,
+        resource_storage=_normalize_resource_storage(player.resource_storage, updated_power_plants),
+    )
+    updated_state = _replace_player_on_state(state, updated_player)
+    updated_state = _remove_visible_plant_and_refill(
+        updated_state,
+        plant.price,
+        clear_discount_before_refill=(
+            updated_state.auction_state is not None
+            and updated_state.auction_state.discount_token_plant_price == plant.price
+        ),
+    )
+
+    auction_state = updated_state.auction_state
+    assert auction_state is not None
+    buyers = tuple((*auction_state.players_with_plants, winner_id))
+    if winner_id == chooser_id:
+        next_chooser = _next_auction_chooser(
+            updated_state.player_order,
+            chooser_id,
+            players_with_plants=buyers,
+            players_passed_phase=auction_state.players_passed_phase,
+        )
+    else:
+        next_chooser = chooser_id
+
+    cleared_auction = replace(
+        auction_state,
+        current_chooser_id=next_chooser,
+        players_with_plants=buyers,
+        active_plant_price=None,
+        current_bid=None,
+        highest_bidder_id=None,
+        active_bidders=(),
+        next_bidder_id=None,
+    )
+    updated_state = replace(updated_state, auction_state=cleared_auction)
+
+    max_plants = updated_state.rules.player_count_rules[len(updated_state.players)]["max_power_plants"]
+    if len(updated_player.power_plants) > max_plants:
+        legal_discards = tuple(
+            Action(
+                action_type="discard_power_plant",
+                player_id=winner_id,
+                payload={"price": power_plant.price},
+            )
+            for power_plant in updated_player.power_plants
+        )
+        updated_state = replace(
+            updated_state,
+            pending_decision=DecisionRequest(
+                player_id=winner_id,
+                decision_type="discard_power_plant",
+                prompt="Choose a power plant to discard.",
+                legal_actions=legal_discards,
+                metadata={"max_power_plants": max_plants},
+            ),
+        )
+        return updated_state
+
+    return _maybe_finish_auction_phase(updated_state)
+
+
+def _maybe_finish_auction_phase(state: GameState) -> GameState:
+    if state.phase != "auction" or state.auction_state is None or state.pending_decision is not None:
+        return state
+    auction_state = state.auction_state
+    if auction_state.has_active_auction:
+        return state
+    if auction_state.current_chooser_id is not None:
+        return state
+    return resolve_auction_round(state)
+
+
+def _remove_visible_plant_and_refill(
+    state: GameState,
+    sold_price: int,
+    clear_discount_before_refill: bool = False,
+) -> GameState:
+    visible_market = [plant for plant in (*state.current_market, *state.future_market) if plant.price != sold_price]
+    if len(visible_market) != len(state.current_market) + len(state.future_market) - 1:
+        raise ModelValidationError("expected to remove exactly one visible power plant")
+    draw_stack = list(state.power_plant_draw_stack)
+    auction_state = state.auction_state
+    if auction_state is not None and clear_discount_before_refill:
+        auction_state = replace(auction_state, discount_token_plant_price=None)
+
+    if draw_stack:
+        drawn_plant = draw_stack.pop(0)
+        if (
+            auction_state is not None
+            and auction_state.discount_token_plant_price is not None
+            and drawn_plant.price < auction_state.discount_token_plant_price
+        ):
+            auction_state = replace(auction_state, discount_token_plant_price=None)
+            if draw_stack:
+                drawn_plant = draw_stack.pop(0)
+                visible_market.append(drawn_plant)
+        else:
+            visible_market.append(drawn_plant)
+    visible_market.sort(key=lambda plant: plant.price)
+    if len(visible_market) < 8:
+        raise ModelValidationError("power plant market must contain eight visible plants before Step 3")
+    return replace(
+        state,
+        current_market=tuple(visible_market[:4]),
+        future_market=tuple(visible_market[4:8]),
+        power_plant_draw_stack=tuple(draw_stack),
+        auction_state=auction_state,
+    )
+
+
+def _recalculate_player_order(state: GameState) -> GameState:
+    previous_index = {player_id: index for index, player_id in enumerate(state.player_order)}
+    sorted_players = sorted(
+        state.players,
+        key=lambda player: (
+            -player.connected_city_count,
+            -player.largest_power_plant,
+            previous_index[player.player_id],
+        ),
+    )
+    ordered_ids = tuple(player.player_id for player in sorted_players)
+    positioned_players = tuple(
+        replace(player, turn_order_position=ordered_ids.index(player.player_id) + 1)
+        for player in state.players
+    )
+    return replace(state, players=positioned_players, player_order=ordered_ids)
+
+
+def _validate_play_areas(
+    game_map: MapDefinition,
+    selected_regions: tuple[str, ...],
+    required_count: int,
+) -> None:
+    region_ids = {region.id for region in game_map.regions}
+    if len(selected_regions) != required_count:
+        raise ModelValidationError(
+            f"expected exactly {required_count} selected regions, got {len(selected_regions)}"
+        )
+    if len(set(selected_regions)) != len(selected_regions):
+        raise ModelValidationError("selected regions must be unique")
+    if any(region not in region_ids for region in selected_regions):
+        raise ModelValidationError("selected regions must exist on the chosen map")
+    if not _are_regions_contiguous(game_map, selected_regions):
+        raise ModelValidationError("selected regions must form one contiguous playing zone")
+
+
+def _are_regions_contiguous(game_map: MapDefinition, selected_regions: tuple[str, ...] | list[str]) -> bool:
+    selected = tuple(selected_regions)
+    if not selected:
+        return False
+    allowed = set(selected)
+    frontier = [selected[0]]
+    visited: set[str] = set()
+    while frontier:
+        region = frontier.pop()
+        if region in visited:
+            continue
+        visited.add(region)
+        for neighbor in game_map.region_adjacency.get(region, ()):
+            if neighbor in allowed and neighbor not in visited:
+                frontier.append(neighbor)
+    return visited == allowed
+
+
+def _serialize_map_definition(game_map: MapDefinition) -> dict[str, Any]:
+    return {
+        "id": game_map.id,
+        "name": game_map.name,
+        "regions": [
+            {"id": region.id, "label": region.label, "color": region.color}
+            for region in game_map.regions
+        ],
+        "cities": [
+            {"id": city.id, "name": city.name, "region": city.region}
+            for city in game_map.cities
+        ],
+        "connections": [
+            {"city_1": connection.city_1, "city_2": connection.city_2, "cost": connection.cost}
+            for connection in game_map.connections
+        ],
+        "region_adjacency": {
+            region: list(neighbors) for region, neighbors in game_map.region_adjacency.items()
+        },
+        "special_rules": list(game_map.special_rules),
+    }
+
+
+def _deserialize_map_definition(payload: dict[str, Any]) -> MapDefinition:
+    return MapDefinition(
+        id=payload["id"],
+        name=payload["name"],
+        regions=tuple(
+            RegionDefinition(
+                id=region["id"],
+                label=region["label"],
+                color=region["color"],
+            )
+            for region in payload["regions"]
+        ),
+        cities=tuple(
+            CityDefinition(
+                id=city["id"],
+                name=city["name"],
+                region=city["region"],
+            )
+            for city in payload["cities"]
+        ),
+        connections=tuple(
+            ConnectionDefinition(
+                city_1=connection["city_1"],
+                city_2=connection["city_2"],
+                cost=int(connection["cost"]),
+            )
+            for connection in payload["connections"]
+        ),
+        region_adjacency={
+            region: tuple(neighbors)
+            for region, neighbors in payload["region_adjacency"].items()
+        },
+        special_rules=tuple(payload["special_rules"]),
+    )
+
+
+def _serialize_rule_tables(rules: RuleTables) -> dict[str, Any]:
+    return {
+        "starting_money": rules.starting_money,
+        "houses_per_player": rules.houses_per_player,
+        "resource_supply": dict(rules.resource_supply),
+        "resource_market_tracks": rules.resource_market_tracks,
+        "payment_schedule": {str(key): value for key, value in rules.payment_schedule.items()},
+        "player_count_rules": {str(key): value for key, value in rules.player_count_rules.items()},
+        "setup": rules.setup,
+    }
+
+
+def _deserialize_rule_tables(payload: dict[str, Any]) -> RuleTables:
+    return RuleTables(
+        starting_money=int(payload["starting_money"]),
+        houses_per_player=int(payload["houses_per_player"]),
+        resource_supply={key: int(value) for key, value in payload["resource_supply"].items()},
+        resource_market_tracks=payload["resource_market_tracks"],
+        payment_schedule={int(key): int(value) for key, value in payload["payment_schedule"].items()},
+        player_count_rules={
+            int(key): value for key, value in payload["player_count_rules"].items()
+        },
+        setup=payload["setup"],
+    )
