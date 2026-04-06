@@ -23,12 +23,21 @@ You can also pre-fill the setup values:
 PYTHONPATH=src python tests/manual_test/run_auction_phase.py --players 4 --step 2 --first-round no --seed 11
 ```
 
+To force the next market refill to discover the Step 3 card during auction:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_auction_phase.py --players 3 --step 2 --first-round no --seed 7 --step3-on-next-refill
+```
+
 The script will:
 - build a valid seeded auction state
 - let you choose first round vs later round
 - let you choose Step 1, 2, or 3
+- optionally force an auction-time Step 3 discovery on the next refill
 - show the current market, future market, and draw-stack preview
 - show whether the `$1` token is currently on a specific plant or off the market
+- show whether the Step 3 card is still pending in the deck or already staged for end-of-auction collapse
+- show the visible `STEP3` placeholder in the future market and the immediately shuffled bottom stack when this happens
 - prompt the active player for each auction decision
 - accept only valid auction commands according to the current state
 - print a rejection message for invalid commands without changing the state
@@ -37,7 +46,7 @@ Supported commands depend on the current state:
 - chooser with no active auction: `start <plant_price> <bid>` or `pass`
 - bidder in an active auction: `bid <amount>` or `pass`
 - discard decision: `discard <plant_price>`
-- utility commands at any time: `status`, `help`, `quit`
+- utility commands at any time: `options`, `status`, `help`, `quit`
 
 ## Resource Buying Manual Test
 

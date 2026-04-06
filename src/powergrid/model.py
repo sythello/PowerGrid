@@ -25,6 +25,7 @@ GAME_PHASES = ("setup", "determine_order", "auction", "buy_resources", "build_ho
 ROUND_PHASES = ("determine_order", "auction", "buy_resources", "build_houses", "bureaucracy")
 PLAYER_COLORS = ("black", "purple", "green", "blue", "yellow", "red")
 HOUSES_PER_PLAYER = 22
+STEP_3_PLACEHOLDER_PRICE = 10000
 
 
 class ModelValidationError(ValueError):
@@ -117,10 +118,18 @@ class PowerPlantCard:
             raise ModelValidationError("power plant price must be positive")
         if self.resource_cost < 0:
             raise ModelValidationError("power plant resource cost cannot be negative")
-        if self.output_cities <= 0:
+        if self.output_cities <= 0 and not self.is_step_3_placeholder:
             raise ModelValidationError("power plant output must be positive")
-        if self.deck_back not in {"plug", "socket"}:
+        if self.deck_back not in {"plug", "socket", "step3"}:
             raise ModelValidationError("deck_back must be 'plug' or 'socket'")
+        if self.is_step_3_placeholder:
+            if self.resource_types or self.resource_cost != 0 or self.output_cities != 0:
+                raise ModelValidationError("Step 3 placeholder may not consume resources or power cities")
+            if self.deck_back != "step3":
+                raise ModelValidationError("Step 3 placeholder must use deck_back='step3'")
+            if self.is_hybrid or self.is_ecological:
+                raise ModelValidationError("Step 3 placeholder may not be hybrid or ecological")
+            return
         if self.is_ecological != (len(self.resource_types) == 0):
             raise ModelValidationError("ecological flag must match resource types")
         if self.is_hybrid and set(self.resource_types) != {"coal", "oil"}:
@@ -133,6 +142,10 @@ class PowerPlantCard:
     @property
     def max_storage(self) -> int:
         return self.resource_cost * 2
+
+    @property
+    def is_step_3_placeholder(self) -> bool:
+        return self.deck_back == "step3"
 
     @classmethod
     def from_definition(cls, definition: PowerPlantDefinition) -> "PowerPlantCard":
@@ -167,6 +180,18 @@ class PowerPlantCard:
             deck_back=payload["deck_back"],
             is_hybrid=bool(payload["is_hybrid"]),
             is_ecological=bool(payload["is_ecological"]),
+        )
+
+    @classmethod
+    def step_3_placeholder(cls) -> "PowerPlantCard":
+        return cls(
+            price=STEP_3_PLACEHOLDER_PRICE,
+            resource_types=(),
+            resource_cost=0,
+            output_cities=0,
+            deck_back="step3",
+            is_hybrid=False,
+            is_ecological=False,
         )
 
 
@@ -676,6 +701,7 @@ class GameState:
     power_plant_draw_stack: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
     power_plant_bottom_stack: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
     step_3_card_pending: bool = True
+    auction_step_3_pending: bool = False
     round_number: int = 0
     step: int = 1
     phase: str = "setup"
@@ -721,13 +747,33 @@ class GameState:
         if self.selected_regions and len(self.selected_regions) != required_regions:
             raise ModelValidationError("selected regions must match the required area count")
         if self.step in {1, 2}:
-            if len(self.current_market) != 4 or len(self.future_market) != 4:
+            if self.auction_step_3_pending:
+                total_visible = len(self.current_market) + len(self.future_market)
+                if len(self.current_market) > 4 or len(self.future_market) > 4:
+                    raise ModelValidationError(
+                        "auction Step 3 pending state may expose at most 4 current and 4 future plants"
+                    )
+                if not 1 <= total_visible <= 8:
+                    raise ModelValidationError(
+                        "auction Step 3 pending state must expose between 1 and 8 visible power plants"
+                    )
+                if self.step_3_card_pending:
+                    raise ModelValidationError(
+                        "auction Step 3 pending state may not also keep the Step 3 card pending in the draw stack"
+                    )
+                if sum(1 for plant in (*self.current_market, *self.future_market) if plant.is_step_3_placeholder) != 1:
+                    raise ModelValidationError(
+                        "auction Step 3 pending state must contain exactly one Step 3 placeholder"
+                    )
+            elif len(self.current_market) != 4 or len(self.future_market) != 4:
                 raise ModelValidationError("steps 1 and 2 must contain 4 current and 4 future plants")
         else:
+            if self.auction_step_3_pending:
+                raise ModelValidationError("auction Step 3 pending state is only valid before Step 3 begins")
             if self.future_market:
                 raise ModelValidationError("step 3 may not contain a future market")
-            if not 1 <= len(self.current_market) <= 6:
-                raise ModelValidationError("step 3 current market must contain between 1 and 6 plants")
+            if not 0 <= len(self.current_market) <= 6:
+                raise ModelValidationError("step 3 current market must contain between 0 and 6 plants")
         current_prices = [plant.price for plant in self.current_market]
         future_prices = [plant.price for plant in self.future_market]
         if current_prices != sorted(current_prices) or future_prices != sorted(future_prices):
@@ -778,6 +824,7 @@ class GameState:
             "power_plant_draw_stack": [plant.to_dict() for plant in self.power_plant_draw_stack],
             "power_plant_bottom_stack": [plant.to_dict() for plant in self.power_plant_bottom_stack],
             "step_3_card_pending": self.step_3_card_pending,
+            "auction_step_3_pending": self.auction_step_3_pending,
             "round_number": self.round_number,
             "step": self.step,
             "phase": self.phase,
@@ -814,6 +861,7 @@ class GameState:
                 for plant in payload.get("power_plant_bottom_stack", [])
             ),
             step_3_card_pending=bool(payload.get("step_3_card_pending", True)),
+            auction_step_3_pending=bool(payload.get("auction_step_3_pending", False)),
             round_number=int(payload["round_number"]),
             step=int(payload["step"]),
             phase=payload["phase"],
@@ -1145,6 +1193,8 @@ def resolve_auction_round(state: GameState) -> GameState:
             auction_state.discount_token_plant_price,
             clear_discount_before_refill=True,
         )
+    if visible_market_state.auction_step_3_pending:
+        visible_market_state = _apply_auction_step_3_transition(visible_market_state)
 
     completed_state = replace(
         visible_market_state,
@@ -1903,6 +1953,7 @@ def _replace_visible_market(
     draw_stack: tuple[PowerPlantCard, ...] | None = None,
     bottom_stack: tuple[PowerPlantCard, ...] | None = None,
     step_3_card_pending: bool | None = None,
+    auction_step_3_pending: bool | None = None,
 ) -> GameState:
     step = state.step if step_override is None else step_override
     ordered = tuple(sorted(visible_market, key=lambda plant: plant.price))
@@ -1915,9 +1966,26 @@ def _replace_visible_market(
         "step_3_card_pending": (
             state.step_3_card_pending if step_3_card_pending is None else step_3_card_pending
         ),
+        "auction_step_3_pending": (
+            state.auction_step_3_pending
+            if auction_step_3_pending is None
+            else auction_step_3_pending
+        ),
     }
     if step == 3:
         return replace(state, current_market=ordered, future_market=(), **replace_kwargs)
+    if replace_kwargs["auction_step_3_pending"]:
+        if not 1 <= len(ordered) <= 8:
+            raise ModelValidationError(
+                "auction Step 3 pending state must keep between 1 and 8 visible plants including the Step 3 placeholder"
+            )
+        current_count = min(4, len(ordered))
+        return replace(
+            state,
+            current_market=ordered[:current_count],
+            future_market=ordered[current_count:],
+            **replace_kwargs,
+        )
     if len(ordered) != 8:
         raise ModelValidationError("steps 1 and 2 must expose exactly 8 visible power plants")
     return replace(
@@ -1951,6 +2019,25 @@ def _shuffle_bottom_stack_for_step_3(
     rng = random.Random(f"{state.config.seed}:step3:{state.round_number}:{len(bottom_stack)}")
     rng.shuffle(shuffled)
     return tuple(shuffled)
+
+
+def _apply_auction_step_3_transition(state: GameState) -> GameState:
+    if not state.auction_step_3_pending:
+        return state
+    visible_market = [
+        plant for plant in _visible_market(state) if not plant.is_step_3_placeholder
+    ]
+    if visible_market:
+        visible_market.pop(0)
+    return _replace_visible_market(
+        state,
+        visible_market,
+        step_override=3,
+        draw_stack=state.power_plant_draw_stack,
+        bottom_stack=(),
+        step_3_card_pending=False,
+        auction_step_3_pending=False,
+    )
 
 
 def _apply_step_2_transition(state: GameState) -> GameState:
@@ -2350,6 +2437,7 @@ def _remove_visible_plant_and_refill(
         raise ModelValidationError("expected to remove exactly one visible power plant")
     draw_stack = list(state.power_plant_draw_stack)
     auction_state = state.auction_state
+    auction_step_3_pending = state.auction_step_3_pending
     if auction_state is not None and clear_discount_before_refill:
         auction_state = replace(auction_state, discount_token_plant_price=None)
 
@@ -2370,6 +2458,19 @@ def _remove_visible_plant_and_refill(
             auction_state=auction_state,
         )
 
+    if auction_step_3_pending:
+        if draw_stack:
+            visible_market.append(draw_stack.pop(0))
+        visible_market.sort(key=lambda plant: plant.price)
+        return _replace_visible_market(
+            replace(state, auction_state=auction_state),
+            visible_market,
+            draw_stack=tuple(draw_stack),
+            bottom_stack=(),
+            step_3_card_pending=False,
+            auction_step_3_pending=True,
+        )
+
     if draw_stack:
         drawn_plant = draw_stack.pop(0)
         if (
@@ -2381,9 +2482,25 @@ def _remove_visible_plant_and_refill(
             if draw_stack:
                 drawn_plant = draw_stack.pop(0)
                 visible_market.append(drawn_plant)
+            elif state.step_3_card_pending:
+                visible_market.append(PowerPlantCard.step_3_placeholder())
+                auction_step_3_pending = True
         else:
             visible_market.append(drawn_plant)
+    elif state.step_3_card_pending:
+        visible_market.append(PowerPlantCard.step_3_placeholder())
+        auction_step_3_pending = True
     visible_market.sort(key=lambda plant: plant.price)
+    if auction_step_3_pending:
+        shuffled_bottom = _shuffle_bottom_stack_for_step_3(state, state.power_plant_bottom_stack)
+        return _replace_visible_market(
+            replace(state, auction_state=auction_state),
+            visible_market,
+            draw_stack=shuffled_bottom if not state.auction_step_3_pending else tuple(draw_stack),
+            step_3_card_pending=False,
+            auction_step_3_pending=True,
+            bottom_stack=(),
+        )
     if len(visible_market) < 8:
         raise ModelValidationError("power plant market must contain eight visible plants before Step 3")
     return replace(
@@ -2392,6 +2509,7 @@ def _remove_visible_plant_and_refill(
         future_market=tuple(visible_market[4:8]),
         power_plant_draw_stack=tuple(draw_stack),
         auction_state=auction_state,
+        auction_step_3_pending=False,
     )
 
 

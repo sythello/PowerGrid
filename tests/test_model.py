@@ -186,6 +186,35 @@ def _bureaucracy_test_state(
     )
 
 
+def _auction_step_3_triggered_state(map_id: str = "germany") -> GameState:
+    config_kwargs = {
+        "map_id": map_id,
+        "players": make_default_seat_configs(3),
+        "seed": 7,
+    }
+    if map_id == "test":
+        config_kwargs["selected_regions"] = ("alpha", "beta", "gamma")
+    state = advance_phase(create_initial_state(GameConfig(**config_kwargs)))
+    definitions = {definition.price: definition for definition in load_power_plants()}
+    state = replace(
+        state,
+        round_number=2,
+        step=2,
+        power_plant_draw_stack=(),
+        power_plant_bottom_stack=tuple(
+            PowerPlantCard.from_definition(definitions[price]) for price in (25, 31, 33)
+        ),
+    )
+    chooser, second, third = state.player_order
+    lowest_current = min(plant.price for plant in state.current_market)
+    state = start_auction(state, chooser, lowest_current, 1)
+    state = pass_auction(state, second)
+    state = pass_auction(state, third)
+    state = pass_auction(state, second)
+    state = pass_auction(state, third)
+    return state
+
+
 class ModelTests(unittest.TestCase):
     def test_create_initial_state_three_players(self) -> None:
         config = GameConfig(
@@ -801,6 +830,198 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(tuple(plant.price for plant in state.future_market), (13, 14, 15, 44))
         with self.assertRaises(ModelValidationError):
             start_auction(state, "p1", 6, 1)
+
+    def test_auction_refill_can_stage_step_3_until_end_of_phase(self) -> None:
+        state = advance_phase(
+            create_initial_state(
+                GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+            )
+        )
+        definitions = {definition.price: definition for definition in load_power_plants()}
+        chooser, second, third = state.player_order
+        state = replace(
+            state,
+            round_number=2,
+            step=2,
+            power_plant_draw_stack=(),
+            power_plant_bottom_stack=tuple(
+                PowerPlantCard.from_definition(definitions[price]) for price in (25, 31, 33)
+            ),
+        )
+        state = start_auction(state, chooser, 6, 1)
+        state = pass_auction(state, second)
+        state = pass_auction(state, third)
+
+        self.assertEqual(state.phase, "auction")
+        self.assertEqual(state.step, 2)
+        self.assertTrue(state.auction_step_3_pending)
+        self.assertFalse(state.step_3_card_pending)
+        self.assertEqual(tuple(plant.price for plant in state.current_market), (7, 10, 11, 12))
+        self.assertEqual(tuple(plant.price for plant in state.future_market[:-1]), (13, 14, 15))
+        self.assertTrue(state.future_market[-1].is_step_3_placeholder)
+        self.assertEqual(
+            tuple(plant.price for plant in list_auctionable_plants(state)),
+            (7, 10, 11, 12),
+        )
+        self.assertEqual(
+            {plant.price for plant in state.power_plant_draw_stack},
+            {25, 31, 33},
+        )
+        self.assertEqual(state.power_plant_bottom_stack, ())
+
+    def test_auction_refills_from_shuffled_bottom_after_step_3_placeholder_is_revealed(self) -> None:
+        state = advance_phase(
+            create_initial_state(
+                GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+            )
+        )
+        definitions = {definition.price: definition for definition in load_power_plants()}
+        chooser, second, third = state.player_order
+        state = replace(
+            state,
+            round_number=2,
+            step=2,
+            power_plant_draw_stack=(),
+            power_plant_bottom_stack=tuple(
+                PowerPlantCard.from_definition(definitions[price]) for price in (25, 31, 33)
+            ),
+        )
+        state = start_auction(state, chooser, 6, 1)
+        state = pass_auction(state, second)
+        state = pass_auction(state, third)
+        state = start_auction(state, second, 7, 7)
+        state = pass_auction(state, third)
+
+        self.assertTrue(state.auction_step_3_pending)
+        self.assertEqual(tuple(plant.price for plant in state.current_market), (10, 11, 12, 13))
+        self.assertEqual(tuple(plant.price for plant in state.future_market[:-1]), (14, 15, 31))
+        self.assertTrue(state.future_market[-1].is_step_3_placeholder)
+        self.assertEqual({plant.price for plant in state.power_plant_draw_stack}, {25, 33})
+
+    def test_auction_step_3_pending_allows_market_to_shrink_when_draw_stack_is_empty(self) -> None:
+        state = advance_phase(
+            create_initial_state(
+                GameConfig(map_id="germany", players=make_default_seat_configs(4), seed=7)
+            )
+        )
+        definitions = {definition.price: definition for definition in load_power_plants()}
+        chooser, second, third, fourth = state.player_order
+        state = replace(
+            state,
+            round_number=2,
+            step=2,
+            power_plant_draw_stack=(),
+            power_plant_bottom_stack=tuple(
+                PowerPlantCard.from_definition(definitions[25]) for _ in range(1)
+            ),
+        )
+        state = start_auction(state, chooser, 6, 1)
+        state = pass_auction(state, second)
+        state = pass_auction(state, third)
+        state = pass_auction(state, fourth)
+        state = start_auction(state, second, 7, 7)
+        state = pass_auction(state, third)
+        state = pass_auction(state, fourth)
+
+        self.assertTrue(state.auction_step_3_pending)
+        self.assertEqual(tuple(plant.price for plant in state.current_market), (10, 11, 12, 13))
+        self.assertEqual(tuple(plant.price for plant in state.future_market[:-1]), (14, 15, 25))
+        self.assertTrue(state.future_market[-1].is_step_3_placeholder)
+        self.assertEqual(state.power_plant_draw_stack, ())
+
+        state = start_auction(state, third, 10, 10)
+        state = pass_auction(state, fourth)
+
+        self.assertTrue(state.auction_step_3_pending)
+        self.assertEqual(tuple(plant.price for plant in state.current_market), (11, 12, 13, 14))
+        self.assertEqual(tuple(plant.price for plant in state.future_market[:-1]), (15, 25))
+        self.assertTrue(state.future_market[-1].is_step_3_placeholder)
+        self.assertEqual(state.power_plant_draw_stack, ())
+        assert state.auction_state is not None
+        self.assertEqual(state.auction_state.current_chooser_id, fourth)
+
+    def test_auction_end_applies_step_3_transition_for_rest_of_round(self) -> None:
+        state = _auction_step_3_triggered_state()
+
+        self.assertEqual(state.phase, "buy_resources")
+        self.assertEqual(state.step, 3)
+        self.assertFalse(state.auction_step_3_pending)
+        self.assertFalse(state.step_3_card_pending)
+        self.assertEqual(tuple(plant.price for plant in state.current_market), (10, 11, 12, 13, 14, 15))
+        self.assertEqual(state.future_market, ())
+        self.assertEqual(state.power_plant_bottom_stack, ())
+        self.assertEqual(
+            {plant.price for plant in state.power_plant_draw_stack},
+            {25, 31, 33},
+        )
+
+    def test_auction_step_3_transition_allows_placeholder_only_corner_case(self) -> None:
+        state = advance_phase(
+            create_initial_state(
+                GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+            )
+        )
+        state = replace(
+            state,
+            round_number=2,
+            step=2,
+            current_market=(),
+            future_market=(PowerPlantCard.step_3_placeholder(),),
+            power_plant_draw_stack=(),
+            power_plant_bottom_stack=(),
+            step_3_card_pending=False,
+            auction_step_3_pending=True,
+            auction_state=AuctionState(players_with_plants=state.player_order),
+        )
+
+        state = resolve_auction_round(state)
+
+        self.assertEqual(state.phase, "buy_resources")
+        self.assertEqual(state.step, 3)
+        self.assertEqual(state.current_market, ())
+        self.assertEqual(state.future_market, ())
+        self.assertFalse(state.auction_step_3_pending)
+
+    def test_auction_triggered_step_3_opens_third_city_slot_in_same_round(self) -> None:
+        state = _auction_step_3_triggered_state(map_id="test")
+        updated_players = []
+        for player in state.players:
+            if player.player_id == "p1":
+                updated_players.append(
+                    replace(
+                        player,
+                        houses_in_supply=21,
+                        network_city_ids=("amber_falls",),
+                    )
+                )
+            elif player.player_id == "p2":
+                updated_players.append(
+                    replace(
+                        player,
+                        houses_in_supply=21,
+                        network_city_ids=("amber_falls",),
+                    )
+                )
+            else:
+                updated_players.append(replace(player, elektro=60))
+        state = replace(state, phase="build_houses", players=tuple(updated_players))
+
+        amber_target = {
+            action.payload["city_id"]: action.payload for action in legal_build_targets(state, "p3")
+        }["amber_falls"]
+        self.assertEqual(amber_target["build_cost"], 20)
+
+    def test_auction_triggered_step_3_uses_step_3_refill_in_same_round(self) -> None:
+        state = _auction_step_3_triggered_state()
+        state = replace(
+            state,
+            phase="bureaucracy",
+            resource_market=state.resource_market.remove_from_market("oil", 4),
+        )
+        updated_state, summary = resolve_bureaucracy(state, generation_choices={})
+
+        self.assertEqual(summary.refill_step_used, 3)
+        self.assertEqual(updated_state.resource_market.total_in_market("oil"), 18)
 
     def test_first_round_pass_is_rejected(self) -> None:
         state = advance_phase(

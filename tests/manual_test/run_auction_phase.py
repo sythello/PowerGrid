@@ -6,6 +6,7 @@ from dataclasses import replace
 from powergrid.model import (
     GameConfig,
     ModelValidationError,
+    PowerPlantCard,
     advance_phase,
     create_initial_state,
     list_auctionable_plants,
@@ -15,6 +16,7 @@ from powergrid.model import (
     replace_plant_if_needed,
     start_auction,
 )
+from powergrid.rules_data import load_power_plants
 
 
 def main() -> None:
@@ -27,6 +29,11 @@ def main() -> None:
         "--first-round",
         choices=("yes", "no"),
         help="Use round 1 mandatory-purchase behavior or a later round.",
+    )
+    parser.add_argument(
+        "--step3-on-next-refill",
+        action="store_true",
+        help="Force the next auction-time market refill to discover the Step 3 card.",
     )
     args = parser.parse_args()
 
@@ -45,6 +52,7 @@ def main() -> None:
         seed=seed,
         step=step,
         first_round=first_round,
+        step3_on_next_refill=args.step3_on_next_refill,
     )
 
     print("Auction Phase Manual Test")
@@ -79,6 +87,9 @@ def main() -> None:
         if lowered == "status":
             print_state(state)
             continue
+        if lowered == "options":
+            print_options(state)
+            continue
 
         try:
             next_state = apply_command(state, raw)
@@ -100,6 +111,7 @@ def build_manual_auction_state(
     seed: int,
     step: int,
     first_round: bool,
+    step3_on_next_refill: bool,
 ):
     config = GameConfig(
         map_id=map_id,
@@ -107,11 +119,21 @@ def build_manual_auction_state(
         seed=seed,
     )
     state = advance_phase(create_initial_state(config))
-    return replace(
+    state = replace(
         state,
         round_number=1 if first_round else 2,
         step=step,
     )
+    if step3_on_next_refill:
+        definitions = {definition.price: definition for definition in load_power_plants()}
+        state = replace(
+            state,
+            power_plant_draw_stack=(),
+            power_plant_bottom_stack=tuple(
+                PowerPlantCard.from_definition(definitions[price]) for price in (25, 31, 33)
+            ),
+        )
+    return state
 
 
 def apply_command(state, raw: str):
@@ -137,7 +159,7 @@ def apply_command(state, raw: str):
             if len(tokens) != 1:
                 raise ValueError("expected: pass")
             return pass_auction(state, str(acting_player))
-        raise ValueError("allowed commands: bid <amount>, pass, status, help, quit")
+        raise ValueError("allowed commands: bid <amount>, pass, options, status, help, quit")
 
     acting_player = auction_state.current_chooser_id
     if command == "start":
@@ -148,7 +170,7 @@ def apply_command(state, raw: str):
         if len(tokens) != 1:
             raise ValueError("expected: pass")
         return pass_auction(state, str(acting_player))
-    raise ValueError("allowed commands: start <plant_price> <bid>, pass, status, help, quit")
+    raise ValueError("allowed commands: start <plant_price> <bid>, pass, options, status, help, quit")
 
 
 def turn_prompt(state) -> str:
@@ -170,11 +192,11 @@ def turn_prompt(state) -> str:
             f"Active bidder: {auction_state.next_bidder_id}. "
             f"Plant {auction_state.active_plant_price}, current bid {auction_state.current_bid}, "
             f"leader {auction_state.highest_bidder_id}, bidders [{bidders}]. "
-            "Use: bid <amount> or pass"
+            "Use: bid <amount>, pass, or options"
         )
 
     chooser = auction_state.current_chooser_id
-    auctionable = ", ".join(str(plant.price) for plant in list_auctionable_plants(state))
+    auctionable = ", ".join(format_plant(plant) for plant in list_auctionable_plants(state))
     pass_note = "pass allowed" if state.round_number > 1 else "pass not allowed in round 1"
     discount_note = (
         f"$1 token on plant {auction_state.discount_token_plant_price}"
@@ -183,7 +205,7 @@ def turn_prompt(state) -> str:
     )
     return (
         f"Chooser: {chooser}. Auctionable plants [{auctionable}]. "
-        f"{discount_note}. Use: start <plant_price> <bid> or pass ({pass_note})"
+        f"{discount_note}. Use: start <plant_price> <bid>, pass, or options ({pass_note})"
     )
 
 
@@ -197,10 +219,20 @@ def print_state(state) -> None:
             f"  {player.turn_order_position}. {player.player_id} elektro={player.elektro} "
             f"plants=[{plants}] cities={player.connected_city_count}"
         )
-    print("Current market: " + ", ".join(str(plant.price) for plant in state.current_market))
-    print("Future market: " + ", ".join(str(plant.price) for plant in state.future_market))
-    stack_preview = ", ".join(str(plant.price) for plant in state.power_plant_draw_stack[:8]) or "-"
+    print("Current market: " + ", ".join(format_plant(plant) for plant in state.current_market))
+    print(
+        "Future market: "
+        + (", ".join(format_plant(plant) for plant in state.future_market) if state.future_market else "(none)")
+    )
+    stack_preview = ", ".join(format_plant(plant) for plant in state.power_plant_draw_stack[:8]) or "-"
     print(f"Draw stack preview: {stack_preview}")
+    bottom_preview = ", ".join(format_plant(plant) for plant in state.power_plant_bottom_stack) or "-"
+    print(f"Bottom stack: {bottom_preview}")
+    print(
+        "Step 3 status: "
+        f"card_pending={state.step_3_card_pending} "
+        f"auction_pending={state.auction_step_3_pending}"
+    )
     if state.auction_state is not None:
         print(
             "Auction state: "
@@ -225,7 +257,7 @@ def print_state(state) -> None:
 
 
 def print_help(state) -> None:
-    print("Utility commands: status, help, quit")
+    print("Utility commands: options, status, help, quit")
     if state.pending_decision is not None:
         print("Decision command: discard <plant_price>")
         return
@@ -233,6 +265,61 @@ def print_help(state) -> None:
         print("Auction commands: bid <amount>, pass")
         return
     print("Chooser commands: start <plant_price> <bid>, pass")
+
+
+def print_options(state) -> None:
+    if state.pending_decision is not None:
+        legal_discards = ", ".join(
+            str(action.payload["price"]) for action in state.pending_decision.legal_actions
+        )
+        print(
+            f"Discard options for {state.pending_decision.player_id}: "
+            f"[{legal_discards}]"
+        )
+        return
+
+    auction_state = state.auction_state
+    if auction_state is None:
+        print("Auction state is missing.")
+        return
+
+    if auction_state.has_active_auction:
+        acting_player = str(auction_state.next_bidder_id)
+        player = next(player for player in state.players if player.player_id == acting_player)
+        minimum_raise = int(auction_state.current_bid) + 1
+        print(f"Bid options for {acting_player}:")
+        print(f"  pass")
+        if minimum_raise <= player.elektro:
+            print(f"  bid <amount> where {minimum_raise} <= amount <= {player.elektro}")
+        else:
+            print(
+                f"  no legal raise: current bid is {auction_state.current_bid}, "
+                f"but {acting_player} only has {player.elektro} Elektro"
+            )
+        return
+
+    chooser = str(auction_state.current_chooser_id)
+    player = next(player for player in state.players if player.player_id == chooser)
+    print(f"Auction start options for {chooser}:")
+    for plant in list_auctionable_plants(state):
+        minimum_bid = 1 if auction_state.discount_token_plant_price == plant.price else plant.price
+        if minimum_bid <= player.elektro:
+            print(
+                f"  start {plant.price} <bid> where {minimum_bid} <= bid <= {player.elektro}"
+            )
+        else:
+            print(
+                f"  plant {plant.price} unavailable to start: minimum bid {minimum_bid}, "
+                f"but {chooser} only has {player.elektro} Elektro"
+            )
+    if state.round_number > 1:
+        print("  pass")
+    else:
+        print("  pass unavailable in round 1")
+
+
+def format_plant(plant) -> str:
+    return "STEP3" if getattr(plant, "is_step_3_placeholder", False) else str(plant.price)
 
 
 def prompt_int(label: str, default: int, allowed=None) -> int:
