@@ -7,10 +7,16 @@ from powergrid.model import (
     Action,
     apply_builds,
     AuctionState,
+    BureaucracySummary,
     build_city,
     can_store_resources,
+    check_step_2_trigger,
+    check_step_3_trigger,
+    choose_plants_to_run,
     compute_all_targets_connection_cost,
     compute_connection_cost,
+    compute_powered_cities,
+    consume_resources,
     DecisionRequest,
     GameConfig,
     GameState,
@@ -18,8 +24,10 @@ from powergrid.model import (
     ModelValidationError,
     legal_resource_purchases,
     plant_storage_capacity,
+    PlantRunPlan,
     PlayerState,
     PowerPlantCard,
+    pay_income,
     purchase_resources,
     refill_resource_market,
     ResourceStorage,
@@ -34,9 +42,12 @@ from powergrid.model import (
     prepare_plant_deck,
     raise_bid,
     replace_plant_if_needed,
+    resolve_bureaucracy,
     resolve_auction_round,
+    resolve_winner,
     select_play_areas,
     start_auction,
+    update_plant_market_after_bureaucracy,
 )
 from powergrid.rules_data import MapDefinition, RegionDefinition, load_power_plants
 
@@ -105,6 +116,74 @@ def _build_test_state(step: int = 1) -> GameState:
         else:
             updated_players.append(replace(player, elektro=60))
     return replace(base_state, players=tuple(updated_players), phase="build_houses", step=step, auction_state=None)
+
+
+def _bureaucracy_test_state(
+    *,
+    step: int = 1,
+    round_number: int = 2,
+    player_specs: dict[str, dict[str, object]] | None = None,
+    draw_stack_prices: tuple[int, ...] | None = None,
+    bottom_stack_prices: tuple[int, ...] = (),
+) -> GameState:
+    base_state = create_initial_state(
+        GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+    )
+    definitions = {definition.price: definition for definition in load_power_plants()}
+    available_city_ids = [
+        city.id for city in base_state.game_map.cities if city.region in base_state.selected_regions
+    ]
+    if not available_city_ids:
+        raise AssertionError("expected at least one city inside the selected play area")
+
+    default_specs: dict[str, dict[str, object]] = {
+        "p1": {"cities": 3, "plants": (10, 13), "storage": {"coal": 2}, "elektro": 40},
+        "p2": {"cities": 4, "plants": (11, 18), "storage": {"uranium": 1}, "elektro": 35},
+        "p3": {"cities": 2, "plants": (6, 15), "storage": {"garbage": 1, "coal": 2}, "elektro": 30},
+    }
+    specs = player_specs or default_specs
+    updated_players = []
+    for player in base_state.players:
+        spec = specs[player.player_id]
+        city_count = int(spec["cities"])
+        owned_cities = tuple(available_city_ids[:city_count])
+        plants = tuple(
+            PowerPlantCard.from_definition(definitions[price])
+            for price in spec["plants"]  # type: ignore[index]
+        )
+        updated_players.append(
+            replace(
+                player,
+                elektro=int(spec.get("elektro", 50)),
+                houses_in_supply=22 - city_count,
+                network_city_ids=owned_cities,
+                power_plants=plants,
+                resource_storage=ResourceStorage.from_dict(spec.get("storage", {})),
+            )
+        )
+
+    draw_stack = (
+        tuple(PowerPlantCard.from_definition(definitions[price]) for price in draw_stack_prices)
+        if draw_stack_prices is not None
+        else base_state.power_plant_draw_stack
+    )
+    bottom_stack = tuple(
+        PowerPlantCard.from_definition(definitions[price]) for price in bottom_stack_prices
+    )
+
+    return replace(
+        base_state,
+        players=tuple(updated_players),
+        phase="bureaucracy",
+        step=step,
+        round_number=round_number,
+        auction_state=None,
+        pending_decision=None,
+        power_plant_draw_stack=draw_stack,
+        power_plant_bottom_stack=bottom_stack,
+        last_powered_cities={},
+        last_income_paid={},
+    )
 
 
 class ModelTests(unittest.TestCase):
@@ -397,6 +476,34 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(state.resource_market.available_unit_prices("uranium"), (14, 16))
         self.assertEqual(state.resource_market.quote_purchase_cost("oil", 4), 13)
 
+    def test_choose_plants_to_run_defaults_hybrid_mix_and_consumes_shared_storage(self) -> None:
+        state = _resource_test_state()
+        player = replace(
+            _player(state, "p1"),
+            houses_in_supply=21,
+            network_city_ids=(state.game_map.cities[0].id,),
+            resource_storage=ResourceStorage(coal=1, hybrid_oil=1),
+        )
+        state = replace(
+            state,
+            players=tuple(player if existing.player_id == "p1" else existing for existing in state.players),
+        )
+
+        plans = choose_plants_to_run(state, "p1", (5,))
+        self.assertEqual(plans, (PlantRunPlan(plant_price=5, resource_mix={"coal": 1, "oil": 1}),))
+        self.assertEqual(compute_powered_cities(state, "p1", plans), 1)
+
+        updated_state = consume_resources(state, "p1", plans)
+        self.assertEqual(_player(updated_state, "p1").resource_storage, ResourceStorage())
+
+    def test_pay_income_uses_payment_schedule(self) -> None:
+        rules = create_initial_state(
+            GameConfig(map_id="test", players=make_default_seat_configs(3), seed=1)
+        ).rules
+        self.assertEqual(pay_income(rules, 0), 10)
+        self.assertEqual(pay_income(rules, 4), 54)
+        self.assertEqual(pay_income(rules, 25), 150)
+
     def test_compute_connection_cost_uses_shortest_path_through_occupied_city(self) -> None:
         state = _build_test_state(step=1)
         self.assertEqual(compute_connection_cost(state, "p1", "cinder_grove"), 11)
@@ -472,6 +579,122 @@ class ModelTests(unittest.TestCase):
         germany_state = replace(germany_state, phase="build_houses", step=1)
         with self.assertRaises(ModelValidationError):
             build_city(germany_state, germany_state.player_order[0], "aachen")
+
+    def test_resolve_bureaucracy_updates_income_storage_market_and_order(self) -> None:
+        state = _bureaucracy_test_state()
+
+        updated_state, summary = resolve_bureaucracy(
+            state,
+            generation_choices={
+                "p1": (10, 13),
+                "p2": (11, 18),
+                "p3": (6, 15),
+            },
+        )
+
+        self.assertEqual(summary.powered_cities, {"p3": 2, "p1": 3, "p2": 4})
+        self.assertEqual(summary.income_paid, {"p3": 33, "p1": 44, "p2": 54})
+        self.assertFalse(summary.triggered_step_2)
+        self.assertFalse(summary.triggered_step_3)
+        self.assertFalse(summary.game_end_triggered)
+        self.assertEqual(updated_state.phase, "determine_order")
+        self.assertEqual(updated_state.round_number, 3)
+        self.assertEqual(updated_state.player_order, ("p2", "p1", "p3"))
+        self.assertEqual(_player(updated_state, "p1").resource_storage, ResourceStorage())
+        self.assertEqual(_player(updated_state, "p2").resource_storage, ResourceStorage())
+        self.assertEqual(_player(updated_state, "p3").resource_storage, ResourceStorage())
+        self.assertEqual(_player(updated_state, "p1").elektro, 84)
+        self.assertEqual(_player(updated_state, "p2").elektro, 89)
+        self.assertEqual(_player(updated_state, "p3").elektro, 63)
+        self.assertEqual(updated_state.last_powered_cities, summary.powered_cities)
+        self.assertEqual(updated_state.last_income_paid, summary.income_paid)
+        self.assertEqual(tuple(plant.price for plant in updated_state.future_market), (12, 13, 14, 44))
+        self.assertEqual(tuple(plant.price for plant in updated_state.power_plant_bottom_stack), (15,))
+
+    def test_step_2_trigger_starts_before_income_and_updates_market(self) -> None:
+        state = _bureaucracy_test_state(
+            player_specs={
+                "p1": {"cities": 7, "plants": (13,), "storage": {}, "elektro": 40},
+                "p2": {"cities": 4, "plants": (18,), "storage": {}, "elektro": 35},
+                "p3": {"cities": 2, "plants": (22,), "storage": {}, "elektro": 30},
+            }
+        )
+
+        self.assertTrue(check_step_2_trigger(state))
+        updated_state, summary = resolve_bureaucracy(
+            state,
+            generation_choices={"p1": (13,), "p2": (18,), "p3": (22,)},
+        )
+
+        self.assertTrue(summary.triggered_step_2)
+        self.assertEqual(summary.refill_step_used, 2)
+        self.assertEqual(updated_state.step, 2)
+        self.assertNotIn(6, tuple(plant.price for plant in (*updated_state.current_market, *updated_state.future_market)))
+        self.assertEqual(tuple(plant.price for plant in updated_state.future_market), (13, 14, 15, 29))
+
+    def test_step_3_trigger_reduces_market_and_uses_previous_refill_step(self) -> None:
+        state = _bureaucracy_test_state(
+            step=2,
+            player_specs={
+                "p1": {"cities": 3, "plants": (13,), "storage": {}, "elektro": 40},
+                "p2": {"cities": 4, "plants": (18,), "storage": {}, "elektro": 35},
+                "p3": {"cities": 2, "plants": (22,), "storage": {}, "elektro": 30},
+            },
+            draw_stack_prices=(),
+            bottom_stack_prices=(25, 31, 33),
+        )
+        depleted_market = state.resource_market.remove_from_market("oil", 4)
+        state = replace(state, resource_market=depleted_market)
+
+        self.assertTrue(check_step_3_trigger(state))
+        updated_state, summary = resolve_bureaucracy(
+            state,
+            generation_choices={"p1": (13,), "p2": (18,), "p3": (22,)},
+        )
+
+        self.assertTrue(summary.triggered_step_3)
+        self.assertEqual(summary.refill_step_used, 2)
+        self.assertEqual(updated_state.step, 3)
+        self.assertFalse(updated_state.step_3_card_pending)
+        self.assertEqual(len(updated_state.current_market), 6)
+        self.assertEqual(updated_state.future_market, ())
+        self.assertEqual(updated_state.resource_market.total_in_market("oil"), 17)
+        self.assertEqual(updated_state.power_plant_bottom_stack, ())
+
+    def test_resolve_winner_uses_powered_cities_then_money_then_connected_cities(self) -> None:
+        state = _bureaucracy_test_state(
+            player_specs={
+                "p1": {"cities": 17, "plants": (25, 13), "storage": {"coal": 2}, "elektro": 40},
+                "p2": {"cities": 15, "plants": (20, 23), "storage": {"coal": 3, "uranium": 1}, "elektro": 20},
+                "p3": {"cities": 10, "plants": (18, 22), "storage": {}, "elektro": 50},
+            },
+        )
+        updated_state, summary = resolve_bureaucracy(
+            state,
+            generation_choices={"p1": (25, 13), "p2": (20, 23), "p3": (18, 22)},
+        )
+
+        self.assertTrue(summary.game_end_triggered)
+        self.assertIsNotNone(summary.winner_result)
+        assert summary.winner_result is not None
+        self.assertEqual(summary.winner_result.winner_ids, ("p2",))
+        self.assertEqual(summary.powered_cities, {"p3": 4, "p1": 6, "p2": 8})
+        self.assertEqual(updated_state.phase, "bureaucracy")
+
+        tiebreak_state = replace(
+            state,
+            players=tuple(
+                replace(player, elektro=70 if player.player_id == "p2" else 60 if player.player_id == "p1" else 10)
+                for player in state.players
+            ),
+            last_powered_cities={"p1": 6, "p2": 6, "p3": 1},
+        )
+        self.assertEqual(resolve_winner(tiebreak_state).winner_ids, ("p2",))
+        second_tiebreak_state = replace(
+            tiebreak_state,
+            players=tuple(replace(player, elektro=60 if player.player_id in {"p1", "p2"} else player.elektro) for player in tiebreak_state.players),
+        )
+        self.assertEqual(resolve_winner(second_tiebreak_state).winner_ids, ("p1",))
 
     def test_replace_plant_if_needed_discards_excess_resources_when_capacity_shrinks(self) -> None:
         base_state = advance_phase(

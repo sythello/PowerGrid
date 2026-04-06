@@ -101,3 +101,40 @@ Supported commands:
 - `status`
 - `help`
 - `quit`
+
+## Bureaucracy Phase Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_bureaucracy_phase.py
+```
+
+You can also choose a focused scenario:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_bureaucracy_phase.py --scenario step3 --seed 7
+```
+
+Available scenarios:
+- `normal`
+- `step2`
+- `step3`
+- `endgame`
+
+The script will:
+- build a valid seeded state in the `bureaucracy` phase
+- seed players with city networks, power plants, and shared resource storage
+- let each player choose which power plants to run
+- validate hybrid-fuel mixes when you provide them
+- resolve the whole Bureaucracy phase and print step changes, incomes, market updates, and winner information
+
+Supported commands:
+- `options`
+- `run <plant_price>[:resource=amount,...] ...`
+- `skip`
+- `done`
+- `status`
+- `resolve`
+- `help`
+- `quit`

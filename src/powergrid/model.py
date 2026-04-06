@@ -586,6 +586,84 @@ class AuctionState:
 
 
 @dataclass
+class PlantRunPlan:
+    plant_price: int
+    resource_mix: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.plant_price = int(self.plant_price)
+        if self.plant_price <= 0:
+            raise ModelValidationError("plant run plan must reference a positive plant price")
+        self.resource_mix = _normalize_resource_mix(self.resource_mix)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "plant_price": self.plant_price,
+            "resource_mix": dict(self.resource_mix),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PlantRunPlan":
+        return cls(
+            plant_price=int(payload["plant_price"]),
+            resource_mix=dict(payload.get("resource_mix", {})),
+        )
+
+
+@dataclass
+class WinnerResult:
+    winner_ids: tuple[str, ...]
+    powered_cities: dict[str, int]
+    money: dict[str, int]
+    connected_cities: dict[str, int]
+
+    def __post_init__(self) -> None:
+        self.winner_ids = tuple(self.winner_ids)
+        self.powered_cities = {player_id: int(value) for player_id, value in self.powered_cities.items()}
+        self.money = {player_id: int(value) for player_id, value in self.money.items()}
+        self.connected_cities = {
+            player_id: int(value) for player_id, value in self.connected_cities.items()
+        }
+        if not self.winner_ids:
+            raise ModelValidationError("winner result must include at least one winner")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "winner_ids": list(self.winner_ids),
+            "powered_cities": dict(self.powered_cities),
+            "money": dict(self.money),
+            "connected_cities": dict(self.connected_cities),
+        }
+
+
+@dataclass
+class BureaucracySummary:
+    powered_cities: dict[str, int]
+    income_paid: dict[str, int]
+    triggered_step_2: bool
+    triggered_step_3: bool
+    refill_step_used: int
+    game_end_triggered: bool
+    winner_result: WinnerResult | None = None
+
+    def __post_init__(self) -> None:
+        self.powered_cities = {player_id: int(value) for player_id, value in self.powered_cities.items()}
+        self.income_paid = {player_id: int(value) for player_id, value in self.income_paid.items()}
+        self.refill_step_used = int(self.refill_step_used)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "powered_cities": dict(self.powered_cities),
+            "income_paid": dict(self.income_paid),
+            "triggered_step_2": self.triggered_step_2,
+            "triggered_step_3": self.triggered_step_3,
+            "refill_step_used": self.refill_step_used,
+            "game_end_triggered": self.game_end_triggered,
+            "winner_result": self.winner_result.to_dict() if self.winner_result is not None else None,
+        }
+
+
+@dataclass
 class GameState:
     config: GameConfig
     game_map: MapDefinition
@@ -596,6 +674,7 @@ class GameState:
     current_market: tuple[PowerPlantCard, ...]
     future_market: tuple[PowerPlantCard, ...]
     power_plant_draw_stack: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
+    power_plant_bottom_stack: tuple[PowerPlantCard, ...] = field(default_factory=tuple)
     step_3_card_pending: bool = True
     round_number: int = 0
     step: int = 1
@@ -603,6 +682,8 @@ class GameState:
     selected_regions: tuple[str, ...] = field(default_factory=tuple)
     auction_state: AuctionState | None = None
     pending_decision: DecisionRequest | None = None
+    last_powered_cities: dict[str, int] = field(default_factory=dict)
+    last_income_paid: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.players = tuple(self.players)
@@ -610,7 +691,14 @@ class GameState:
         self.current_market = tuple(self.current_market)
         self.future_market = tuple(self.future_market)
         self.power_plant_draw_stack = tuple(self.power_plant_draw_stack)
+        self.power_plant_bottom_stack = tuple(self.power_plant_bottom_stack)
         self.selected_regions = tuple(self.selected_regions)
+        self.last_powered_cities = {
+            player_id: int(value) for player_id, value in self.last_powered_cities.items()
+        }
+        self.last_income_paid = {
+            player_id: int(value) for player_id, value in self.last_income_paid.items()
+        }
         if self.phase not in GAME_PHASES:
             raise ModelValidationError(f"phase must be one of {GAME_PHASES}")
         if self.step not in {1, 2, 3}:
@@ -632,8 +720,14 @@ class GameState:
         required_regions = self.rules.player_count_rules[len(self.players)]["areas"]
         if self.selected_regions and len(self.selected_regions) != required_regions:
             raise ModelValidationError("selected regions must match the required area count")
-        if len(self.current_market) != 4 or len(self.future_market) != 4:
-            raise ModelValidationError("initial game state must contain 4 current and 4 future plants")
+        if self.step in {1, 2}:
+            if len(self.current_market) != 4 or len(self.future_market) != 4:
+                raise ModelValidationError("steps 1 and 2 must contain 4 current and 4 future plants")
+        else:
+            if self.future_market:
+                raise ModelValidationError("step 3 may not contain a future market")
+            if not 1 <= len(self.current_market) <= 6:
+                raise ModelValidationError("step 3 current market must contain between 1 and 6 plants")
         current_prices = [plant.price for plant in self.current_market]
         future_prices = [plant.price for plant in self.future_market]
         if current_prices != sorted(current_prices) or future_prices != sorted(future_prices):
@@ -641,8 +735,14 @@ class GameState:
         if set(current_prices) & set(future_prices):
             raise ModelValidationError("current and future markets may not overlap")
         stack_prices = [plant.price for plant in self.power_plant_draw_stack]
-        if (set(current_prices) | set(future_prices)) & set(stack_prices):
+        bottom_prices = [plant.price for plant in self.power_plant_bottom_stack]
+        visible_prices = set(current_prices) | set(future_prices)
+        if visible_prices & set(stack_prices):
             raise ModelValidationError("draw stack may not overlap with visible markets")
+        if visible_prices & set(bottom_prices):
+            raise ModelValidationError("bottom stack may not overlap with visible markets")
+        if set(stack_prices) & set(bottom_prices):
+            raise ModelValidationError("draw stack may not overlap with bottom stack")
         if self.auction_state is not None:
             if (
                 self.auction_state.discount_token_plant_price is not None
@@ -676,6 +776,7 @@ class GameState:
             "current_market": [plant.to_dict() for plant in self.current_market],
             "future_market": [plant.to_dict() for plant in self.future_market],
             "power_plant_draw_stack": [plant.to_dict() for plant in self.power_plant_draw_stack],
+            "power_plant_bottom_stack": [plant.to_dict() for plant in self.power_plant_bottom_stack],
             "step_3_card_pending": self.step_3_card_pending,
             "round_number": self.round_number,
             "step": self.step,
@@ -685,6 +786,8 @@ class GameState:
             "pending_decision": (
                 self.pending_decision.to_dict() if self.pending_decision is not None else None
             ),
+            "last_powered_cities": dict(self.last_powered_cities),
+            "last_income_paid": dict(self.last_income_paid),
         }
 
     @classmethod
@@ -706,6 +809,10 @@ class GameState:
                 PowerPlantCard.from_dict(plant)
                 for plant in payload.get("power_plant_draw_stack", [])
             ),
+            power_plant_bottom_stack=tuple(
+                PowerPlantCard.from_dict(plant)
+                for plant in payload.get("power_plant_bottom_stack", [])
+            ),
             step_3_card_pending=bool(payload.get("step_3_card_pending", True)),
             round_number=int(payload["round_number"]),
             step=int(payload["step"]),
@@ -721,6 +828,8 @@ class GameState:
                 if payload.get("pending_decision") is not None
                 else None
             ),
+            last_powered_cities=dict(payload.get("last_powered_cities", {})),
+            last_income_paid=dict(payload.get("last_income_paid", {})),
         )
 
 
@@ -1218,6 +1327,187 @@ def refill_resource_market(
     return ResourceMarket(market=updated_market, supply=updated_supply)
 
 
+def choose_plants_to_run(
+    state: GameState,
+    player_id: str,
+    selection: (
+        tuple[int | PlantRunPlan, ...]
+        | list[int | PlantRunPlan]
+        | dict[int | str, dict[str, int] | None]
+    ),
+) -> tuple[PlantRunPlan, ...]:
+    player = _get_player(state, player_id)
+    return _normalize_run_selection(player, selection)
+
+
+def consume_resources(
+    state: GameState,
+    player_id: str,
+    selection: (
+        tuple[int | PlantRunPlan, ...]
+        | list[int | PlantRunPlan]
+        | dict[int | str, dict[str, int] | None]
+    ),
+) -> GameState:
+    player = _get_player(state, player_id)
+    plans = _normalize_run_selection(player, selection)
+    required = _summarize_resource_usage(plans)
+    remaining = player.resource_storage.resource_totals()
+    for resource, amount in required.items():
+        if amount > remaining[resource]:
+            raise ModelValidationError(f"player does not have enough {resource} to run the selected plants")
+        remaining[resource] -= amount
+    updated_player = replace(
+        player,
+        resource_storage=_normalize_resource_totals_into_storage(
+            remaining,
+            _storage_space_capacities(player.power_plants),
+        ),
+    )
+    return _replace_player_on_state(state, updated_player)
+
+
+def compute_powered_cities(
+    state: GameState,
+    player_id: str,
+    selection: (
+        tuple[int | PlantRunPlan, ...]
+        | list[int | PlantRunPlan]
+        | dict[int | str, dict[str, int] | None]
+    ),
+) -> int:
+    player = _get_player(state, player_id)
+    plans = _normalize_run_selection(player, selection)
+    output = 0
+    for plan in plans:
+        plant = _get_player_power_plant(player, plan.plant_price)
+        output += plant.output_cities
+    return min(output, player.connected_city_count)
+
+
+def pay_income(rules: RuleTables, powered_cities: int) -> int:
+    bounded = max(0, min(20, int(powered_cities)))
+    return int(rules.payment_schedule[bounded])
+
+
+def update_plant_market_after_bureaucracy(state: GameState) -> GameState:
+    return _update_plant_market_after_bureaucracy(state)
+
+
+def check_step_2_trigger(state: GameState) -> bool:
+    if state.step != 1:
+        return False
+    threshold = state.rules.player_count_rules[len(state.players)]["step_2_cities"]
+    return any(player.connected_city_count >= threshold for player in state.players)
+
+
+def check_step_3_trigger(state: GameState) -> bool:
+    return state.step_3_card_pending and not state.power_plant_draw_stack
+
+
+def resolve_winner(
+    state: GameState,
+    powered_cities: dict[str, int] | None = None,
+) -> WinnerResult:
+    powered = (
+        {player_id: int(value) for player_id, value in powered_cities.items()}
+        if powered_cities is not None
+        else dict(state.last_powered_cities)
+    )
+    if not powered:
+        raise ModelValidationError("winner resolution requires powered-city totals for the round")
+
+    money = {player.player_id: player.elektro for player in state.players}
+    connected = {player.player_id: player.connected_city_count for player in state.players}
+    prior_index = {player_id: index for index, player_id in enumerate(state.player_order)}
+    ordered_player_ids = sorted(
+        powered,
+        key=lambda player_id: (
+            -powered[player_id],
+            -money[player_id],
+            -connected[player_id],
+            prior_index.get(player_id, 0),
+        ),
+    )
+    best_id = ordered_player_ids[0]
+    best_signature = (powered[best_id], money[best_id], connected[best_id])
+    winner_ids = tuple(
+        player_id
+        for player_id in ordered_player_ids
+        if (powered[player_id], money[player_id], connected[player_id]) == best_signature
+    )
+    return WinnerResult(
+        winner_ids=winner_ids,
+        powered_cities=powered,
+        money=money,
+        connected_cities=connected,
+    )
+
+
+def resolve_bureaucracy(
+    state: GameState,
+    generation_choices: dict[str, tuple[int | PlantRunPlan, ...] | list[int | PlantRunPlan] | dict[int | str, dict[str, int] | None]] | None = None,
+) -> tuple[GameState, BureaucracySummary]:
+    if state.phase != "bureaucracy":
+        raise ModelValidationError("bureaucracy resolution may only be used during the bureaucracy phase")
+
+    choices = generation_choices or {}
+    working_state = state
+    triggered_step_2 = check_step_2_trigger(working_state)
+    if triggered_step_2:
+        working_state = _apply_step_2_transition(working_state)
+
+    refill_step_used = working_state.step
+    powered_cities: dict[str, int] = {}
+    income_paid: dict[str, int] = {}
+
+    for player_id in working_state.player_order:
+        selection = choices.get(player_id, ())
+        powered = compute_powered_cities(working_state, player_id, selection)
+        working_state = consume_resources(working_state, player_id, selection)
+        player = _get_player(working_state, player_id)
+        income = pay_income(working_state.rules, powered)
+        powered_cities[player_id] = powered
+        income_paid[player_id] = income
+        working_state = _replace_player_on_state(
+            working_state,
+            replace(player, elektro=player.elektro + income),
+        )
+
+    working_state = replace(
+        working_state,
+        last_powered_cities=powered_cities,
+        last_income_paid=income_paid,
+    )
+    working_state = update_plant_market_after_bureaucracy(working_state)
+    triggered_step_3 = working_state.step == 3 and state.step != 3
+    working_state = replace(
+        working_state,
+        resource_market=refill_resource_market(
+            working_state.resource_market,
+            working_state.rules,
+            step=refill_step_used,
+            player_count=len(working_state.players),
+        ),
+    )
+
+    game_end_triggered = _check_end_game_trigger(working_state)
+    winner_result = resolve_winner(working_state, powered_cities) if game_end_triggered else None
+    if not game_end_triggered:
+        working_state = advance_round(working_state)
+
+    summary = BureaucracySummary(
+        powered_cities=powered_cities,
+        income_paid=income_paid,
+        triggered_step_2=triggered_step_2,
+        triggered_step_3=triggered_step_3,
+        refill_step_used=refill_step_used,
+        game_end_triggered=game_end_triggered,
+        winner_result=winner_result,
+    )
+    return working_state, summary
+
+
 def compute_connection_cost(
     state: GameState,
     player_id: str,
@@ -1353,8 +1643,9 @@ def advance_round(state: GameState) -> GameState:
         )
     if state.phase != "bureaucracy":
         raise ModelValidationError("advance_round may only be called from setup or bureaucracy")
+    ordered_state = _recalculate_player_order(state)
     return replace(
-        state,
+        ordered_state,
         phase="determine_order",
         round_number=state.round_number + 1,
         auction_state=None,
@@ -1494,6 +1785,277 @@ def _normalize_purchase_request(
                 aggregated[resource] += amount
         return {resource: amount for resource, amount in aggregated.items() if amount}
     return _normalize_resource_mix(basket)  # type: ignore[arg-type]
+
+
+def _get_player_power_plant(player: PlayerState, plant_price: int) -> PowerPlantCard:
+    for plant in player.power_plants:
+        if plant.price == int(plant_price):
+            return plant
+    raise ModelValidationError(f"player does not own power plant {plant_price}")
+
+
+def _normalize_run_selection(
+    player: PlayerState,
+    selection: (
+        tuple[int | PlantRunPlan, ...]
+        | list[int | PlantRunPlan]
+        | dict[int | str, dict[str, int] | None]
+    ),
+) -> tuple[PlantRunPlan, ...]:
+    if isinstance(selection, dict):
+        raw_items = [(int(plant_price), mix) for plant_price, mix in selection.items()]
+    else:
+        raw_items = []
+        for item in selection:
+            if isinstance(item, PlantRunPlan):
+                raw_items.append((item.plant_price, dict(item.resource_mix)))
+            else:
+                raw_items.append((int(item), None))
+
+    remaining_resources = player.resource_storage.resource_totals()
+    seen_prices: set[int] = set()
+    plans: list[PlantRunPlan] = []
+
+    for plant_price, requested_mix in raw_items:
+        if plant_price in seen_prices:
+            raise ModelValidationError("a power plant may only be selected once per bureaucracy phase")
+        seen_prices.add(plant_price)
+        plant = _get_player_power_plant(player, plant_price)
+
+        if plant.is_ecological:
+            normalized_mix: dict[str, int] = {}
+        elif plant.is_hybrid:
+            if requested_mix:
+                normalized_mix = _normalize_resource_mix(requested_mix)
+                if set(normalized_mix) - {"coal", "oil"}:
+                    raise ModelValidationError("hybrid plants may only consume coal and oil")
+                if sum(normalized_mix.values()) != plant.resource_cost:
+                    raise ModelValidationError(
+                        f"hybrid plant {plant.price} must consume exactly {plant.resource_cost} resources"
+                    )
+            else:
+                normalized_mix = _default_hybrid_mix(remaining_resources, plant.resource_cost)
+        else:
+            resource = plant.resource_types[0]
+            expected_mix = {resource: plant.resource_cost}
+            if requested_mix:
+                normalized_mix = _normalize_resource_mix(requested_mix)
+                if normalized_mix != expected_mix:
+                    raise ModelValidationError(
+                        f"power plant {plant.price} must consume exactly {expected_mix}"
+                    )
+            else:
+                normalized_mix = expected_mix
+
+        for resource, amount in normalized_mix.items():
+            if amount > remaining_resources[resource]:
+                raise ModelValidationError(
+                    f"player does not have enough {resource} to run power plant {plant.price}"
+                )
+            remaining_resources[resource] -= amount
+        plans.append(PlantRunPlan(plant_price=plant.price, resource_mix=normalized_mix))
+
+    return tuple(plans)
+
+
+def _default_hybrid_mix(
+    available_resources: dict[str, int],
+    required_amount: int,
+) -> dict[str, int]:
+    coal_used = min(available_resources["coal"], required_amount)
+    oil_used = min(available_resources["oil"], required_amount - coal_used)
+    if coal_used + oil_used != required_amount:
+        raise ModelValidationError("player does not have enough coal and oil to run the hybrid plant")
+    mix: dict[str, int] = {}
+    if coal_used:
+        mix["coal"] = coal_used
+    if oil_used:
+        mix["oil"] = oil_used
+    return mix
+
+
+def _summarize_resource_usage(plans: tuple[PlantRunPlan, ...]) -> dict[str, int]:
+    usage = {resource: 0 for resource in RESOURCE_TYPES}
+    for plan in plans:
+        for resource, amount in plan.resource_mix.items():
+            usage[resource] += amount
+    return usage
+
+
+def _highest_connected_city_count(state: GameState) -> int:
+    return max((player.connected_city_count for player in state.players), default=0)
+
+
+def _check_end_game_trigger(state: GameState) -> bool:
+    threshold = state.rules.player_count_rules[len(state.players)]["end_game_cities"]
+    return any(player.connected_city_count >= threshold for player in state.players)
+
+
+def _visible_market(state: GameState) -> list[PowerPlantCard]:
+    return sorted((*state.current_market, *state.future_market), key=lambda plant: plant.price)
+
+
+def _replace_visible_market(
+    state: GameState,
+    visible_market: list[PowerPlantCard] | tuple[PowerPlantCard, ...],
+    *,
+    step_override: int | None = None,
+    draw_stack: tuple[PowerPlantCard, ...] | None = None,
+    bottom_stack: tuple[PowerPlantCard, ...] | None = None,
+    step_3_card_pending: bool | None = None,
+) -> GameState:
+    step = state.step if step_override is None else step_override
+    ordered = tuple(sorted(visible_market, key=lambda plant: plant.price))
+    replace_kwargs: dict[str, Any] = {
+        "step": step,
+        "power_plant_draw_stack": state.power_plant_draw_stack if draw_stack is None else draw_stack,
+        "power_plant_bottom_stack": (
+            state.power_plant_bottom_stack if bottom_stack is None else bottom_stack
+        ),
+        "step_3_card_pending": (
+            state.step_3_card_pending if step_3_card_pending is None else step_3_card_pending
+        ),
+    }
+    if step == 3:
+        return replace(state, current_market=ordered, future_market=(), **replace_kwargs)
+    if len(ordered) != 8:
+        raise ModelValidationError("steps 1 and 2 must expose exactly 8 visible power plants")
+    return replace(
+        state,
+        current_market=ordered[:4],
+        future_market=ordered[4:8],
+        **replace_kwargs,
+    )
+
+
+def _draw_valid_market_plant(
+    draw_stack: tuple[PowerPlantCard, ...],
+    minimum_allowed_price: int,
+    *,
+    trigger_step_3_if_exhausted: bool,
+) -> tuple[PowerPlantCard | None, tuple[PowerPlantCard, ...], bool]:
+    remaining = list(draw_stack)
+    while remaining:
+        candidate = remaining.pop(0)
+        if candidate.price <= minimum_allowed_price:
+            continue
+        return candidate, tuple(remaining), False
+    return None, tuple(remaining), trigger_step_3_if_exhausted
+
+
+def _shuffle_bottom_stack_for_step_3(
+    state: GameState,
+    bottom_stack: tuple[PowerPlantCard, ...],
+) -> tuple[PowerPlantCard, ...]:
+    shuffled = list(bottom_stack)
+    rng = random.Random(f"{state.config.seed}:step3:{state.round_number}:{len(bottom_stack)}")
+    rng.shuffle(shuffled)
+    return tuple(shuffled)
+
+
+def _apply_step_2_transition(state: GameState) -> GameState:
+    if not check_step_2_trigger(state):
+        return state
+
+    lowest_current = min(state.current_market, key=lambda plant: plant.price)
+    visible_market = [
+        plant
+        for plant in _visible_market(state)
+        if plant.price != lowest_current.price
+    ]
+    replacement, draw_stack, trigger_step_3 = _draw_valid_market_plant(
+        state.power_plant_draw_stack,
+        _highest_connected_city_count(state),
+        trigger_step_3_if_exhausted=state.step_3_card_pending,
+    )
+    if replacement is not None:
+        visible_market.append(replacement)
+        return _replace_visible_market(
+            state,
+            visible_market,
+            step_override=2,
+            draw_stack=draw_stack,
+        )
+    if trigger_step_3:
+        if visible_market:
+            visible_market = visible_market[1:]
+        return _replace_visible_market(
+            state,
+            visible_market,
+            step_override=3,
+            draw_stack=_shuffle_bottom_stack_for_step_3(
+                state,
+                state.power_plant_bottom_stack,
+            ),
+            bottom_stack=(),
+            step_3_card_pending=False,
+        )
+    return _replace_visible_market(
+        state,
+        visible_market,
+        step_override=2,
+        draw_stack=draw_stack,
+    )
+
+
+def _update_plant_market_after_bureaucracy(state: GameState) -> GameState:
+    visible_market = _visible_market(state)
+    if not visible_market:
+        return state
+
+    if state.step in {1, 2}:
+        cycled_highest = visible_market.pop(-1)
+        bottom_stack = tuple((*state.power_plant_bottom_stack, cycled_highest))
+        replacement, draw_stack, trigger_step_3 = _draw_valid_market_plant(
+            state.power_plant_draw_stack,
+            _highest_connected_city_count(state),
+            trigger_step_3_if_exhausted=state.step_3_card_pending,
+        )
+        if replacement is not None:
+            visible_market.append(replacement)
+            return _replace_visible_market(
+                state,
+                visible_market,
+                step_override=state.step,
+                draw_stack=draw_stack,
+                bottom_stack=bottom_stack,
+            )
+        if trigger_step_3:
+            if visible_market:
+                visible_market = visible_market[1:]
+            return _replace_visible_market(
+                state,
+                visible_market,
+                step_override=3,
+                draw_stack=_shuffle_bottom_stack_for_step_3(
+                    state,
+                    bottom_stack,
+                ),
+                bottom_stack=(),
+                step_3_card_pending=False,
+            )
+        return _replace_visible_market(
+            state,
+            visible_market,
+            step_override=state.step,
+            draw_stack=draw_stack,
+            bottom_stack=bottom_stack,
+        )
+
+    visible_market = visible_market[1:]
+    replacement, draw_stack, _ = _draw_valid_market_plant(
+        state.power_plant_draw_stack,
+        _highest_connected_city_count(state),
+        trigger_step_3_if_exhausted=False,
+    )
+    if replacement is not None:
+        visible_market.append(replacement)
+    return _replace_visible_market(
+        state,
+        visible_market,
+        step_override=3,
+        draw_stack=draw_stack,
+    )
 
 
 def _allowed_city_ids(state: GameState) -> set[str]:
@@ -1790,6 +2352,23 @@ def _remove_visible_plant_and_refill(
     auction_state = state.auction_state
     if auction_state is not None and clear_discount_before_refill:
         auction_state = replace(auction_state, discount_token_plant_price=None)
+
+    if state.step == 3:
+        drawn_plant, remaining_stack, _ = _draw_valid_market_plant(
+            tuple(draw_stack),
+            _highest_connected_city_count(state),
+            trigger_step_3_if_exhausted=False,
+        )
+        if drawn_plant is not None:
+            visible_market.append(drawn_plant)
+        visible_market.sort(key=lambda plant: plant.price)
+        return replace(
+            state,
+            current_market=tuple(visible_market),
+            future_market=(),
+            power_plant_draw_stack=remaining_stack,
+            auction_state=auction_state,
+        )
 
     if draw_stack:
         drawn_plant = draw_stack.pop(0)
