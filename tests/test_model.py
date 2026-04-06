@@ -31,8 +31,10 @@ from powergrid.model import (
     pay_income,
     purchase_resources,
     refill_resource_market,
+    remove_power_plant_from_player,
     ResourceStorage,
     ResourceMarket,
+    set_player_resource_totals,
     advance_phase,
     advance_round,
     create_initial_state,
@@ -900,6 +902,33 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(
             _player(state, "p3").resource_storage,
             ResourceStorage(hybrid_coal=3, hybrid_oil=1),
+        )
+
+    def test_set_player_resource_totals_can_prompt_for_hybrid_overflow_choice(self) -> None:
+        state = _resource_test_state()
+        player = replace(
+            _player(state, "p1"),
+            resource_storage=ResourceStorage(),
+        )
+        state = replace(
+            state,
+            players=tuple(player if existing.player_id == "p1" else existing for existing in state.players),
+        )
+
+        state = set_player_resource_totals(state, "p1", {"coal": 6, "oil": 4})
+        self.assertIsNotNone(state.pending_decision)
+        assert state.pending_decision is not None
+        self.assertEqual(state.pending_decision.decision_type, "discard_hybrid_resources")
+        self.assertEqual(
+            {(action.payload["coal"], action.payload["oil"]) for action in state.pending_decision.legal_actions},
+            {(0, 2), (1, 1), (2, 0)},
+        )
+
+        state = discard_resources_to_fit_storage(state, "p1", {"coal": 1, "oil": 1})
+        self.assertIsNone(state.pending_decision)
+        self.assertEqual(
+            _player(state, "p1").resource_storage,
+            ResourceStorage(coal=4, hybrid_coal=1, hybrid_oil=3),
         )
 
     def test_list_auctionable_plants_returns_current_market(self) -> None:

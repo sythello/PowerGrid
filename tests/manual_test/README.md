@@ -183,3 +183,26 @@ Supported full-game commands depend on the active phase:
 - `build_houses`: `options`, `quote <city_id> [city_id ...]`, `build <city_id> [city_id ...]`, `done`
 - `bureaucracy`: `options`, `run <plant_price>[:resource=amount,...] ...`, `skip`
 - utility commands in every phase: `status`, `help`, `quit`
+
+## Debug Commands In The Main CLI
+
+Enable them in the main game entrypoint with:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.play_cli_game --allow-debug-commands
+```
+
+When enabled, the following commands are available during any prompt:
+- `debug-help`
+- `add-plant [player_id] <plant_price>`
+- `rm-plant [player_id] <plant_price>`
+- `set-resource [player_id] <resource>=<amount> [<resource>=<amount> ...]`
+- `add-city [player_id] <city_id>`
+- `clear-city <city_id>`
+
+Notes:
+- If `player_id` is omitted, the current acting player is used.
+- `rm-plant` and `set-resource` can trigger a follow-up hybrid discard prompt:
+  - `discard coal=<amount> oil=<amount>`
+- `add-city` ignores Step 1/2/3 build-slot restrictions and does not change house supply.
+- `clear-city` removes all houses from that city and also does not change house supply.

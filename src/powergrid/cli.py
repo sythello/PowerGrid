@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 from .model import (
     BureaucracySummary,
     DecisionRequest,
+    add_power_plant_to_player,
     discard_resources_to_fit_storage,
     GameState,
     ModelValidationError,
     PlantRunPlan,
     PowerPlantCard,
+    remove_power_plant_from_player,
     advance_phase,
     apply_builds,
     build_city,
@@ -25,6 +27,7 @@ from .model import (
     raise_bid,
     replace_plant_if_needed,
     resolve_bureaucracy,
+    set_player_resource_totals,
     start_auction,
     WinnerResult,
 )
@@ -204,6 +207,7 @@ def run_game(
     output_fn: OutputFn | None = print,
     render_state: bool = True,
     stop_condition: StopCondition | None = None,
+    allow_debug_commands: bool = False,
 ) -> GameRunResult:
     _validate_controllers(state, controllers)
     emit = output_fn if output_fn is not None else (lambda _: None)
@@ -232,6 +236,7 @@ def run_game(
                 controllers,
                 output_fn=emit,
                 render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
             )
             if quit_requested:
                 break
@@ -246,6 +251,7 @@ def run_game(
                 controllers,
                 output_fn=emit,
                 render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
             )
             if quit_requested:
                 break
@@ -261,6 +267,7 @@ def run_game(
                 controllers,
                 output_fn=emit,
                 render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
             )
             if quit_requested:
                 break
@@ -275,6 +282,8 @@ def run_game(
                 state,
                 controllers,
                 output_fn=emit,
+                render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
             )
             if quit_requested:
                 break
@@ -306,6 +315,7 @@ def _run_auction_phase(
     *,
     output_fn: OutputFn,
     render_state: bool,
+    allow_debug_commands: bool,
 ) -> tuple[GameState, bool]:
     while state.phase == "auction":
         request = _build_auction_request(state)
@@ -327,6 +337,17 @@ def _run_auction_phase(
         if lowered == "options":
             output_fn(_auction_options_text(state))
             continue
+        if allow_debug_commands:
+            state, handled = _apply_debug_command(
+                state,
+                acting_player_id=request.player_id,
+                command=command,
+                output_fn=output_fn,
+            )
+            if handled:
+                if render_state:
+                    output_fn(render_game_state(state, active_player_id=request.player_id))
+                continue
         prior_state = state
         try:
             state = _apply_auction_command(state, request.player_id, command)
@@ -349,10 +370,22 @@ def _run_resource_phase(
     *,
     output_fn: OutputFn,
     render_state: bool,
+    allow_debug_commands: bool,
 ) -> tuple[GameState, bool]:
     buy_order = tuple(reversed(state.player_order))
     active_index = 0
     while active_index < len(buy_order):
+        if state.pending_decision is not None:
+            state, quit_requested = _run_pending_decision(
+                state,
+                controllers,
+                output_fn=output_fn,
+                render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
+            )
+            if quit_requested:
+                return state, True
+            continue
         player_id = buy_order[active_index]
         request = DecisionRequest(
             player_id=player_id,
@@ -381,6 +414,17 @@ def _run_resource_phase(
         if lowered == "options":
             output_fn(_resource_options_text(state, player_id))
             continue
+        if allow_debug_commands:
+            state, handled = _apply_debug_command(
+                state,
+                acting_player_id=player_id,
+                command=command,
+                output_fn=output_fn,
+            )
+            if handled:
+                if render_state:
+                    output_fn(render_game_state(state, active_player_id=player_id))
+                continue
         if lowered == "done":
             active_index += 1
             output_fn(f"{player_id} finished resource buying.")
@@ -407,10 +451,22 @@ def _run_build_phase(
     *,
     output_fn: OutputFn,
     render_state: bool,
+    allow_debug_commands: bool,
 ) -> tuple[GameState, bool]:
     build_order = tuple(reversed(state.player_order))
     active_index = 0
     while active_index < len(build_order):
+        if state.pending_decision is not None:
+            state, quit_requested = _run_pending_decision(
+                state,
+                controllers,
+                output_fn=output_fn,
+                render_state=render_state,
+                allow_debug_commands=allow_debug_commands,
+            )
+            if quit_requested:
+                return state, True
+            continue
         player_id = build_order[active_index]
         request = DecisionRequest(
             player_id=player_id,
@@ -440,6 +496,17 @@ def _run_build_phase(
         if lowered == "options":
             output_fn(_build_options_text(state, player_id))
             continue
+        if allow_debug_commands:
+            state, handled = _apply_debug_command(
+                state,
+                acting_player_id=player_id,
+                command=command,
+                output_fn=output_fn,
+            )
+            if handled:
+                if render_state:
+                    output_fn(render_game_state(state, active_player_id=player_id))
+                continue
         if lowered.startswith("quote "):
             try:
                 output_fn(_quote_build_text(state, player_id, command.split()[1:]))
@@ -472,10 +539,23 @@ def _run_bureaucracy_phase(
     controllers: dict[str, CommandController],
     *,
     output_fn: OutputFn,
+    render_state: bool,
+    allow_debug_commands: bool,
 ) -> tuple[GameState, BureaucracySummary, bool]:
     choices: dict[str, tuple[PlantRunPlan, ...]] = {}
     for player_id in state.player_order:
         while True:
+            if state.pending_decision is not None:
+                state, quit_requested = _run_pending_decision(
+                    state,
+                    controllers,
+                    output_fn=output_fn,
+                    render_state=render_state,
+                    allow_debug_commands=allow_debug_commands,
+                )
+                if quit_requested:
+                    return state, BureaucracySummary({}, {}, False, False, state.step, False), True
+                continue
             request = DecisionRequest(
                 player_id=player_id,
                 decision_type="bureaucracy",
@@ -503,6 +583,17 @@ def _run_bureaucracy_phase(
             if lowered == "options":
                 output_fn(_bureaucracy_options_text(state, player_id))
                 continue
+            if allow_debug_commands:
+                state, handled = _apply_debug_command(
+                    state,
+                    acting_player_id=player_id,
+                    command=command,
+                    output_fn=output_fn,
+                )
+                if handled:
+                    if render_state:
+                        output_fn(render_game_state(state, active_player_id=player_id))
+                    continue
             if lowered == "skip":
                 choices[player_id] = ()
                 output_fn(
@@ -528,6 +619,59 @@ def _run_bureaucracy_phase(
             break
     resolved_state, summary = resolve_bureaucracy(state, generation_choices=choices)
     return resolved_state, summary, False
+
+
+def _run_pending_decision(
+    state: GameState,
+    controllers: dict[str, CommandController],
+    *,
+    output_fn: OutputFn,
+    render_state: bool,
+    allow_debug_commands: bool,
+) -> tuple[GameState, bool]:
+    request = _build_pending_request(state)
+    controller = controllers[request.player_id]
+    command = controller.choose_command(request).strip()
+    if not command:
+        if getattr(controller, "interactive", False):
+            return state, False
+        raise ModelValidationError(f"{request.player_id} returned an empty pending-decision command")
+    lowered = command.lower()
+    if lowered == "quit":
+        return state, True
+    if lowered == "status":
+        output_fn(render_game_state(state, active_player_id=request.player_id))
+        return state, False
+    if lowered == "help":
+        output_fn(_pending_help_text(state))
+        return state, False
+    if lowered == "options":
+        output_fn(_pending_options_text(state))
+        return state, False
+    if allow_debug_commands:
+        state, handled = _apply_debug_command(
+            state,
+            acting_player_id=request.player_id,
+            command=command,
+            output_fn=output_fn,
+        )
+        if handled:
+            if render_state:
+                output_fn(render_game_state(state, active_player_id=request.player_id))
+            return state, False
+    try:
+        state = _apply_pending_command(state, request.player_id, command)
+    except (ModelValidationError, ValueError) as exc:
+        if getattr(controller, "interactive", False):
+            output_fn(f"Rejected: {exc}")
+            return state, False
+        raise ModelValidationError(
+            f"{request.player_id} pending command {command!r} rejected: {exc}"
+        ) from exc
+    output_fn("Accepted.")
+    if render_state:
+        output_fn(render_game_state(state, active_player_id=request.player_id))
+    return state, False
 
 
 def _apply_auction_command(state: GameState, player_id: str, command: str) -> GameState:
@@ -579,6 +723,24 @@ def _apply_build_command(state: GameState, player_id: str, command: str) -> Game
     return apply_builds(state, player_id, city_ids)
 
 
+def _apply_pending_command(state: GameState, player_id: str, command: str) -> GameState:
+    if state.pending_decision is None:
+        raise ModelValidationError("there is no pending decision to resolve")
+    if state.pending_decision.player_id != player_id:
+        raise ModelValidationError("the pending decision belongs to another player")
+    tokens = command.split()
+    decision_type = state.pending_decision.decision_type
+    if decision_type == "discard_power_plant":
+        if tokens[0].lower() != "discard" or len(tokens) != 2:
+            raise ValueError("expected: discard <plant_price>")
+        return replace_plant_if_needed(state, player_id, int(tokens[1]))
+    if decision_type == "discard_hybrid_resources":
+        if tokens[0].lower() != "discard" or len(tokens) < 2:
+            raise ValueError("expected: discard coal=<amount> oil=<amount>")
+        return discard_resources_to_fit_storage(state, player_id, _parse_named_resource_mix(tokens[1:]))
+    raise ModelValidationError(f"unsupported pending decision type {decision_type!r}")
+
+
 def _parse_run_command(command: str) -> tuple[PlantRunPlan, ...]:
     tokens = command.split()
     if len(tokens) < 2 or tokens[0].lower() != "run":
@@ -597,29 +759,34 @@ def _parse_run_command(command: str) -> tuple[PlantRunPlan, ...]:
     return tuple(plans)
 
 
-def _build_auction_request(state: GameState) -> DecisionRequest:
-    if state.pending_decision is not None:
-        if state.pending_decision.decision_type == "discard_hybrid_resources":
-            return DecisionRequest(
-                player_id=state.pending_decision.player_id,
-                decision_type="discard_hybrid_resources",
-                prompt=(
-                    f"{state.pending_decision.player_id} must discard coal/oil resources to fit the remaining plants. "
-                    "Use: options, discard coal=<amount> oil=<amount>, status, help, quit"
-                ),
-                legal_actions=state.pending_decision.legal_actions,
-                metadata=state.pending_decision.metadata,
-            )
+def _build_pending_request(state: GameState) -> DecisionRequest:
+    assert state.pending_decision is not None
+    if state.pending_decision.decision_type == "discard_hybrid_resources":
         return DecisionRequest(
             player_id=state.pending_decision.player_id,
-            decision_type="discard_power_plant",
+            decision_type="discard_hybrid_resources",
             prompt=(
-                f"{state.pending_decision.player_id} must discard a power plant. "
-                "Use: options, discard <plant_price>, status, help, quit"
+                f"{state.pending_decision.player_id} must discard coal/oil resources to fit the remaining plants. "
+                "Use: options, discard coal=<amount> oil=<amount>, status, help, quit"
             ),
             legal_actions=state.pending_decision.legal_actions,
-            metadata={"phase": state.phase},
+            metadata=dict(state.pending_decision.metadata),
         )
+    return DecisionRequest(
+        player_id=state.pending_decision.player_id,
+        decision_type="discard_power_plant",
+        prompt=(
+            f"{state.pending_decision.player_id} must discard a power plant. "
+            "Use: options, discard <plant_price>, status, help, quit"
+        ),
+        legal_actions=state.pending_decision.legal_actions,
+        metadata=dict(state.pending_decision.metadata),
+    )
+
+
+def _build_auction_request(state: GameState) -> DecisionRequest:
+    if state.pending_decision is not None:
+        return _build_pending_request(state)
     auction_state = state.auction_state
     if auction_state is None:
         raise ModelValidationError("auction state is missing")
@@ -647,23 +814,7 @@ def _build_auction_request(state: GameState) -> DecisionRequest:
 
 def _auction_options_text(state: GameState) -> str:
     if state.pending_decision is not None:
-        if state.pending_decision.decision_type == "discard_hybrid_resources":
-            auto_discards = state.pending_decision.metadata.get("auto_discard_resources", {})
-            options = ", ".join(
-                f"discard coal={action.payload.get('coal', 0)} oil={action.payload.get('oil', 0)}"
-                for action in state.pending_decision.legal_actions
-            )
-            if auto_discards:
-                auto_text = ", ".join(
-                    f"{resource}={amount}" for resource, amount in sorted(auto_discards.items())
-                )
-                return (
-                    "Automatic discards: " + auto_text + "\n"
-                    "Legal coal/oil discard choices: " + options
-                )
-            return "Legal coal/oil discard choices: " + options
-        prices = ", ".join(str(action.payload["price"]) for action in state.pending_decision.legal_actions)
-        return "Legal discard choices: " + prices
+        return _pending_options_text(state)
     auction_state = state.auction_state
     if auction_state is None:
         return "Auction state missing."
@@ -688,6 +839,28 @@ def _auction_options_text(state: GameState) -> str:
         player_id=chooser_id,
         options=", ".join(options) if options else "(none)",
     )
+
+
+def _pending_options_text(state: GameState) -> str:
+    if state.pending_decision is None:
+        return "There is no pending decision."
+    if state.pending_decision.decision_type == "discard_hybrid_resources":
+        auto_discards = state.pending_decision.metadata.get("auto_discard_resources", {})
+        options = ", ".join(
+            f"discard coal={action.payload.get('coal', 0)} oil={action.payload.get('oil', 0)}"
+            for action in state.pending_decision.legal_actions
+        )
+        if auto_discards:
+            auto_text = ", ".join(
+                f"{resource}={amount}" for resource, amount in sorted(auto_discards.items())
+            )
+            return (
+                "Automatic discards: " + auto_text + "\n"
+                "Legal coal/oil discard choices: " + options
+            )
+        return "Legal coal/oil discard choices: " + options
+    prices = ", ".join(str(action.payload["price"]) for action in state.pending_decision.legal_actions)
+    return "Legal discard choices: " + prices
 
 
 def _resource_options_text(state: GameState, player_id: str) -> str:
@@ -768,24 +941,30 @@ def _quote_build_text(state: GameState, player_id: str, city_ids: list[str]) -> 
 
 def _auction_help_text(state: GameState) -> str:
     if state.pending_decision is not None:
-        if state.pending_decision.decision_type == "discard_hybrid_resources":
-            return "Commands: options, discard coal=<amount> oil=<amount>, status, help, quit"
-        return "Commands: options, discard <plant_price>, status, help, quit"
+        return _pending_help_text(state)
     if state.auction_state is not None and state.auction_state.has_active_auction:
-        return "Commands: options, bid <amount>, pass, status, help, quit"
-    return "Commands: options, start <plant_price> <bid>, pass, status, help, quit"
+        return "Commands: options, bid <amount>, pass, status, help, quit, debug-help"
+    return "Commands: options, start <plant_price> <bid>, pass, status, help, quit, debug-help"
 
 
 def _resource_help_text() -> str:
-    return "Commands: options, buy <resource> <amount>, done, status, help, quit"
+    return "Commands: options, buy <resource> <amount>, done, status, help, quit, debug-help"
 
 
 def _build_help_text() -> str:
-    return "Commands: options, quote <city_id> [city_id ...], build <city_id> [city_id ...], done, status, help, quit"
+    return "Commands: options, quote <city_id> [city_id ...], build <city_id> [city_id ...], done, status, help, quit, debug-help"
 
 
 def _bureaucracy_help_text() -> str:
-    return "Commands: options, run <plant_price>[:resource=amount,...] ..., skip, status, help, quit"
+    return "Commands: options, run <plant_price>[:resource=amount,...] ..., skip, status, help, quit, debug-help"
+
+
+def _pending_help_text(state: GameState) -> str:
+    if state.pending_decision is None:
+        return "No pending decision."
+    if state.pending_decision.decision_type == "discard_hybrid_resources":
+        return "Commands: options, discard coal=<amount> oil=<amount>, status, help, quit, debug-help"
+    return "Commands: options, discard <plant_price>, status, help, quit, debug-help"
 
 
 def _append_phase_history(phase_history: list[PhaseTraceEntry], state: GameState) -> None:
@@ -884,3 +1063,162 @@ def _parse_named_resource_mix(tokens: list[str]) -> dict[str, int]:
         resource, amount = token.split("=", 1)
         mix[resource.strip()] = int(amount)
     return mix
+
+
+def _apply_debug_command(
+    state: GameState,
+    *,
+    acting_player_id: str,
+    command: str,
+    output_fn: OutputFn,
+) -> tuple[GameState, bool]:
+    tokens = command.split()
+    if not tokens:
+        return state, False
+    debug_command = tokens[0].lower()
+
+    if debug_command == "debug-help":
+        output_fn(_debug_help_text())
+        return state, True
+
+    if debug_command == "add-plant":
+        player_id, args = _parse_debug_player_and_args(state, acting_player_id, tokens[1:])
+        if len(args) != 1:
+            raise ValueError("expected: add-plant [player_id] <plant_price>")
+        updated_state = add_power_plant_to_player(state, player_id, int(args[0]))
+        output_fn(f"Debug: added power plant {int(args[0])} to {player_id}.")
+        return updated_state, True
+
+    if debug_command == "rm-plant":
+        player_id, args = _parse_debug_player_and_args(state, acting_player_id, tokens[1:])
+        if len(args) != 1:
+            raise ValueError("expected: rm-plant [player_id] <plant_price>")
+        updated_state = remove_power_plant_from_player(state, player_id, int(args[0]))
+        output_fn(f"Debug: removed power plant {int(args[0])} from {player_id}.")
+        return updated_state, True
+
+    if debug_command == "set-resource":
+        player_id, args = _parse_debug_player_and_args(state, acting_player_id, tokens[1:])
+        if not args:
+            raise ValueError(
+                "expected: set-resource [player_id] <resource>=<amount> [<resource>=<amount> ...]"
+            )
+        updates = _parse_resource_assignments(args)
+        updated_state = set_player_resource_totals(state, player_id, updates)
+        output_fn(
+            "Debug: set resources for "
+            f"{player_id} to "
+            + ", ".join(f"{resource}={amount}" for resource, amount in sorted(updates.items()))
+            + "."
+        )
+        return updated_state, True
+
+    if debug_command == "add-city":
+        player_id, args = _parse_debug_player_and_args(state, acting_player_id, tokens[1:])
+        if len(args) != 1:
+            raise ValueError("expected: add-city [player_id] <city_id>")
+        updated_state, message = _debug_add_city(state, player_id, args[0])
+        output_fn(message)
+        return updated_state, True
+
+    if debug_command == "clear-city":
+        if len(tokens) != 2:
+            raise ValueError("expected: clear-city <city_id>")
+        updated_state, message = _debug_clear_city(state, tokens[1])
+        output_fn(message)
+        return updated_state, True
+
+    return state, False
+
+
+def _parse_debug_player_and_args(
+    state: GameState,
+    acting_player_id: str,
+    tokens: list[str],
+) -> tuple[str, list[str]]:
+    player_ids = {player.player_id for player in state.players}
+    if tokens and tokens[0] in player_ids:
+        return tokens[0], tokens[1:]
+    return acting_player_id, tokens
+
+
+def _parse_resource_assignments(tokens: list[str]) -> dict[str, int]:
+    if not tokens:
+        raise ValueError("expected at least one resource assignment")
+    if any("=" in token for token in tokens):
+        return _parse_named_resource_mix(tokens)
+    if len(tokens) % 2 != 0:
+        raise ValueError("expected resource assignments as pairs like coal 2 oil 1")
+    assignments: dict[str, int] = {}
+    for index in range(0, len(tokens), 2):
+        assignments[tokens[index]] = int(tokens[index + 1])
+    return assignments
+
+
+def _debug_add_city(state: GameState, player_id: str, city_id: str) -> tuple[GameState, str]:
+    _get_city_id(state, city_id)
+    player = _get_player(state, player_id)
+    if city_id in player.network_city_ids:
+        return state, f"Debug warning: {player_id} already has a house in {city_id}."
+    occupant_count = sum(1 for existing in state.players if city_id in existing.network_city_ids)
+    if occupant_count >= 3:
+        return state, f"Debug warning: {city_id} already uses all 3 city slots."
+    updated_player = replace(
+        player,
+        network_city_ids=tuple(sorted((*player.network_city_ids, city_id))),
+    )
+    return _replace_player_on_state(state, updated_player), f"Debug: added {player_id} to {city_id}."
+
+
+def _debug_clear_city(state: GameState, city_id: str) -> tuple[GameState, str]:
+    _get_city_id(state, city_id)
+    cleared = 0
+    updated_players = []
+    for player in state.players:
+        if city_id in player.network_city_ids:
+            cleared += 1
+            updated_players.append(
+                replace(
+                    player,
+                    network_city_ids=tuple(
+                        existing_city for existing_city in player.network_city_ids if existing_city != city_id
+                    ),
+                )
+            )
+        else:
+            updated_players.append(player)
+    if cleared == 0:
+        return state, f"Debug warning: no houses were present in {city_id}."
+    return replace(state, players=tuple(updated_players)), f"Debug: cleared {cleared} house(s) from {city_id}."
+
+
+def _debug_help_text() -> str:
+    return "\n".join(
+        (
+            "Debug commands:",
+            "  debug-help",
+            "  add-plant [player_id] <plant_price>",
+            "  rm-plant [player_id] <plant_price>",
+            "  set-resource [player_id] <resource>=<amount> [<resource>=<amount> ...]",
+            "  add-city [player_id] <city_id>",
+            "  clear-city <city_id>",
+            "If player_id is omitted, the current acting player is used.",
+        )
+    )
+
+
+def _replace_player_on_state(state: GameState, updated_player) -> GameState:
+    return replace(
+        state,
+        players=tuple(
+            updated_player if player.player_id == updated_player.player_id else player
+            for player in state.players
+        ),
+    )
+
+
+def _get_city_id(state: GameState, city_id: str) -> str:
+    for city in state.game_map.cities:
+        if city.id == city_id:
+            return city.id
+    raise ModelValidationError(f"unknown city {city_id!r}")

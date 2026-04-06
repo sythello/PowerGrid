@@ -433,8 +433,8 @@ class PlayerState:
             raise ModelValidationError("player elektro cannot be negative")
         if self.houses_in_supply < 0:
             raise ModelValidationError("player houses_in_supply cannot be negative")
-        if self.houses_in_supply + len(self.network_city_ids) != HOUSES_PER_PLAYER:
-            raise ModelValidationError("player houses must add up to 22")
+        if self.houses_in_supply > HOUSES_PER_PLAYER:
+            raise ModelValidationError("player houses_in_supply cannot exceed 22")
         if len(set(self.network_city_ids)) != len(self.network_city_ids):
             raise ModelValidationError("player network cannot contain duplicate cities")
         plant_prices = [plant.price for plant in self.power_plants]
@@ -1270,6 +1270,93 @@ def replace_plant_if_needed(
     return updated_state
 
 
+def add_power_plant_to_player(
+    state: GameState,
+    player_id: str,
+    plant_price: int,
+) -> GameState:
+    player = _get_player(state, player_id)
+    if any(plant.price == plant_price for plant in player.power_plants):
+        raise ModelValidationError(f"player already owns power plant {plant_price}")
+    definitions = {definition.price: definition for definition in load_power_plants()}
+    if plant_price not in definitions:
+        raise ModelValidationError(f"unknown power plant {plant_price}")
+
+    granted_plant = PowerPlantCard.from_definition(definitions[plant_price])
+    updated_power_plants = tuple(sorted((*player.power_plants, granted_plant), key=lambda plant: plant.price))
+    updated_player = replace(
+        player,
+        power_plants=updated_power_plants,
+        resource_storage=_normalize_resource_storage(player.resource_storage, updated_power_plants),
+    )
+    updated_state = _replace_player_on_state(state, updated_player)
+    max_plants = updated_state.rules.player_count_rules[len(updated_state.players)]["max_power_plants"]
+    if len(updated_power_plants) > max_plants:
+        return _queue_power_plant_discard_decision(updated_state, player_id, updated_power_plants, max_plants)
+    return replace(updated_state, pending_decision=None)
+
+
+def remove_power_plant_from_player(
+    state: GameState,
+    player_id: str,
+    plant_price: int,
+) -> GameState:
+    player = _get_player(state, player_id)
+    if all(plant.price != plant_price for plant in player.power_plants):
+        raise ModelValidationError(f"player does not own power plant {plant_price}")
+    kept_plants = tuple(
+        sorted(
+            (plant for plant in player.power_plants if plant.price != plant_price),
+            key=lambda plant: plant.price,
+        )
+    )
+    storage_result = _resolve_resource_storage_for_player_change(
+        player_id=player_id,
+        resource_totals=player.resource_storage.resource_totals(),
+        power_plants=kept_plants,
+        extra_metadata={"discarded_power_plant_price": int(plant_price)},
+    )
+    if isinstance(storage_result, DecisionRequest):
+        return replace(state, pending_decision=storage_result)
+    updated_player = replace(
+        player,
+        power_plants=kept_plants,
+        resource_storage=storage_result,
+    )
+    return replace(_replace_player_on_state(state, updated_player), pending_decision=None)
+
+
+def set_player_resource_totals(
+    state: GameState,
+    player_id: str,
+    resource_totals: dict[str, int],
+) -> GameState:
+    player = _get_player(state, player_id)
+    desired_totals = player.resource_storage.resource_totals()
+    normalized_updates = _normalize_resource_mix(resource_totals)
+    specified_resources = set(resource_totals)
+    unknown_resources = specified_resources - set(RESOURCE_TYPES)
+    if unknown_resources:
+        raise ModelValidationError(
+            f"unknown resource types in set_player_resource_totals: {', '.join(sorted(unknown_resources))}"
+        )
+    for resource, amount in resource_totals.items():
+        desired_amount = int(amount)
+        if desired_amount < 0:
+            raise ModelValidationError("resource totals cannot be negative")
+        desired_totals[resource] = desired_amount
+    storage_result = _resolve_resource_storage_for_player_change(
+        player_id=player_id,
+        resource_totals=desired_totals,
+        power_plants=player.power_plants,
+        extra_metadata={"set_resource_updates": dict(normalized_updates)},
+    )
+    if isinstance(storage_result, DecisionRequest):
+        return replace(state, pending_decision=storage_result)
+    updated_player = replace(player, resource_storage=storage_result)
+    return replace(_replace_player_on_state(state, updated_player), pending_decision=None)
+
+
 def discard_resources_to_fit_storage(
     state: GameState,
     player_id: str,
@@ -1300,7 +1387,10 @@ def discard_resources_to_fit_storage(
         raise ModelValidationError("discard choice must match one of the legal coal/oil discard options")
 
     player = _get_player(state, player_id)
-    current_totals = player.resource_storage.resource_totals()
+    current_totals = {
+        resource: int(amount)
+        for resource, amount in state.pending_decision.metadata["target_resource_totals"].items()
+    }
     auto_discards = {
         resource: int(amount)
         for resource, amount in state.pending_decision.metadata.get("auto_discard_resources", {}).items()
@@ -1964,8 +2054,23 @@ def _resolve_resource_storage_after_power_plant_discard(
     kept_plants: tuple[PowerPlantCard, ...],
     discarded_plant_price: int,
 ) -> ResourceStorage | DecisionRequest:
-    current_totals = player.resource_storage.resource_totals()
-    capacities = _storage_space_capacities(kept_plants)
+    return _resolve_resource_storage_for_player_change(
+        player_id=player.player_id,
+        resource_totals=player.resource_storage.resource_totals(),
+        power_plants=kept_plants,
+        extra_metadata={"discarded_power_plant_price": discarded_plant_price},
+    )
+
+
+def _resolve_resource_storage_for_player_change(
+    *,
+    player_id: str,
+    resource_totals: dict[str, int],
+    power_plants: tuple[PowerPlantCard, ...],
+    extra_metadata: dict[str, Any] | None = None,
+) -> ResourceStorage | DecisionRequest:
+    current_totals = dict(resource_totals)
+    capacities = _storage_space_capacities(power_plants)
     auto_discards = {
         "garbage": max(0, current_totals["garbage"] - capacities["garbage"]),
         "uranium": max(0, current_totals["uranium"] - capacities["uranium"]),
@@ -1976,11 +2081,21 @@ def _resolve_resource_storage_after_power_plant_discard(
         capacities,
     )
     if not hybrid_options:
-        raise ModelValidationError("discarding this power plant leaves no valid storage configuration")
+        raise ModelValidationError("this state change leaves no valid storage configuration")
 
     if len(hybrid_options) > 1:
+        metadata = {
+            "kept_power_plants": [plant.to_dict() for plant in power_plants],
+            "target_resource_totals": dict(current_totals),
+            "storage_capacities": dict(capacities),
+            "auto_discard_resources": {
+                resource: amount for resource, amount in auto_discards.items() if amount
+            },
+        }
+        if extra_metadata:
+            metadata.update(extra_metadata)
         return DecisionRequest(
-            player_id=player.player_id,
+            player_id=player_id,
             decision_type="discard_hybrid_resources",
             prompt=(
                 "Choose how many coal and oil resources to discard so the remaining plants "
@@ -1989,20 +2104,12 @@ def _resolve_resource_storage_after_power_plant_discard(
             legal_actions=tuple(
                 Action(
                     action_type="discard_hybrid_resources",
-                    player_id=player.player_id,
+                    player_id=player_id,
                     payload={"coal": option["coal"], "oil": option["oil"]},
                 )
                 for option in hybrid_options
             ),
-            metadata={
-                "discarded_power_plant_price": discarded_plant_price,
-                "kept_power_plants": [plant.to_dict() for plant in kept_plants],
-                "current_resource_totals": dict(current_totals),
-                "storage_capacities": dict(capacities),
-                "auto_discard_resources": {
-                    resource: amount for resource, amount in auto_discards.items() if amount
-                },
-            },
+            metadata=metadata,
         )
 
     final_totals = dict(current_totals)
@@ -2010,6 +2117,32 @@ def _resolve_resource_storage_after_power_plant_discard(
     for resource, amount in {**auto_discards, **chosen_option}.items():
         final_totals[resource] -= amount
     return _normalize_resource_totals_into_storage(final_totals, capacities)
+
+
+def _queue_power_plant_discard_decision(
+    state: GameState,
+    player_id: str,
+    power_plants: tuple[PowerPlantCard, ...],
+    max_plants: int,
+) -> GameState:
+    legal_discards = tuple(
+        Action(
+            action_type="discard_power_plant",
+            player_id=player_id,
+            payload={"price": power_plant.price},
+        )
+        for power_plant in power_plants
+    )
+    return replace(
+        state,
+        pending_decision=DecisionRequest(
+            player_id=player_id,
+            decision_type="discard_power_plant",
+            prompt="Choose a power plant to discard.",
+            legal_actions=legal_discards,
+            metadata={"max_power_plants": max_plants},
+        ),
+    )
 
 
 def _normalize_purchase_request(
@@ -2663,25 +2796,12 @@ def _award_auction_purchase(
 
     max_plants = updated_state.rules.player_count_rules[len(updated_state.players)]["max_power_plants"]
     if len(updated_player.power_plants) > max_plants:
-        legal_discards = tuple(
-            Action(
-                action_type="discard_power_plant",
-                player_id=winner_id,
-                payload={"price": power_plant.price},
-            )
-            for power_plant in updated_player.power_plants
-        )
-        updated_state = replace(
+        return _queue_power_plant_discard_decision(
             updated_state,
-            pending_decision=DecisionRequest(
-                player_id=winner_id,
-                decision_type="discard_power_plant",
-                prompt="Choose a power plant to discard.",
-                legal_actions=legal_discards,
-                metadata={"max_power_plants": max_plants},
-            ),
+            winner_id,
+            updated_player.power_plants,
+            max_plants,
         )
-        return updated_state
 
     return _maybe_finish_auction_phase(updated_state)
 

@@ -13,6 +13,10 @@ def _phase_signature(result: GameRunResult) -> tuple[tuple[int, str, int], ...]:
     )
 
 
+def _player(result: GameRunResult, player_id: str):
+    return next(player for player in result.final_state.players if player.player_id == player_id)
+
+
 class CLIGameLoopTests(unittest.TestCase):
     def test_run_game_progresses_through_opening_round(self) -> None:
         state = build_game_scenario("opening", seed=7)
@@ -153,6 +157,52 @@ class CLIGameLoopTests(unittest.TestCase):
         self.assertEqual(len(result.round_summaries), 1)
         self.assertTrue(result.round_summaries[0].game_end_triggered)
         self.assertEqual(result.winner_result.winner_ids, ("p2",))
+
+    def test_run_game_debug_add_plant_can_trigger_discard_prompt(self) -> None:
+        state = build_game_scenario("opening", seed=7)
+        controllers = {
+            "p1": ScriptedController(player_id="p1", commands=[]),
+            "p2": ScriptedController(player_id="p2", commands=[]),
+            "p3": ScriptedController(
+                player_id="p3",
+                commands=["add-plant 5", "add-plant 10", "add-plant 11", "add-plant 13", "discard 5", "quit"],
+            ),
+        }
+
+        result = run_game(
+            state,
+            controllers,
+            output_fn=None,
+            render_state=False,
+            allow_debug_commands=True,
+        )
+
+        self.assertTrue(result.quit_requested)
+        self.assertEqual(tuple(plant.price for plant in _player(result, "p3").power_plants), (10, 11, 13))
+        self.assertIsNone(result.final_state.pending_decision)
+
+    def test_run_game_debug_add_and_clear_city_preserve_house_supply(self) -> None:
+        state = build_game_scenario("opening", seed=7)
+        controllers = {
+            "p1": ScriptedController(player_id="p1", commands=[]),
+            "p2": ScriptedController(player_id="p2", commands=[]),
+            "p3": ScriptedController(
+                player_id="p3",
+                commands=["add-city berlin", "clear-city berlin", "quit"],
+            ),
+        }
+
+        result = run_game(
+            state,
+            controllers,
+            output_fn=None,
+            render_state=False,
+            allow_debug_commands=True,
+        )
+
+        self.assertTrue(result.quit_requested)
+        self.assertEqual(_player(result, "p3").houses_in_supply, 22)
+        self.assertEqual(_player(result, "p3").network_city_ids, ())
 
 
 if __name__ == "__main__":

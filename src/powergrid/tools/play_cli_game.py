@@ -15,6 +15,11 @@ def main() -> None:
         "--regions",
         help="Optional comma-separated region ids. If omitted, a valid contiguous area is auto-selected.",
     )
+    parser.add_argument(
+        "--allow-debug-commands",
+        action="store_true",
+        help="Enable debug-help and debug state-edit commands during prompts.",
+    )
     args = parser.parse_args()
 
     selected_regions = ()
@@ -34,7 +39,12 @@ def main() -> None:
         for seat in config.players
     }
     state = advance_phase(initialize_game(config, controllers))
-    result = run_game(state, controllers, render_state=True)
+    result = run_game(
+        state,
+        controllers,
+        render_state=True,
+        allow_debug_commands=args.allow_debug_commands,
+    )
 
     if result.quit_requested:
         print("Game stopped before completion.")

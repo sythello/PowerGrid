@@ -12,6 +12,7 @@ from .cli import (
 )
 from .model import (
     Action,
+    add_power_plant_to_player,
     apply_builds,
     AuctionState,
     BureaucracySummary,
@@ -39,9 +40,11 @@ from .model import (
     PowerPlantCard,
     purchase_resources,
     refill_resource_market,
+    remove_power_plant_from_player,
     ResourceStorage,
     ResourceMarket,
     SeatConfig,
+    set_player_resource_totals,
     advance_phase,
     advance_round,
     create_initial_state,
@@ -78,6 +81,7 @@ from .scenarios import SCENARIO_NAMES, build_game_scenario
 
 __all__ = [
     "Action",
+    "add_power_plant_to_player",
     "apply_builds",
     "advance_phase",
     "advance_round",
@@ -119,6 +123,7 @@ __all__ = [
     "purchase_resources",
     "PhaseTraceEntry",
     "refill_resource_market",
+    "remove_power_plant_from_player",
     "render_game_state",
     "render_round_summary",
     "ResourceStorage",
@@ -130,6 +135,7 @@ __all__ = [
     "ScriptedController",
     "SeatConfig",
     "select_play_areas",
+    "set_player_resource_totals",
     "ValidationReport",
     "create_initial_state",
     "load_map",
