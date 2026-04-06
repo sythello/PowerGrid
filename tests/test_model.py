@@ -5,11 +5,16 @@ import unittest
 
 from powergrid.model import (
     Action,
+    apply_builds,
     AuctionState,
+    build_city,
     can_store_resources,
+    compute_all_targets_connection_cost,
+    compute_connection_cost,
     DecisionRequest,
     GameConfig,
     GameState,
+    legal_build_targets,
     ModelValidationError,
     legal_resource_purchases,
     plant_storage_capacity,
@@ -66,6 +71,40 @@ def _resource_test_state(seed: int = 7) -> GameState:
         )
         updated_players.append(replace(player, power_plants=plants))
     return replace(base_state, players=tuple(updated_players), phase="buy_resources", auction_state=None)
+
+
+def _build_test_state(step: int = 1) -> GameState:
+    base_state = create_initial_state(
+        GameConfig(
+            map_id="test",
+            players=make_default_seat_configs(3),
+            seed=11,
+            selected_regions=("alpha", "beta", "gamma"),
+        )
+    )
+    updated_players = []
+    for player in base_state.players:
+        if player.player_id == "p1":
+            updated_players.append(
+                replace(
+                    player,
+                    elektro=60,
+                    houses_in_supply=21,
+                    network_city_ids=("amber_falls",),
+                )
+            )
+        elif player.player_id == "p2":
+            updated_players.append(
+                replace(
+                    player,
+                    elektro=60,
+                    houses_in_supply=21,
+                    network_city_ids=("brass_harbor",),
+                )
+            )
+        else:
+            updated_players.append(replace(player, elektro=60))
+    return replace(base_state, players=tuple(updated_players), phase="build_houses", step=step, auction_state=None)
 
 
 class ModelTests(unittest.TestCase):
@@ -357,6 +396,82 @@ class ModelTests(unittest.TestCase):
         state = _resource_test_state()
         self.assertEqual(state.resource_market.available_unit_prices("uranium"), (14, 16))
         self.assertEqual(state.resource_market.quote_purchase_cost("oil", 4), 13)
+
+    def test_compute_connection_cost_uses_shortest_path_through_occupied_city(self) -> None:
+        state = _build_test_state(step=1)
+        self.assertEqual(compute_connection_cost(state, "p1", "cinder_grove"), 11)
+        self.assertEqual(compute_connection_cost(state, "p3", "cinder_grove"), 0)
+
+    def test_compute_all_targets_connection_cost_returns_shared_distances(self) -> None:
+        state = _build_test_state(step=1)
+        self.assertEqual(
+            compute_all_targets_connection_cost(state, "p1"),
+            {
+                "amber_falls": 0,
+                "brass_harbor": 4,
+                "cinder_grove": 11,
+            },
+        )
+        self.assertEqual(
+            compute_all_targets_connection_cost(state, "p3"),
+            {
+                "amber_falls": 0,
+                "brass_harbor": 0,
+                "cinder_grove": 0,
+            },
+        )
+
+    def test_legal_build_targets_respect_step_occupancy(self) -> None:
+        step_one = _build_test_state(step=1)
+        step_two = _build_test_state(step=2)
+
+        self.assertEqual(
+            {action.payload["city_id"] for action in legal_build_targets(step_one, "p3")},
+            {"cinder_grove"},
+        )
+        brass_target = {
+            action.payload["city_id"]: action.payload for action in legal_build_targets(step_two, "p3")
+        }["brass_harbor"]
+        self.assertEqual(brass_target["build_cost"], 15)
+        self.assertEqual(brass_target["total_cost"], 15)
+
+    def test_build_city_updates_network_houses_and_money(self) -> None:
+        state = _build_test_state(step=1)
+        state = build_city(state, "p1", "cinder_grove")
+
+        player = _player(state, "p1")
+        self.assertEqual(player.network_city_ids, ("amber_falls", "cinder_grove"))
+        self.assertEqual(player.houses_in_supply, 20)
+        self.assertEqual(player.elektro, 39)
+
+    def test_apply_builds_uses_cheapest_multi_city_sequence(self) -> None:
+        state = _build_test_state(step=2)
+        rich_player = replace(_player(state, "p1"), elektro=80)
+        state = replace(
+            state,
+            players=tuple(
+                rich_player if existing.player_id == "p1" else existing for existing in state.players
+            ),
+        )
+
+        state = apply_builds(state, "p1", ("cinder_grove", "brass_harbor"))
+
+        updated_player = _player(state, "p1")
+        self.assertEqual(updated_player.network_city_ids, ("amber_falls", "brass_harbor", "cinder_grove"))
+        self.assertEqual(updated_player.elektro, 44)
+        self.assertEqual(updated_player.houses_in_supply, 19)
+
+    def test_apply_builds_rejects_full_city_and_out_of_area_city(self) -> None:
+        state = _build_test_state(step=1)
+        with self.assertRaises(ModelValidationError):
+            build_city(state, "p3", "brass_harbor")
+
+        germany_state = create_initial_state(
+            GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+        )
+        germany_state = replace(germany_state, phase="build_houses", step=1)
+        with self.assertRaises(ModelValidationError):
+            build_city(germany_state, germany_state.player_order[0], "aachen")
 
     def test_replace_plant_if_needed_discards_excess_resources_when_capacity_shrinks(self) -> None:
         base_state = advance_phase(

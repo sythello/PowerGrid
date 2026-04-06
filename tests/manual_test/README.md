@@ -70,3 +70,34 @@ Supported commands:
 - `status`
 - `help`
 - `quit`
+
+## Build Phase Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_build_phase.py
+```
+
+You can also choose the map and step:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_build_phase.py --map germany --seed 7 --step 2
+```
+
+The script will:
+- build a valid seeded state in the `build_houses` phase
+- seed each player with an existing city network
+- show reverse turn order for building
+- let you inspect legal single-city build targets
+- let you quote multi-city builds before committing
+- let you execute single-city or multi-city builds and inspect the updated state
+
+Supported commands:
+- `options`
+- `quote <city_id> [city_id ...]`
+- `build <city_id> [city_id ...]`
+- `done`
+- `status`
+- `help`
+- `quit`

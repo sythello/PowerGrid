@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from itertools import combinations
+from itertools import combinations, permutations
+import heapq
 import random
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -1217,6 +1218,105 @@ def refill_resource_market(
     return ResourceMarket(market=updated_market, supply=updated_supply)
 
 
+def compute_connection_cost(
+    state: GameState,
+    player_id: str,
+    target_city: str,
+    source_city_ids: tuple[str, ...] | list[str] | None = None,
+) -> int:
+    allowed_cities = _allowed_city_ids(state)
+    if target_city not in allowed_cities:
+        raise ModelValidationError(f"city {target_city!r} is not in the selected play area")
+    all_costs = compute_all_targets_connection_cost(state, player_id, source_city_ids=source_city_ids)
+    if target_city not in all_costs:
+        raise ModelValidationError(f"city {target_city!r} is not reachable from the player's network")
+    return all_costs[target_city]
+
+
+def compute_all_targets_connection_cost(
+    state: GameState,
+    player_id: str,
+    source_city_ids: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, int]:
+    player = _get_player(state, player_id)
+    sources = tuple(source_city_ids) if source_city_ids is not None else player.network_city_ids
+    return _all_connection_costs_from_sources(state, sources)
+
+
+def legal_build_targets(state: GameState, player_id: str) -> tuple[Action, ...]:
+    player = _get_player(state, player_id)
+    allowed_cities = _allowed_city_ids(state)
+    connection_costs = compute_all_targets_connection_cost(state, player_id)
+    actions: list[Action] = []
+    for city_id in sorted(allowed_cities):
+        if city_id in player.network_city_ids:
+            continue
+        occupant_count = _city_occupant_count(state, city_id)
+        if occupant_count >= _city_occupancy_limit(state.step):
+            continue
+        connection_cost = connection_costs.get(city_id)
+        if connection_cost is None:
+            continue
+        build_cost = _city_build_cost(state, city_id)
+        total_cost = connection_cost + build_cost
+        if total_cost > player.elektro or player.houses_in_supply <= 0:
+            continue
+        actions.append(
+            Action(
+                action_type="build_city",
+                player_id=player_id,
+                payload={
+                    "city_id": city_id,
+                    "city_name": _city_name(state, city_id),
+                    "connection_cost": connection_cost,
+                    "build_cost": build_cost,
+                    "total_cost": total_cost,
+                },
+            )
+        )
+    return tuple(actions)
+
+
+def build_city(state: GameState, player_id: str, city_id: str) -> GameState:
+    return apply_builds(state, player_id, (city_id,))
+
+
+def apply_builds(
+    state: GameState,
+    player_id: str,
+    city_ids: tuple[str, ...] | list[str],
+) -> GameState:
+    player = _get_player(state, player_id)
+    targets = tuple(city_ids)
+    if not targets:
+        raise ModelValidationError("build selection cannot be empty")
+    if len(set(targets)) != len(targets):
+        raise ModelValidationError("build selection cannot contain duplicate cities")
+    if player.houses_in_supply < len(targets):
+        raise ModelValidationError("player does not have enough houses left to build there")
+
+    allowed_cities = _allowed_city_ids(state)
+    for city_id in targets:
+        if city_id not in allowed_cities:
+            raise ModelValidationError(f"city {city_id!r} is not in the selected play area")
+        if city_id in player.network_city_ids:
+            raise ModelValidationError(f"player already has a house in {city_id!r}")
+        if _city_occupant_count(state, city_id) >= _city_occupancy_limit(state.step):
+            raise ModelValidationError(f"city {city_id!r} is already full for step {state.step}")
+
+    total_cost, ordered_targets = _best_build_sequence(state, player, targets)
+    if total_cost > player.elektro:
+        raise ModelValidationError("player cannot afford the requested city builds")
+
+    updated_player = replace(
+        player,
+        elektro=player.elektro - total_cost,
+        houses_in_supply=player.houses_in_supply - len(ordered_targets),
+        network_city_ids=tuple(sorted((*player.network_city_ids, *ordered_targets))),
+    )
+    return _replace_player_on_state(state, updated_player)
+
+
 def advance_phase(state: GameState) -> GameState:
     if state.phase == "setup":
         auction_state = _create_auction_state(state, state.player_order[0])
@@ -1394,6 +1494,116 @@ def _normalize_purchase_request(
                 aggregated[resource] += amount
         return {resource: amount for resource, amount in aggregated.items() if amount}
     return _normalize_resource_mix(basket)  # type: ignore[arg-type]
+
+
+def _allowed_city_ids(state: GameState) -> set[str]:
+    selected_regions = set(state.selected_regions)
+    if not selected_regions:
+        return {city.id for city in state.game_map.cities}
+    return {city.id for city in state.game_map.cities if city.region in selected_regions}
+
+
+def _city_name(state: GameState, city_id: str) -> str:
+    for city in state.game_map.cities:
+        if city.id == city_id:
+            return city.name
+    raise ModelValidationError(f"unknown city {city_id!r}")
+
+
+def _city_occupancy_limit(step: int) -> int:
+    if step not in {1, 2, 3}:
+        raise ModelValidationError("step must be 1, 2, or 3")
+    return step
+
+
+def _city_occupant_count(state: GameState, city_id: str) -> int:
+    return sum(1 for player in state.players if city_id in player.network_city_ids)
+
+
+def _city_build_cost(state: GameState, city_id: str) -> int:
+    occupants = _city_occupant_count(state, city_id)
+    if occupants >= _city_occupancy_limit(state.step):
+        raise ModelValidationError(f"city {city_id!r} is already full for step {state.step}")
+    return 10 + (occupants * 5)
+
+
+def _selected_area_adjacency(state: GameState) -> dict[str, dict[str, int]]:
+    allowed = _allowed_city_ids(state)
+    adjacency: dict[str, dict[str, int]] = {city_id: {} for city_id in allowed}
+    for connection in state.game_map.connections:
+        if connection.city_1 not in allowed or connection.city_2 not in allowed:
+            continue
+        adjacency[connection.city_1][connection.city_2] = connection.cost
+        adjacency[connection.city_2][connection.city_1] = connection.cost
+    return adjacency
+
+
+def _shortest_connection_cost(
+    state: GameState,
+    source_city_ids: tuple[str, ...],
+    target_city: str,
+) -> int:
+    return _all_connection_costs_from_sources(state, source_city_ids)[target_city]
+
+
+def _all_connection_costs_from_sources(
+    state: GameState,
+    source_city_ids: tuple[str, ...],
+) -> dict[str, int]:
+    adjacency = _selected_area_adjacency(state)
+    if not source_city_ids:
+        return {city_id: 0 for city_id in adjacency}
+
+    queue: list[tuple[int, str]] = []
+    best_costs: dict[str, int] = {}
+    for city_id in source_city_ids:
+        if city_id not in adjacency:
+            raise ModelValidationError(f"city {city_id!r} is not in the selected play area")
+        best_costs[city_id] = 0
+        heapq.heappush(queue, (0, city_id))
+
+    while queue:
+        cost, city_id = heapq.heappop(queue)
+        if cost > best_costs.get(city_id, cost):
+            continue
+        for neighbor, edge_cost in adjacency[city_id].items():
+            next_cost = cost + edge_cost
+            if next_cost < best_costs.get(neighbor, next_cost + 1):
+                best_costs[neighbor] = next_cost
+                heapq.heappush(queue, (next_cost, neighbor))
+    return best_costs
+
+
+def _best_build_sequence(
+    state: GameState,
+    player: PlayerState,
+    targets: tuple[str, ...],
+) -> tuple[int, tuple[str, ...]]:
+    if len(targets) == 1:
+        target = targets[0]
+        connection_cost = compute_connection_cost(state, player.player_id, target)
+        return connection_cost + _city_build_cost(state, target), targets
+
+    best_total: int | None = None
+    best_order: tuple[str, ...] | None = None
+    for order in permutations(targets):
+        current_sources = tuple(player.network_city_ids)
+        running_total = 0
+        built_sources = list(current_sources)
+        for city_id in order:
+            connection_cost = (
+                0 if not built_sources else _shortest_connection_cost(state, tuple(built_sources), city_id)
+            )
+            running_total += connection_cost + _city_build_cost(state, city_id)
+            built_sources.append(city_id)
+            if best_total is not None and running_total >= best_total:
+                break
+        else:
+            if best_total is None or running_total < best_total:
+                best_total = running_total
+                best_order = tuple(order)
+    assert best_total is not None and best_order is not None
+    return best_total, best_order
 
 
 def _get_auctionable_plant(state: GameState, plant_id: int) -> PowerPlantCard:
