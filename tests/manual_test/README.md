@@ -147,3 +147,38 @@ Supported commands:
 - `resolve`
 - `help`
 - `quit`
+
+## Full Game Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_full_game.py
+```
+
+You can also start from a specific scenario:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_full_game.py --scenario auction_step3 --seed 7
+```
+
+Available scenarios:
+- `opening`
+- `resource`
+- `build_test`
+- `step2`
+- `auction_step3`
+- `endgame`
+
+The script will:
+- start from a valid full-game state for the selected scenario
+- hand control to the same stage-8 full-game CLI runner used by the normal game entrypoint
+- let you continue through later phases and rounds from that starting point
+- show updated phase, step, market, resource, and player state after accepted commands
+
+Supported full-game commands depend on the active phase:
+- `auction`: `options`, `start <plant_price> <bid>`, `bid <amount>`, `pass`, `discard <plant_price>`
+- `buy_resources`: `options`, `buy <resource> <amount>`, `done`
+- `build_houses`: `options`, `quote <city_id> [city_id ...]`, `build <city_id> [city_id ...]`, `done`
+- `bureaucracy`: `options`, `run <plant_price>[:resource=amount,...] ...`, `skip`
+- utility commands in every phase: `status`, `help`, `quit`

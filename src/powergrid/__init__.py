@@ -1,5 +1,15 @@
 """Power Grid package."""
 
+from .cli import (
+    CLIController,
+    GameRunResult,
+    PhaseTraceEntry,
+    prompt_decision,
+    render_game_state,
+    render_round_summary,
+    run_game,
+    ScriptedController,
+)
 from .model import (
     Action,
     apply_builds,
@@ -63,6 +73,7 @@ from .rules_data import (
     load_rule_tables,
     validate_static_data,
 )
+from .scenarios import SCENARIO_NAMES, build_game_scenario
 
 __all__ = [
     "Action",
@@ -72,11 +83,13 @@ __all__ = [
     "AuctionState",
     "BureaucracySummary",
     "build_city",
+    "build_game_scenario",
     "can_store_resources",
     "check_step_2_trigger",
     "check_step_3_trigger",
     "choose_plants_to_run",
     "CityDefinition",
+    "CLIController",
     "ConnectionDefinition",
     "compute_all_targets_connection_cost",
     "compute_connection_cost",
@@ -85,6 +98,7 @@ __all__ = [
     "DataValidationError",
     "DecisionRequest",
     "GameConfig",
+    "GameRunResult",
     "GameState",
     "initialize_game",
     "legal_build_targets",
@@ -99,12 +113,19 @@ __all__ = [
     "PowerPlantCard",
     "PreparedDeck",
     "prepare_plant_deck",
+    "prompt_decision",
     "purchase_resources",
+    "PhaseTraceEntry",
     "refill_resource_market",
+    "render_game_state",
+    "render_round_summary",
     "ResourceStorage",
     "RegionDefinition",
     "ResourceMarket",
+    "run_game",
     "RuleTables",
+    "SCENARIO_NAMES",
+    "ScriptedController",
     "SeatConfig",
     "select_play_areas",
     "ValidationReport",
