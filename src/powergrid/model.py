@@ -370,6 +370,25 @@ class ResourceMarket:
             remaining -= removed
         return ResourceMarket(market=updated_market, supply=dict(self.supply))
 
+    def add_to_supply(self, resource: str, amount: int) -> "ResourceMarket":
+        _validate_resource_name(resource)
+        if amount < 0:
+            raise ModelValidationError("resource supply addition amount cannot be negative")
+        if amount == 0:
+            return self
+        updated_supply = dict(self.supply)
+        updated_supply[resource] += amount
+        return ResourceMarket(
+            market={name: dict(price_bands) for name, price_bands in self.market.items()},
+            supply=updated_supply,
+        )
+
+    def add_resources_to_supply(self, resources: dict[str, int]) -> "ResourceMarket":
+        updated_market: ResourceMarket = self
+        for resource, amount in resources.items():
+            updated_market = updated_market.add_to_supply(resource, int(amount))
+        return updated_market
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "market": {
@@ -1414,7 +1433,11 @@ def consume_resources(
             _storage_space_capacities(player.power_plants),
         ),
     )
-    return _replace_player_on_state(state, updated_player)
+    updated_state = _replace_player_on_state(state, updated_player)
+    return replace(
+        updated_state,
+        resource_market=updated_state.resource_market.add_resources_to_supply(required),
+    )
 
 
 def compute_powered_cities(

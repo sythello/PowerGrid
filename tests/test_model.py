@@ -524,6 +524,14 @@ class ModelTests(unittest.TestCase):
 
         updated_state = consume_resources(state, "p1", plans)
         self.assertEqual(_player(updated_state, "p1").resource_storage, ResourceStorage())
+        self.assertEqual(
+            updated_state.resource_market.supply["coal"],
+            state.resource_market.supply["coal"] + 1,
+        )
+        self.assertEqual(
+            updated_state.resource_market.supply["oil"],
+            state.resource_market.supply["oil"] + 1,
+        )
 
     def test_pay_income_uses_payment_schedule(self) -> None:
         rules = create_initial_state(
@@ -639,6 +647,28 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(updated_state.last_income_paid, summary.income_paid)
         self.assertEqual(tuple(plant.price for plant in updated_state.future_market), (12, 13, 14, 44))
         self.assertEqual(tuple(plant.price for plant in updated_state.power_plant_bottom_stack), (15,))
+
+    def test_bureaucracy_returns_burned_resources_to_supply_before_refill(self) -> None:
+        state = _bureaucracy_test_state(
+            player_specs={
+                "p1": {"cities": 2, "plants": (10,), "storage": {"coal": 2}, "elektro": 40},
+                "p2": {"cities": 1, "plants": (18,), "storage": {}, "elektro": 35},
+                "p3": {"cities": 1, "plants": (22,), "storage": {}, "elektro": 30},
+            }
+        )
+        state = replace(
+            state,
+            resource_market=state.resource_market.remove_from_market("coal", 4),
+        )
+
+        updated_state, summary = resolve_bureaucracy(
+            state,
+            generation_choices={"p1": (10,), "p2": (), "p3": ()},
+        )
+
+        self.assertEqual(summary.refill_step_used, 1)
+        self.assertEqual(updated_state.resource_market.total_in_market("coal"), 22)
+        self.assertEqual(updated_state.resource_market.supply["coal"], 0)
 
     def test_step_2_trigger_starts_before_income_and_updates_market(self) -> None:
         state = _bureaucracy_test_state(
