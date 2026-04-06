@@ -4,6 +4,7 @@ import argparse
 from dataclasses import replace
 
 from powergrid.model import (
+    discard_resources_to_fit_storage,
     GameConfig,
     ModelValidationError,
     PowerPlantCard,
@@ -141,9 +142,19 @@ def apply_command(state, raw: str):
     command = tokens[0].lower()
 
     if state.pending_decision is not None:
-        if command != "discard" or len(tokens) != 2:
-            raise ValueError("expected: discard <plant_price>")
-        return replace_plant_if_needed(state, state.pending_decision.player_id, int(tokens[1]))
+        if state.pending_decision.decision_type == "discard_power_plant":
+            if command != "discard" or len(tokens) != 2:
+                raise ValueError("expected: discard <plant_price>")
+            return replace_plant_if_needed(state, state.pending_decision.player_id, int(tokens[1]))
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            if command != "discard" or len(tokens) < 2:
+                raise ValueError("expected: discard coal=<amount> oil=<amount>")
+            return discard_resources_to_fit_storage(
+                state,
+                state.pending_decision.player_id,
+                parse_named_resource_mix(tokens[1:]),
+            )
+        raise ValueError("unsupported pending decision type")
 
     auction_state = state.auction_state
     if auction_state is None:
@@ -175,6 +186,16 @@ def apply_command(state, raw: str):
 
 def turn_prompt(state) -> str:
     if state.pending_decision is not None:
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            legal_discards = ", ".join(
+                f"coal={action.payload.get('coal', 0)} oil={action.payload.get('oil', 0)}"
+                for action in state.pending_decision.legal_actions
+            )
+            return (
+                f"{state.pending_decision.player_id} must discard coal/oil resources. "
+                "Allowed: discard coal=<amount> oil=<amount> "
+                f"where the choice is one of [{legal_discards}]"
+            )
         legal_discards = ", ".join(
             str(action.payload["price"]) for action in state.pending_decision.legal_actions
         )
@@ -259,7 +280,10 @@ def print_state(state) -> None:
 def print_help(state) -> None:
     print("Utility commands: options, status, help, quit")
     if state.pending_decision is not None:
-        print("Decision command: discard <plant_price>")
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            print("Decision command: discard coal=<amount> oil=<amount>")
+        else:
+            print("Decision command: discard <plant_price>")
         return
     if state.auction_state is not None and state.auction_state.has_active_auction:
         print("Auction commands: bid <amount>, pass")
@@ -269,6 +293,22 @@ def print_help(state) -> None:
 
 def print_options(state) -> None:
     if state.pending_decision is not None:
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            auto_discards = state.pending_decision.metadata.get("auto_discard_resources", {})
+            if auto_discards:
+                print(
+                    "Automatic discards: "
+                    + ", ".join(
+                        f"{resource}={amount}" for resource, amount in sorted(auto_discards.items())
+                    )
+                )
+            print(f"Coal/oil discard options for {state.pending_decision.player_id}:")
+            for action in state.pending_decision.legal_actions:
+                print(
+                    f"  discard coal={action.payload.get('coal', 0)} "
+                    f"oil={action.payload.get('oil', 0)}"
+                )
+            return
         legal_discards = ", ".join(
             str(action.payload["price"]) for action in state.pending_decision.legal_actions
         )
@@ -320,6 +360,16 @@ def print_options(state) -> None:
 
 def format_plant(plant) -> str:
     return "STEP3" if getattr(plant, "is_step_3_placeholder", False) else str(plant.price)
+
+
+def parse_named_resource_mix(tokens: list[str]) -> dict[str, int]:
+    mix: dict[str, int] = {}
+    for token in tokens:
+        if "=" not in token:
+            raise ValueError("expected resource assignments like coal=2 oil=1")
+        resource, amount = token.split("=", 1)
+        mix[resource.strip()] = int(amount)
+    return mix
 
 
 def prompt_int(label: str, default: int, allowed=None) -> int:

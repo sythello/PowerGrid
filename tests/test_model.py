@@ -17,6 +17,7 @@ from powergrid.model import (
     compute_connection_cost,
     compute_powered_cities,
     consume_resources,
+    discard_resources_to_fit_storage,
     DecisionRequest,
     GameConfig,
     GameState,
@@ -533,6 +534,48 @@ class ModelTests(unittest.TestCase):
             state.resource_market.supply["oil"] + 1,
         )
 
+    def test_choose_plants_to_run_requires_explicit_hybrid_mix_when_ambiguous(self) -> None:
+        state = _resource_test_state()
+        player = replace(
+            _player(state, "p1"),
+            houses_in_supply=21,
+            network_city_ids=(state.game_map.cities[0].id,),
+            resource_storage=ResourceStorage(coal=2, hybrid_oil=2),
+        )
+        state = replace(
+            state,
+            players=tuple(player if existing.player_id == "p1" else existing for existing in state.players),
+        )
+
+        with self.assertRaises(ModelValidationError) as context:
+            choose_plants_to_run(state, "p1", (5,))
+        self.assertIn("requires an explicit coal/oil mix", str(context.exception))
+        self.assertIn("oil=2", str(context.exception))
+        self.assertIn("coal=1, oil=1", str(context.exception))
+        self.assertIn("coal=2", str(context.exception))
+
+    def test_choose_plants_to_run_deducts_other_plant_costs_before_resolving_hybrid(self) -> None:
+        state = _resource_test_state()
+        player = replace(
+            _player(state, "p1"),
+            houses_in_supply=20,
+            network_city_ids=(state.game_map.cities[0].id, state.game_map.cities[1].id),
+            resource_storage=ResourceStorage(coal=3, hybrid_oil=1),
+        )
+        state = replace(
+            state,
+            players=tuple(player if existing.player_id == "p1" else existing for existing in state.players),
+        )
+
+        plans = choose_plants_to_run(state, "p1", (5, 10))
+        self.assertEqual(
+            plans,
+            (
+                PlantRunPlan(plant_price=5, resource_mix={"coal": 1, "oil": 1}),
+                PlantRunPlan(plant_price=10, resource_mix={"coal": 2}),
+            ),
+        )
+
     def test_pay_income_uses_payment_schedule(self) -> None:
         rules = create_initial_state(
             GameConfig(map_id="test", players=make_default_seat_configs(3), seed=1)
@@ -799,6 +842,65 @@ class ModelTests(unittest.TestCase):
 
         state = replace_plant_if_needed(state, "p3", 10)
         self.assertEqual(_player(state, "p3").resource_storage, ResourceStorage(hybrid_coal=4))
+
+    def test_replace_plant_if_needed_prompts_for_ambiguous_hybrid_resource_discard(self) -> None:
+        base_state = advance_phase(
+            create_initial_state(
+                GameConfig(map_id="germany", players=make_default_seat_configs(3), seed=7)
+            )
+        )
+        player = _player(base_state, "p3")
+        definitions = {definition.price: definition for definition in load_power_plants()}
+        seeded_player = PlayerState(
+            player_id=player.player_id,
+            name=player.name,
+            controller=player.controller,
+            color=player.color,
+            elektro=60,
+            houses_in_supply=player.houses_in_supply,
+            network_city_ids=player.network_city_ids,
+            power_plants=tuple(
+                PowerPlantCard.from_definition(definitions[price]) for price in (5, 10, 11, 13)
+            ),
+            resource_storage=ResourceStorage(coal=4, hybrid_coal=2, hybrid_oil=2),
+            turn_order_position=player.turn_order_position,
+        )
+        state = replace(
+            base_state,
+            players=tuple(
+                seeded_player if existing.player_id == "p3" else existing for existing in base_state.players
+            ),
+            pending_decision=DecisionRequest(
+                player_id="p3",
+                decision_type="discard_power_plant",
+                prompt="Choose a power plant to discard.",
+                legal_actions=tuple(
+                    Action(
+                        action_type="discard_power_plant",
+                        player_id="p3",
+                        payload={"price": price},
+                    )
+                    for price in (5, 10, 11, 13)
+                ),
+            ),
+        )
+
+        state = replace_plant_if_needed(state, "p3", 10)
+        self.assertIsNotNone(state.pending_decision)
+        assert state.pending_decision is not None
+        self.assertEqual(state.pending_decision.decision_type, "discard_hybrid_resources")
+        self.assertEqual(
+            {(action.payload["coal"], action.payload["oil"]) for action in state.pending_decision.legal_actions},
+            {(2, 2), (3, 1), (4, 0)},
+        )
+
+        state = discard_resources_to_fit_storage(state, "p3", {"coal": 3, "oil": 1})
+        self.assertIsNone(state.pending_decision)
+        self.assertEqual(_player_prices(state, "p3"), (5, 11, 13))
+        self.assertEqual(
+            _player(state, "p3").resource_storage,
+            ResourceStorage(hybrid_coal=3, hybrid_oil=1),
+        )
 
     def test_list_auctionable_plants_returns_current_market(self) -> None:
         state = advance_phase(

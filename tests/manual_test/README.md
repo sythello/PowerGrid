@@ -46,6 +46,7 @@ Supported commands depend on the current state:
 - chooser with no active auction: `start <plant_price> <bid>` or `pass`
 - bidder in an active auction: `bid <amount>` or `pass`
 - discard decision: `discard <plant_price>`
+- hybrid overflow discard decision: `discard coal=<amount> oil=<amount>`
 - utility commands at any time: `options`, `status`, `help`, `quit`
 
 ## Resource Buying Manual Test
@@ -135,7 +136,7 @@ The script will:
 - build a valid seeded state in the `bureaucracy` phase
 - seed players with city networks, power plants, and shared resource storage
 - let each player choose which power plants to run
-- validate hybrid-fuel mixes when you provide them
+- require an explicit hybrid-fuel mix when multiple coal/oil choices are still feasible after accounting for the other selected plants
 - resolve the whole Bureaucracy phase and print step changes, incomes, market updates, and winner information
 
 Supported commands:

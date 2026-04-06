@@ -1233,6 +1233,8 @@ def replace_plant_if_needed(
 ) -> GameState:
     if state.pending_decision is None:
         raise ModelValidationError("there is no pending plant replacement decision")
+    if state.pending_decision.decision_type != "discard_power_plant":
+        raise ModelValidationError("the pending decision is not a power plant discard")
     if state.pending_decision.player_id != player_id:
         raise ModelValidationError("the pending replacement decision belongs to another player")
 
@@ -1249,10 +1251,86 @@ def replace_plant_if_needed(
             key=lambda plant: plant.price,
         )
     )
+    storage_result = _resolve_resource_storage_after_power_plant_discard(
+        player,
+        kept_plants=kept_plants,
+        discarded_plant_price=discard_choice,
+    )
+    if isinstance(storage_result, DecisionRequest):
+        return replace(state, pending_decision=storage_result)
     updated_player = replace(
         player,
         power_plants=kept_plants,
-        resource_storage=_normalize_resource_storage(player.resource_storage, kept_plants),
+        resource_storage=storage_result,
+    )
+    updated_state = _replace_player_on_state(state, updated_player)
+    updated_state = replace(updated_state, pending_decision=None)
+    if updated_state.phase == "auction" and updated_state.auction_state is not None:
+        return _maybe_finish_auction_phase(updated_state)
+    return updated_state
+
+
+def discard_resources_to_fit_storage(
+    state: GameState,
+    player_id: str,
+    discard_mix: dict[str, int],
+) -> GameState:
+    if state.pending_decision is None:
+        raise ModelValidationError("there is no pending resource discard decision")
+    if state.pending_decision.decision_type != "discard_hybrid_resources":
+        raise ModelValidationError("the pending decision is not a hybrid resource discard")
+    if state.pending_decision.player_id != player_id:
+        raise ModelValidationError("the pending resource discard decision belongs to another player")
+
+    normalized_mix = _normalize_resource_mix(discard_mix)
+    if set(normalized_mix) - {"coal", "oil"}:
+        raise ModelValidationError("only coal and oil may be chosen in a hybrid resource discard")
+    chosen = {
+        "coal": int(normalized_mix.get("coal", 0)),
+        "oil": int(normalized_mix.get("oil", 0)),
+    }
+    legal_choices = {
+        (
+            int(action.payload.get("coal", 0)),
+            int(action.payload.get("oil", 0)),
+        )
+        for action in state.pending_decision.legal_actions
+    }
+    if (chosen["coal"], chosen["oil"]) not in legal_choices:
+        raise ModelValidationError("discard choice must match one of the legal coal/oil discard options")
+
+    player = _get_player(state, player_id)
+    current_totals = player.resource_storage.resource_totals()
+    auto_discards = {
+        resource: int(amount)
+        for resource, amount in state.pending_decision.metadata.get("auto_discard_resources", {}).items()
+    }
+    capacities = {
+        resource: int(amount)
+        for resource, amount in state.pending_decision.metadata["storage_capacities"].items()
+    }
+    kept_plants = tuple(
+        PowerPlantCard.from_dict(payload)
+        for payload in state.pending_decision.metadata["kept_power_plants"]
+    )
+
+    final_totals = dict(current_totals)
+    for resource, amount in {**auto_discards, **chosen}.items():
+        if amount < 0:
+            raise ModelValidationError("discard amounts may not be negative")
+        if amount > final_totals.get(resource, 0):
+            raise ModelValidationError(f"cannot discard more {resource} than the player currently stores")
+        final_totals[resource] -= amount
+
+    if not _coal_oil_totals_fit_storage(final_totals["coal"], final_totals["oil"], capacities):
+        raise ModelValidationError("the chosen coal/oil discard does not fit the remaining hybrid storage")
+    if final_totals["garbage"] > capacities["garbage"] or final_totals["uranium"] > capacities["uranium"]:
+        raise ModelValidationError("the chosen discard does not remove enough non-hybrid resources")
+
+    updated_player = replace(
+        player,
+        power_plants=kept_plants,
+        resource_storage=_normalize_resource_totals_into_storage(final_totals, capacities),
     )
     updated_state = _replace_player_on_state(state, updated_player)
     updated_state = replace(updated_state, pending_decision=None)
@@ -1844,6 +1922,96 @@ def _resource_storage_fits_power_plants(
     return storage == _normalize_resource_storage(storage, power_plants)
 
 
+def _coal_oil_totals_fit_storage(
+    coal_total: int,
+    oil_total: int,
+    capacities: dict[str, int],
+) -> bool:
+    overflow_into_hybrid = max(0, coal_total - capacities["coal"]) + max(0, oil_total - capacities["oil"])
+    return overflow_into_hybrid <= capacities["hybrid"]
+
+
+def _minimal_hybrid_discard_options(
+    coal_total: int,
+    oil_total: int,
+    capacities: dict[str, int],
+) -> tuple[dict[str, int], ...]:
+    best_kept_total = -1
+    discard_options: list[dict[str, int]] = []
+    for kept_coal in range(coal_total + 1):
+        for kept_oil in range(oil_total + 1):
+            if not _coal_oil_totals_fit_storage(kept_coal, kept_oil, capacities):
+                continue
+            kept_total = kept_coal + kept_oil
+            discard = {"coal": coal_total - kept_coal, "oil": oil_total - kept_oil}
+            if kept_total > best_kept_total:
+                best_kept_total = kept_total
+                discard_options = [discard]
+            elif kept_total == best_kept_total:
+                discard_options.append(discard)
+    unique_options = {
+        (option["coal"], option["oil"]): option for option in discard_options
+    }
+    return tuple(
+        unique_options[key]
+        for key in sorted(unique_options)
+    )
+
+
+def _resolve_resource_storage_after_power_plant_discard(
+    player: PlayerState,
+    *,
+    kept_plants: tuple[PowerPlantCard, ...],
+    discarded_plant_price: int,
+) -> ResourceStorage | DecisionRequest:
+    current_totals = player.resource_storage.resource_totals()
+    capacities = _storage_space_capacities(kept_plants)
+    auto_discards = {
+        "garbage": max(0, current_totals["garbage"] - capacities["garbage"]),
+        "uranium": max(0, current_totals["uranium"] - capacities["uranium"]),
+    }
+    hybrid_options = _minimal_hybrid_discard_options(
+        current_totals["coal"],
+        current_totals["oil"],
+        capacities,
+    )
+    if not hybrid_options:
+        raise ModelValidationError("discarding this power plant leaves no valid storage configuration")
+
+    if len(hybrid_options) > 1:
+        return DecisionRequest(
+            player_id=player.player_id,
+            decision_type="discard_hybrid_resources",
+            prompt=(
+                "Choose how many coal and oil resources to discard so the remaining plants "
+                "can legally store your fuel."
+            ),
+            legal_actions=tuple(
+                Action(
+                    action_type="discard_hybrid_resources",
+                    player_id=player.player_id,
+                    payload={"coal": option["coal"], "oil": option["oil"]},
+                )
+                for option in hybrid_options
+            ),
+            metadata={
+                "discarded_power_plant_price": discarded_plant_price,
+                "kept_power_plants": [plant.to_dict() for plant in kept_plants],
+                "current_resource_totals": dict(current_totals),
+                "storage_capacities": dict(capacities),
+                "auto_discard_resources": {
+                    resource: amount for resource, amount in auto_discards.items() if amount
+                },
+            },
+        )
+
+    final_totals = dict(current_totals)
+    chosen_option = hybrid_options[0]
+    for resource, amount in {**auto_discards, **chosen_option}.items():
+        final_totals[resource] -= amount
+    return _normalize_resource_totals_into_storage(final_totals, capacities)
+
+
 def _normalize_purchase_request(
     basket: dict[str, int] | dict[int | str, dict[str, int]],
 ) -> dict[str, int]:
@@ -1887,7 +2055,9 @@ def _normalize_run_selection(
 
     remaining_resources = player.resource_storage.resource_totals()
     seen_prices: set[int] = set()
-    plans: list[PlantRunPlan] = []
+    raw_plans: list[tuple[PowerPlantCard, dict[str, int] | None]] = []
+    fixed_usage = {resource: 0 for resource in RESOURCE_TYPES}
+    unresolved_hybrids: list[PowerPlantCard] = []
 
     for plant_price, requested_mix in raw_items:
         if plant_price in seen_prices:
@@ -1896,7 +2066,7 @@ def _normalize_run_selection(
         plant = _get_player_power_plant(player, plant_price)
 
         if plant.is_ecological:
-            normalized_mix: dict[str, int] = {}
+            normalized_mix: dict[str, int] | None = {}
         elif plant.is_hybrid:
             if requested_mix:
                 normalized_mix = _normalize_resource_mix(requested_mix)
@@ -1907,7 +2077,8 @@ def _normalize_run_selection(
                         f"hybrid plant {plant.price} must consume exactly {plant.resource_cost} resources"
                     )
             else:
-                normalized_mix = _default_hybrid_mix(remaining_resources, plant.resource_cost)
+                normalized_mix = None
+                unresolved_hybrids.append(plant)
         else:
             resource = plant.resource_types[0]
             expected_mix = {resource: plant.resource_cost}
@@ -1920,12 +2091,51 @@ def _normalize_run_selection(
             else:
                 normalized_mix = expected_mix
 
-        for resource, amount in normalized_mix.items():
-            if amount > remaining_resources[resource]:
-                raise ModelValidationError(
-                    f"player does not have enough {resource} to run power plant {plant.price}"
+        if normalized_mix is not None:
+            for resource, amount in normalized_mix.items():
+                fixed_usage[resource] += amount
+        raw_plans.append((plant, normalized_mix))
+
+    for resource, amount in fixed_usage.items():
+        if amount > remaining_resources[resource]:
+            raise ModelValidationError(f"player does not have enough {resource} to run the selected plants")
+        remaining_resources[resource] -= amount
+
+    resolved_hybrid_mixes: dict[int, dict[str, int]] = {}
+    if unresolved_hybrids:
+        feasible_assignments = _enumerate_hybrid_run_assignments(unresolved_hybrids, remaining_resources)
+        if not feasible_assignments:
+            raise ModelValidationError("player does not have enough coal and oil to run the selected hybrid plants")
+        for plant in unresolved_hybrids:
+            plant_options = {
+                _resource_mix_key(assignment[plant.price])
+                for assignment in feasible_assignments
+            }
+            if len(plant_options) > 1:
+                valid_mixes = "; ".join(
+                    _format_resource_mix(_resource_mix_from_key(key))
+                    for key in sorted(plant_options)
                 )
-            remaining_resources[resource] -= amount
+                raise ModelValidationError(
+                    "hybrid plant "
+                    f"{plant.price} requires an explicit coal/oil mix after accounting for the other selected plants; "
+                    f"valid mixes: {valid_mixes}"
+                )
+            chosen_mix = _resource_mix_from_key(next(iter(plant_options)))
+            resolved_hybrid_mixes[plant.price] = chosen_mix
+            for assignment in feasible_assignments:
+                if assignment[plant.price] == chosen_mix:
+                    feasible_assignments = tuple(
+                        candidate
+                        for candidate in feasible_assignments
+                        if candidate[plant.price] == chosen_mix
+                    )
+                    break
+
+    plans: list[PlantRunPlan] = []
+    for plant, normalized_mix in raw_plans:
+        if normalized_mix is None:
+            normalized_mix = resolved_hybrid_mixes[plant.price]
         plans.append(PlantRunPlan(plant_price=plant.price, resource_mix=normalized_mix))
 
     return tuple(plans)
@@ -1945,6 +2155,43 @@ def _default_hybrid_mix(
     if oil_used:
         mix["oil"] = oil_used
     return mix
+
+
+def _enumerate_hybrid_run_assignments(
+    hybrid_plants: list[PowerPlantCard],
+    remaining_resources: dict[str, int],
+) -> tuple[dict[int, dict[str, int]], ...]:
+    assignments: list[dict[int, dict[str, int]]] = []
+
+    def search(index: int, coal_left: int, oil_left: int, chosen: dict[int, dict[str, int]]) -> None:
+        if index == len(hybrid_plants):
+            assignments.append({price: dict(mix) for price, mix in chosen.items()})
+            return
+        plant = hybrid_plants[index]
+        minimum_coal = max(0, plant.resource_cost - oil_left)
+        maximum_coal = min(plant.resource_cost, coal_left)
+        for coal_used in range(minimum_coal, maximum_coal + 1):
+            oil_used = plant.resource_cost - coal_used
+            chosen[plant.price] = _normalize_resource_mix({"coal": coal_used, "oil": oil_used})
+            search(index + 1, coal_left - coal_used, oil_left - oil_used, chosen)
+        chosen.pop(plant.price, None)
+
+    search(0, remaining_resources["coal"], remaining_resources["oil"], {})
+    return tuple(assignments)
+
+
+def _resource_mix_key(mix: dict[str, int]) -> tuple[tuple[str, int], ...]:
+    return tuple(sorted((resource, int(amount)) for resource, amount in mix.items() if amount))
+
+
+def _resource_mix_from_key(key: tuple[tuple[str, int], ...]) -> dict[str, int]:
+    return {resource: amount for resource, amount in key}
+
+
+def _format_resource_mix(mix: dict[str, int]) -> str:
+    if not mix:
+        return "(none)"
+    return ", ".join(f"{resource}={amount}" for resource, amount in sorted(mix.items()))
 
 
 def _summarize_resource_usage(plans: tuple[PlantRunPlan, ...]) -> dict[str, int]:

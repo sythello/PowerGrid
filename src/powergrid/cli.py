@@ -6,6 +6,7 @@ from typing import Callable
 from .model import (
     BureaucracySummary,
     DecisionRequest,
+    discard_resources_to_fit_storage,
     GameState,
     ModelValidationError,
     PlantRunPlan,
@@ -167,9 +168,12 @@ def render_game_state(state: GameState, *, active_player_id: str | None = None) 
             f"storage=[{_format_storage(player)}]"
         )
     if state.pending_decision is not None:
-        lines.append(
+        pending_line = (
             f"Pending decision: {state.pending_decision.decision_type} for {state.pending_decision.player_id}"
         )
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            pending_line += " (resolve with: discard coal=<n> oil=<m>)"
+        lines.append(pending_line)
     return "\n".join(lines)
 
 
@@ -529,9 +533,19 @@ def _run_bureaucracy_phase(
 def _apply_auction_command(state: GameState, player_id: str, command: str) -> GameState:
     tokens = command.split()
     if state.pending_decision is not None:
-        if tokens[0].lower() != "discard" or len(tokens) != 2:
-            raise ValueError("expected: discard <plant_price>")
-        return replace_plant_if_needed(state, state.pending_decision.player_id, int(tokens[1]))
+        if state.pending_decision.decision_type == "discard_power_plant":
+            if tokens[0].lower() != "discard" or len(tokens) != 2:
+                raise ValueError("expected: discard <plant_price>")
+            return replace_plant_if_needed(state, state.pending_decision.player_id, int(tokens[1]))
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            if tokens[0].lower() != "discard" or len(tokens) < 2:
+                raise ValueError("expected: discard coal=<amount> oil=<amount>")
+            return discard_resources_to_fit_storage(
+                state,
+                state.pending_decision.player_id,
+                _parse_named_resource_mix(tokens[1:]),
+            )
+        raise ModelValidationError("unsupported pending auction decision type")
     auction_state = state.auction_state
     if auction_state is None:
         raise ModelValidationError("auction state is missing")
@@ -585,6 +599,17 @@ def _parse_run_command(command: str) -> tuple[PlantRunPlan, ...]:
 
 def _build_auction_request(state: GameState) -> DecisionRequest:
     if state.pending_decision is not None:
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            return DecisionRequest(
+                player_id=state.pending_decision.player_id,
+                decision_type="discard_hybrid_resources",
+                prompt=(
+                    f"{state.pending_decision.player_id} must discard coal/oil resources to fit the remaining plants. "
+                    "Use: options, discard coal=<amount> oil=<amount>, status, help, quit"
+                ),
+                legal_actions=state.pending_decision.legal_actions,
+                metadata=state.pending_decision.metadata,
+            )
         return DecisionRequest(
             player_id=state.pending_decision.player_id,
             decision_type="discard_power_plant",
@@ -622,6 +647,21 @@ def _build_auction_request(state: GameState) -> DecisionRequest:
 
 def _auction_options_text(state: GameState) -> str:
     if state.pending_decision is not None:
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            auto_discards = state.pending_decision.metadata.get("auto_discard_resources", {})
+            options = ", ".join(
+                f"discard coal={action.payload.get('coal', 0)} oil={action.payload.get('oil', 0)}"
+                for action in state.pending_decision.legal_actions
+            )
+            if auto_discards:
+                auto_text = ", ".join(
+                    f"{resource}={amount}" for resource, amount in sorted(auto_discards.items())
+                )
+                return (
+                    "Automatic discards: " + auto_text + "\n"
+                    "Legal coal/oil discard choices: " + options
+                )
+            return "Legal coal/oil discard choices: " + options
         prices = ", ".join(str(action.payload["price"]) for action in state.pending_decision.legal_actions)
         return "Legal discard choices: " + prices
     auction_state = state.auction_state
@@ -728,6 +768,8 @@ def _quote_build_text(state: GameState, player_id: str, city_ids: list[str]) -> 
 
 def _auction_help_text(state: GameState) -> str:
     if state.pending_decision is not None:
+        if state.pending_decision.decision_type == "discard_hybrid_resources":
+            return "Commands: options, discard coal=<amount> oil=<amount>, status, help, quit"
         return "Commands: options, discard <plant_price>, status, help, quit"
     if state.auction_state is not None and state.auction_state.has_active_auction:
         return "Commands: options, bid <amount>, pass, status, help, quit"
@@ -832,3 +874,13 @@ def _format_storage(player) -> str:
             f"uranium={storage.uranium}",
         )
     )
+
+
+def _parse_named_resource_mix(tokens: list[str]) -> dict[str, int]:
+    mix: dict[str, int] = {}
+    for token in tokens:
+        if "=" not in token:
+            raise ValueError("expected resource assignments like coal=2 oil=1")
+        resource, amount = token.split("=", 1)
+        mix[resource.strip()] = int(amount)
+    return mix
