@@ -5,9 +5,64 @@ This directory is for interactive, human-driven checks that sit outside the auto
 
 These scripts are useful when we want to:
 - drive the engine from the terminal by hand
+- drive the shared frontend session layer before or alongside the GUI
 - verify that legal actions are accepted
 - verify that illegal actions are rejected with a clear explanation
 - inspect intermediate game state after each human-entered action
+
+## Session Layer Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_session_dev.py --scenario opening
+```
+
+You can also start a fresh mixed human/AI game:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_session_dev.py --players 4 --ai-players 2 --seed 11
+```
+
+The script will:
+- exercise the new `GameSession` layer instead of the legacy CLI loop
+- print the current game snapshot after each accepted intent
+- auto-advance AI seats until the next human decision
+- show the last round summary and recent session events on demand
+
+Supported commands depend on the current request:
+- `auction`: `start <plant_price> <bid>`, `bid <amount>`, `pass`
+- `buy_resources`: `buy <resource> <amount>`, `done`
+- `build_houses`: `quote <city_id> [city_id ...]`, `build <city_id> [city_id ...]`, `done`
+- `bureaucracy`: `run <plant_price>[:resource=amount,...] ...`, `skip`
+- pending decisions: `discard <plant_price>` or `discard coal=<amount> oil=<amount>`
+- utility commands: `status`, `events`, `help`, `quit`
+
+## Tkinter GUI Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_gui_app.py
+```
+
+You can also jump straight into a specific phase-oriented scenario:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_gui_app.py --scenario build_test
+```
+
+And you can use a non-interactive smoke check in automation:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_gui_app.py --scenario opening --smoke-test
+```
+
+The GUI manual test lets you:
+- start a new game from the launcher with per-seat human/AI choices
+- load targeted scenarios to verify auction, resource, build, and bureaucracy panels separately
+- inspect the player rail, market tab, event log, and raw state inspector while interacting
+- confirm pending discard decisions and round summaries render inside the app shell
 
 ## Auction Phase Manual Test
 

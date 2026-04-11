@@ -78,6 +78,18 @@ from .rules_data import (
     validate_static_data,
 )
 from .scenarios import SCENARIO_NAMES, build_game_scenario
+from .session import (
+    default_game_config,
+    default_seat_agents,
+    DeterministicAiSeat,
+    GameSession,
+    GameSnapshot,
+    GuiIntent,
+    HumanSeat,
+    SeatAgent,
+    SessionEvent,
+    TurnRequest,
+)
 
 __all__ = [
     "Action",
@@ -102,10 +114,17 @@ __all__ = [
     "consume_resources",
     "discard_resources_to_fit_storage",
     "DataValidationError",
+    "default_game_config",
+    "default_seat_agents",
+    "DeterministicAiSeat",
     "DecisionRequest",
     "GameConfig",
+    "GameSession",
+    "GameSnapshot",
     "GameRunResult",
     "GameState",
+    "GuiIntent",
+    "HumanSeat",
     "initialize_game",
     "legal_build_targets",
     "legal_resource_purchases",
@@ -134,8 +153,11 @@ __all__ = [
     "SCENARIO_NAMES",
     "ScriptedController",
     "SeatConfig",
+    "SeatAgent",
     "select_play_areas",
+    "SessionEvent",
     "set_player_resource_totals",
+    "TurnRequest",
     "ValidationReport",
     "create_initial_state",
     "load_map",
