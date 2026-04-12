@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from itertools import combinations
-from typing import Any
-
+from .ai import BaseAiController, DeterministicAiController, build_ai_controller
 from .model import (
     Action,
-    DecisionRequest,
     GameConfig,
     GameState,
     ModelValidationError,
     PlantRunPlan,
-    PowerPlantCard,
     advance_phase,
     apply_builds,
     build_city,
@@ -32,166 +27,14 @@ from .model import (
     WinnerResult,
 )
 from .scenarios import build_game_scenario
-
-
-@dataclass(frozen=True)
-class GuiIntent:
-    intent_type: str
-    player_id: str
-    payload: dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if not self.intent_type:
-            raise ModelValidationError("intent_type must be non-empty")
-        if not self.player_id:
-            raise ModelValidationError("player_id must be non-empty")
-        object.__setattr__(self, "payload", dict(self.payload))
-
-    @classmethod
-    def auction_start(cls, player_id: str, plant_price: int, bid: int) -> "GuiIntent":
-        return cls(
-            intent_type="auction_start",
-            player_id=player_id,
-            payload={"plant_price": int(plant_price), "bid": int(bid)},
-        )
-
-    @classmethod
-    def auction_bid(cls, player_id: str, bid: int) -> "GuiIntent":
-        return cls(intent_type="auction_bid", player_id=player_id, payload={"bid": int(bid)})
-
-    @classmethod
-    def auction_pass(cls, player_id: str) -> "GuiIntent":
-        return cls(intent_type="auction_pass", player_id=player_id)
-
-    @classmethod
-    def buy_resource(cls, player_id: str, resource: str, amount: int) -> "GuiIntent":
-        return cls(
-            intent_type="buy_resource",
-            player_id=player_id,
-            payload={"resource": resource, "amount": int(amount)},
-        )
-
-    @classmethod
-    def finish_buying(cls, player_id: str) -> "GuiIntent":
-        return cls(intent_type="finish_buying", player_id=player_id)
-
-    @classmethod
-    def quote_build(cls, player_id: str, city_ids: tuple[str, ...] | list[str]) -> "GuiIntent":
-        return cls(intent_type="quote_build", player_id=player_id, payload={"city_ids": list(city_ids)})
-
-    @classmethod
-    def commit_build(cls, player_id: str, city_ids: tuple[str, ...] | list[str]) -> "GuiIntent":
-        return cls(intent_type="commit_build", player_id=player_id, payload={"city_ids": list(city_ids)})
-
-    @classmethod
-    def finish_building(cls, player_id: str) -> "GuiIntent":
-        return cls(intent_type="finish_building", player_id=player_id)
-
-    @classmethod
-    def run_plants(
-        cls,
-        player_id: str,
-        plans: tuple[PlantRunPlan, ...] | list[PlantRunPlan],
-    ) -> "GuiIntent":
-        return cls(
-            intent_type="run_plants",
-            player_id=player_id,
-            payload={"plans": [plan.to_dict() for plan in plans]},
-        )
-
-    @classmethod
-    def skip_bureaucracy(cls, player_id: str) -> "GuiIntent":
-        return cls(intent_type="skip_bureaucracy", player_id=player_id)
-
-    @classmethod
-    def discard_plant(cls, player_id: str, plant_price: int) -> "GuiIntent":
-        return cls(
-            intent_type="discard_power_plant",
-            player_id=player_id,
-            payload={"plant_price": int(plant_price)},
-        )
-
-    @classmethod
-    def discard_hybrid_resources(cls, player_id: str, coal: int, oil: int) -> "GuiIntent":
-        return cls(
-            intent_type="discard_hybrid_resources",
-            player_id=player_id,
-            payload={"coal": int(coal), "oil": int(oil)},
-        )
-
-
-@dataclass(frozen=True)
-class TurnRequest:
-    player_id: str
-    phase: str
-    decision_type: str
-    prompt: str
-    legal_actions: tuple[Action, ...] = field(default_factory=tuple)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if not self.player_id:
-            raise ModelValidationError("turn request player_id must be non-empty")
-        if not self.phase:
-            raise ModelValidationError("turn request phase must be non-empty")
-        if not self.decision_type:
-            raise ModelValidationError("turn request decision_type must be non-empty")
-        if not self.prompt:
-            raise ModelValidationError("turn request prompt must be non-empty")
-        object.__setattr__(self, "legal_actions", tuple(self.legal_actions))
-        object.__setattr__(self, "metadata", dict(self.metadata))
-
-
-@dataclass(frozen=True)
-class SessionEvent:
-    level: str
-    message: str
-    player_id: str | None = None
-    phase: str | None = None
-
-
-@dataclass(frozen=True)
-class GameSnapshot:
-    state: GameState
-    active_request: TurnRequest | None
-    event_log: tuple[SessionEvent, ...]
-    last_round_summary: Any | None = None
-    winner_result: WinnerResult | None = None
-
-
-class SeatAgent:
-    controller = "human"
-
-    def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
-        raise NotImplementedError
-
-
-class HumanSeat(SeatAgent):
-    controller = "human"
-
-    def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
-        raise ModelValidationError("human seats require a user-provided intent")
-
-
-class DeterministicAiSeat(SeatAgent):
-    controller = "ai"
-
-    def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
-        state = snapshot.state
-        if state.pending_decision is not None:
-            return _choose_pending_intent(state)
-        if request.phase == "auction":
-            return _choose_auction_intent(state, request)
-        if request.phase == "buy_resources":
-            return _choose_resource_intent(state, request.player_id)
-        if request.phase == "build_houses":
-            return _choose_build_intent(state, request.player_id)
-        if request.phase == "bureaucracy":
-            plans = _choose_best_generation_plans(state, request.player_id)
-            if plans:
-                return GuiIntent.run_plants(request.player_id, plans)
-            return GuiIntent.skip_bureaucracy(request.player_id)
-        raise ModelValidationError(f"unsupported request phase {request.phase!r}")
+from .session_types import (
+    GameSnapshot,
+    GuiIntent,
+    HumanSeat,
+    SeatAgent,
+    SessionEvent,
+    TurnRequest,
+)
 
 
 class GameSession:
@@ -203,6 +46,12 @@ class GameSession:
         expected = {player.player_id for player in state.players}
         if set(seat_agents) != expected:
             raise ModelValidationError("seat agents must match the active game state's player ids exactly")
+        for player in state.players:
+            agent = seat_agents[player.player_id]
+            if player.controller == "ai" and not isinstance(agent, BaseAiController):
+                raise ModelValidationError(
+                    f"AI-controlled seat {player.player_id} must use a BaseAiController instance"
+                )
         self._state = state
         self._seat_agents = dict(seat_agents)
         self._event_log: list[SessionEvent] = []
@@ -532,8 +381,13 @@ class GameSession:
 def default_seat_agents(config: GameConfig) -> dict[str, SeatAgent]:
     agents: dict[str, SeatAgent] = {}
     for seat in config.players:
-        agents[seat.player_id] = HumanSeat() if seat.controller == "human" else DeterministicAiSeat()
+        agents[seat.player_id] = (
+            HumanSeat() if seat.controller == "human" else build_ai_controller(seat.controller)
+        )
     return agents
+
+
+DeterministicAiSeat = DeterministicAiController
 
 
 def default_game_config(
@@ -634,180 +488,3 @@ def _get_player(state: GameState, player_id: str):
         if player.player_id == player_id:
             return player
     raise ModelValidationError(f"unknown player {player_id!r}")
-
-
-def _choose_pending_intent(state: GameState) -> GuiIntent:
-    assert state.pending_decision is not None
-    if state.pending_decision.decision_type == "discard_power_plant":
-        prices = sorted(int(action.payload["price"]) for action in state.pending_decision.legal_actions)
-        return GuiIntent.discard_plant(state.pending_decision.player_id, prices[0])
-    legal = sorted(
-        (
-            int(action.payload.get("coal", 0)),
-            int(action.payload.get("oil", 0)),
-        )
-        for action in state.pending_decision.legal_actions
-    )
-    coal, oil = legal[0]
-    return GuiIntent.discard_hybrid_resources(state.pending_decision.player_id, coal=coal, oil=oil)
-
-
-def _choose_auction_intent(state: GameState, request: TurnRequest) -> GuiIntent:
-    auction_state = state.auction_state
-    assert auction_state is not None
-    if request.decision_type == "auction_start":
-        start_actions = [
-            action for action in request.legal_actions if action.action_type == "auction_start"
-        ]
-        if not start_actions:
-            return GuiIntent.auction_pass(request.player_id)
-        cheapest = min(start_actions, key=lambda action: int(action.payload["plant_price"]))
-        return GuiIntent.auction_start(
-            request.player_id,
-            plant_price=int(cheapest.payload["plant_price"]),
-            bid=int(cheapest.payload["min_bid"]),
-        )
-    bid_action = next(
-        action for action in request.legal_actions if action.action_type == "auction_bid"
-    )
-    min_bid = int(bid_action.payload["min_bid"])
-    max_bid = int(bid_action.payload["max_bid"])
-    plant_price = int(bid_action.payload["plant_price"])
-    bid_cap = min(max_bid, plant_price + 2)
-    if min_bid > bid_cap:
-        return GuiIntent.auction_pass(request.player_id)
-    return GuiIntent.auction_bid(request.player_id, min_bid)
-
-
-def _resource_need_by_type(state: GameState, player_id: str) -> dict[str, int]:
-    player = _get_player(state, player_id)
-    stored = player.resource_storage.resource_totals()
-    needed = {"coal": 0, "oil": 0, "garbage": 0, "uranium": 0}
-    hybrid_cost = 0
-    for plant in player.power_plants:
-        if plant.is_ecological or plant.is_step_3_placeholder:
-            continue
-        if plant.is_hybrid:
-            hybrid_cost += plant.resource_cost
-            continue
-        needed[plant.resource_types[0]] += plant.resource_cost
-    hybrid_remaining = max(0, hybrid_cost - (stored["coal"] + stored["oil"]))
-    deficits = {
-        resource: max(0, needed[resource] - stored[resource])
-        for resource in needed
-    }
-    if hybrid_remaining > 0:
-        if stored["coal"] <= stored["oil"]:
-            deficits["coal"] += hybrid_remaining
-        else:
-            deficits["oil"] += hybrid_remaining
-    return deficits
-
-
-def _choose_resource_intent(state: GameState, player_id: str) -> GuiIntent:
-    actions = legal_resource_purchases(state, player_id)
-    if not actions:
-        return GuiIntent.finish_buying(player_id)
-    deficits = _resource_need_by_type(state, player_id)
-    candidate_actions = [
-        action
-        for action in actions
-        if deficits.get(str(action.payload["resource"]), 0) > 0
-    ]
-    if not candidate_actions:
-        return GuiIntent.finish_buying(player_id)
-    chosen = min(
-        candidate_actions,
-        key=lambda action: (
-            int(action.payload["unit_prices"][0]),
-            str(action.payload["resource"]),
-        ),
-    )
-    resource = str(chosen.payload["resource"])
-    amount = min(
-        int(chosen.payload["max_affordable_units"]),
-        max(1, deficits[resource]),
-    )
-    return GuiIntent.buy_resource(player_id, resource=resource, amount=amount)
-
-
-def _choose_build_intent(state: GameState, player_id: str) -> GuiIntent:
-    actions = legal_build_targets(state, player_id)
-    if not actions:
-        return GuiIntent.finish_building(player_id)
-    chosen = min(
-        actions,
-        key=lambda action: (
-            int(action.payload["total_cost"]),
-            str(action.payload["city_id"]),
-        ),
-    )
-    return GuiIntent.commit_build(player_id, [str(chosen.payload["city_id"])])
-
-
-def _choose_best_generation_plans(state: GameState, player_id: str) -> tuple[PlantRunPlan, ...]:
-    player = _get_player(state, player_id)
-    resource_totals = player.resource_storage.resource_totals()
-    plant_choices = []
-    for plant in sorted(player.power_plants, key=lambda item: item.price):
-        if plant.is_step_3_placeholder:
-            continue
-        options = [None]
-        if plant.is_ecological:
-            options.append(PlantRunPlan(plant.price, {}))
-        elif plant.is_hybrid:
-            for coal in range(plant.resource_cost + 1):
-                oil = plant.resource_cost - coal
-                if coal <= resource_totals["coal"] and oil <= resource_totals["oil"]:
-                    options.append(PlantRunPlan(plant.price, {"coal": coal, "oil": oil}))
-        else:
-            resource = plant.resource_types[0]
-            if plant.resource_cost <= resource_totals[resource]:
-                options.append(PlantRunPlan(plant.price, {resource: plant.resource_cost}))
-        plant_choices.append((plant, tuple(options)))
-
-    best: tuple[PlantRunPlan, ...] = ()
-    best_signature = (-1, 999999, ())
-
-    def backtrack(
-        index: int,
-        remaining: dict[str, int],
-        selected: list[PlantRunPlan],
-    ) -> None:
-        nonlocal best
-        nonlocal best_signature
-        if index >= len(plant_choices):
-            plans = tuple(selected)
-            try:
-                choose_plants_to_run(state, player_id, plans)
-            except ModelValidationError:
-                return
-            powered = compute_powered_cities(state, player_id, plans)
-            spent = sum(sum(plan.resource_mix.values()) for plan in plans)
-            signature = (
-                powered,
-                -spent,
-                tuple(plan.plant_price for plan in plans),
-            )
-            if signature > best_signature:
-                best_signature = signature
-                best = plans
-            return
-
-        plant, options = plant_choices[index]
-        for option in options:
-            if option is None:
-                backtrack(index + 1, dict(remaining), selected)
-                continue
-            next_remaining = dict(remaining)
-            for resource, amount in option.resource_mix.items():
-                if next_remaining[resource] < amount:
-                    break
-                next_remaining[resource] -= amount
-            else:
-                selected.append(option)
-                backtrack(index + 1, next_remaining, selected)
-                selected.pop()
-
-    backtrack(0, dict(resource_totals), [])
-    return best

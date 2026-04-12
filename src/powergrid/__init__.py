@@ -1,5 +1,12 @@
 """Power Grid package."""
 
+from .ai import (
+    BaseAiController,
+    build_ai_controller,
+    DeterministicAiController,
+    DeterministicAiSeat,
+    register_ai_controller,
+)
 from .cli import (
     CLIController,
     GameRunResult,
@@ -78,17 +85,18 @@ from .rules_data import (
     validate_static_data,
 )
 from .scenarios import SCENARIO_NAMES, build_game_scenario
-from .session import (
-    default_game_config,
-    default_seat_agents,
-    DeterministicAiSeat,
-    GameSession,
+from .session_types import (
     GameSnapshot,
     GuiIntent,
     HumanSeat,
     SeatAgent,
     SessionEvent,
     TurnRequest,
+)
+from .session import (
+    default_game_config,
+    default_seat_agents,
+    GameSession,
 )
 
 __all__ = [
@@ -97,6 +105,8 @@ __all__ = [
     "apply_builds",
     "advance_phase",
     "advance_round",
+    "BaseAiController",
+    "build_ai_controller",
     "AuctionState",
     "BureaucracySummary",
     "build_city",
@@ -116,6 +126,7 @@ __all__ = [
     "DataValidationError",
     "default_game_config",
     "default_seat_agents",
+    "DeterministicAiController",
     "DeterministicAiSeat",
     "DecisionRequest",
     "GameConfig",
@@ -167,6 +178,7 @@ __all__ = [
     "make_default_seat_configs",
     "pass_auction",
     "raise_bid",
+    "register_ai_controller",
     "replace_plant_if_needed",
     "resolve_bureaucracy",
     "resolve_auction_round",
