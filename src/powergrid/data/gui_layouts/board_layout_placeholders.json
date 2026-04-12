@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "coordinate_space": "normalized",
+  "notes": [
+    "All x and y values are normalized to the full board image in the 0.0 to 1.0 range.",
+    "Replace each null coordinate with the board-relative center point for that city marker or token slot.",
+    "If the Germany and USA board scans need different resource market placements, copy resource_market_template into maps.<map_id>.resource_market and fill it there."
+  ],
+  "resource_market_template": {
+    "notes": "Fill each token slot with the normalized center point for one printed resource space at that market price.",
+    "coal": {
+      "1": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "2": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "3": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "4": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "5": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "6": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "7": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "8": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+    },
+    "oil": {
+      "1": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "2": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "3": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "4": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "5": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "6": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "7": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "8": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+    },
+    "garbage": {
+      "1": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "2": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "3": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "4": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "5": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "6": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "7": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }],
+      "8": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+    },
+    "uranium": {
+      "1": [{ "slot": 1, "x": null, "y": null }],
+      "2": [{ "slot": 1, "x": null, "y": null }],
+      "3": [{ "slot": 1, "x": null, "y": null }],
+      "4": [{ "slot": 1, "x": null, "y": null }],
+      "5": [{ "slot": 1, "x": null, "y": null }],
+      "6": [{ "slot": 1, "x": null, "y": null }],
+      "7": [{ "slot": 1, "x": null, "y": null }],
+      "8": [{ "slot": 1, "x": null, "y": null }],
+      "10": [{ "slot": 1, "x": null, "y": null }],
+      "12": [{ "slot": 1, "x": null, "y": null }],
+      "14": [{ "slot": 1, "x": null, "y": null }],
+      "16": [{ "slot": 1, "x": null, "y": null }]
+    }
+  },
+  "maps": {
+    "germany": {
+      "board_art": {
+        "image_path": "assets/boards/germany.png",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Funkenschlag-detail2.jpg",
+        "natural_size": { "width": null, "height": null }
+      },
+      "city_defaults": {
+        "hit_radius": 0.018,
+        "label_offset": { "x": 0.0, "y": -0.03 }
+      },
+      "resource_market": null,
+      "cities": {
+        "aachen": { "name": "Aachen", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "augsburg": { "name": "Augsburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "berlin": { "name": "Berlin", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "bremen": { "name": "Bremen", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "cuxhaven": { "name": "Cuxhaven", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "dortmund": { "name": "Dortmund", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "dresden": { "name": "Dresden", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "duesseldorf": { "name": "Duesseldorf", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "duisburg": { "name": "Duisburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "erfurt": { "name": "Erfurt", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "essen": { "name": "Essen", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "flensburg": { "name": "Flensburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "frankfurt_main": { "name": "Frankfurt-Main", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "frankfurt_oder": { "name": "Frankfurt-Oder", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "freiburg": { "name": "Freiburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "fulda": { "name": "Fulda", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "halle": { "name": "Halle", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "hamburg": { "name": "Hamburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "hannover": { "name": "Hannover", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "kassel": { "name": "Kassel", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "kiel": { "name": "Kiel", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "koeln": { "name": "Koeln", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "konstanz": { "name": "Konstanz", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "leipzig": { "name": "Leipzig", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "luebeck": { "name": "Luebeck", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "magdeburg": { "name": "Magdeburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "mannheim": { "name": "Mannheim", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "muenchen": { "name": "Muenchen", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "muenster": { "name": "Muenster", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "nuernberg": { "name": "Nuernberg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "osnabrueck": { "name": "Osnabrueck", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "passau": { "name": "Passau", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "regensburg": { "name": "Regensburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "rostock": { "name": "Rostock", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "saarbruecken": { "name": "Saarbruecken", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "schwerin": { "name": "Schwerin", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "stuttgart": { "name": "Stuttgart", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "torgelow": { "name": "Torgelow", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "trier": { "name": "Trier", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "wiesbaden": { "name": "Wiesbaden", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "wilhelmshaven": { "name": "Wilhelmshaven", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "wuerzburg": { "name": "Wuerzburg", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] }
+      }
+    },
+    "usa": {
+      "board_art": {
+        "image_path": "assets/boards/usa.png",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Power_Grid_board_game.jpg",
+        "natural_size": { "width": null, "height": null }
+      },
+      "city_defaults": {
+        "hit_radius": 0.018,
+        "label_offset": { "x": 0.0, "y": -0.03 }
+      },
+      "resource_market": null,
+      "cities": {
+        "atlanta": { "name": "Atlanta", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "billings": { "name": "Billings", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "birmingham": { "name": "Birmingham", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "boise": { "name": "Boise", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "boston": { "name": "Boston", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "buffalo": { "name": "Buffalo", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "cheyenne": { "name": "Cheyenne", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "chicago": { "name": "Chicago", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "cincinnati": { "name": "Cincinnati", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "dallas": { "name": "Dallas", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "denver": { "name": "Denver", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "detroit": { "name": "Detroit", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "duluth": { "name": "Duluth", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "fargo": { "name": "Fargo", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "houston": { "name": "Houston", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "jacksonville": { "name": "Jacksonville", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "kansas_city": { "name": "Kansas City", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "knoxville": { "name": "Knoxville", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "las_vegas": { "name": "Las Vegas", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "los_angeles": { "name": "Los Angeles", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "memphis": { "name": "Memphis", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "miami": { "name": "Miami", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "minneapolis": { "name": "Minneapolis", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "new_orleans": { "name": "New Orleans", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "new_york": { "name": "New York", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "norfolk": { "name": "Norfolk", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "oklahoma_city": { "name": "Oklahoma City", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "omaha": { "name": "Omaha", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "philadelphia": { "name": "Philadelphia", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "phoenix": { "name": "Phoenix", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "pittsburgh": { "name": "Pittsburgh", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "portland": { "name": "Portland", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "raleigh": { "name": "Raleigh", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "salt_lake_city": { "name": "Salt Lake City", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "san_diego": { "name": "San Diego", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "san_francisco": { "name": "San Francisco", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "santa_fe": { "name": "Santa Fe", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "savannah": { "name": "Savannah", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "seattle": { "name": "Seattle", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "st_louis": { "name": "St. Louis", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "tampa": { "name": "Tampa", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
+        "washington_dc": { "name": "Washington D.C.", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] }
+      }
+    }
+  }
+}

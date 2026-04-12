@@ -64,6 +64,33 @@ The GUI manual test lets you:
 - inspect the player rail, market tab, event log, and raw state inspector while interacting
 - confirm pending discard decisions and round summaries render inside the app shell
 
+## Board Layout Preview Manual Test
+
+Run:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map germany
+```
+
+You can override the image path if you are calibrating against a local file:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map usa --image /absolute/path/to/usa-board.png
+```
+
+You can also use a non-interactive smoke check:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map germany --smoke-test
+```
+
+The preview tool will:
+- load `src/powergrid/data/gui_layouts/board_layout_placeholders.json`
+- draw the configured board image when available, or a fallback calibration grid when it is not
+- render only the non-null city anchors, house slots, and resource market slots
+- label overlays so you can quickly verify position accuracy while tuning coordinates
+- support scrolling for large board images
+
 ## Auction Phase Manual Test
 
 Run:
