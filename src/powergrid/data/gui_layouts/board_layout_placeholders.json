@@ -165,6 +165,35 @@
         "tampa": { "name": "Tampa", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] },
         "washington_dc": { "name": "Washington D.C.", "anchor": { "x": null, "y": null }, "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }] }
       }
+    },
+    "test": {
+      "board_art": {
+        "image_path": "assets/boards/test.png",
+        "source_url": null,
+        "natural_size": { "width": 1200, "height": 780 }
+      },
+      "city_defaults": {
+        "hit_radius": 0.03,
+        "label_offset": { "x": 0.0, "y": -0.04 }
+      },
+      "resource_market": null,
+      "cities": {
+        "amber_falls": {
+          "name": "Amber Falls",
+          "anchor": { "x": 0.22, "y": 0.44 },
+          "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+        },
+        "brass_harbor": {
+          "name": "Brass Harbor",
+          "anchor": { "x": 0.50, "y": 0.26 },
+          "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+        },
+        "cinder_grove": {
+          "name": "Cinder Grove",
+          "anchor": { "x": 0.77, "y": 0.50 },
+          "house_slots": [{ "slot": 1, "x": null, "y": null }, { "slot": 2, "x": null, "y": null }, { "slot": 3, "x": null, "y": null }]
+        }
+      }
     }
   }
 }

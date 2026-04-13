@@ -24,6 +24,16 @@ class PowerGridGuiTests(unittest.TestCase):
 
         self.assertTrue(app.launcher.winfo_exists())
         self.assertTrue(app.shell.winfo_exists())
+        self.assertTrue(app.shell.board_view.winfo_exists())
+
+    def test_app_creation_smoke_asset_mode(self) -> None:
+        app = PowerGridApp(self.root, board_render_mode="asset")
+        app.pack(fill="both", expand=True)
+
+        self.root.update_idletasks()
+        self.root.update()
+
+        self.assertTrue(app.shell.board_view.winfo_exists())
 
     def test_launcher_can_start_new_game(self) -> None:
         app = PowerGridApp(self.root)

@@ -6,7 +6,8 @@ from tkinter import ttk
 from ..model import GameConfig, SeatConfig
 from ..scenarios import SCENARIO_NAMES
 from ..session import GameSession, GameSnapshot, GuiIntent
-from .components import EventLogView, HeaderView, InspectorView, MarketPanel, PlayerRail
+from .board_view import BoardView, PowerPlantMarketView
+from .components import EventLogView, HeaderView, PlayerRail
 from .panels import AuctionPanel, BuildPanel, BureaucracyPanel, PendingDecisionPanel, ResourcePanel
 
 
@@ -109,7 +110,7 @@ class LauncherFrame(ttk.Frame):
 
 
 class GameShell(ttk.Frame):
-    def __init__(self, master, on_intent) -> None:
+    def __init__(self, master, on_intent, *, board_render_mode: str = "drawn") -> None:
         super().__init__(master, padding=8)
         self.header = HeaderView(self)
         self.header.grid(row=0, column=0, columnspan=3, sticky="ew")
@@ -117,24 +118,31 @@ class GameShell(ttk.Frame):
         self.player_rail.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
         self.workspace = ttk.Frame(self)
         self.workspace.grid(row=1, column=1, sticky="nsew", padx=(0, 8))
-        self.right_tabs = ttk.Notebook(self)
-        self.right_tabs.grid(row=1, column=2, sticky="nsew")
-        self.market_panel = MarketPanel(self.right_tabs)
-        self.log_panel = EventLogView(self.right_tabs)
-        self.inspector_panel = InspectorView(self.right_tabs)
-        self.right_tabs.add(self.market_panel, text="Market")
-        self.right_tabs.add(self.log_panel, text="Events")
-        self.right_tabs.add(self.inspector_panel, text="Inspector")
+        self.board_view = BoardView(self.workspace, board_render_mode=board_render_mode)
+        self.board_view.grid(row=0, column=0, sticky="nsew")
+        self.phase_controls = ttk.Frame(self.workspace, padding=(0, 8, 0, 0))
+        self.phase_controls.grid(row=1, column=0, sticky="ew")
+        self.right_column = ttk.Frame(self)
+        self.right_column.grid(row=1, column=2, sticky="nsew")
+        self.market_panel = PowerPlantMarketView(self.right_column)
+        self.market_panel.grid(row=0, column=0, sticky="nsew")
+        self.log_panel = EventLogView(self.right_column)
+        self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(2, weight=0)
         self.grid_rowconfigure(1, weight=1)
+        self.workspace.grid_columnconfigure(0, weight=1)
+        self.workspace.grid_rowconfigure(0, weight=1)
+        self.right_column.grid_columnconfigure(0, weight=1)
+        self.right_column.grid_rowconfigure(0, weight=0)
+        self.right_column.grid_rowconfigure(1, weight=1)
         self.panels = {
-            "auction": AuctionPanel(self.workspace, on_intent),
-            "buy_resources": ResourcePanel(self.workspace, on_intent),
-            "build_houses": BuildPanel(self.workspace, on_intent),
-            "bureaucracy": BureaucracyPanel(self.workspace, on_intent),
-            "pending": PendingDecisionPanel(self.workspace, on_intent),
+            "auction": AuctionPanel(self.phase_controls, on_intent),
+            "buy_resources": ResourcePanel(self.phase_controls, on_intent),
+            "build_houses": BuildPanel(self.phase_controls, on_intent),
+            "bureaucracy": BureaucracyPanel(self.phase_controls, on_intent),
+            "pending": PendingDecisionPanel(self.phase_controls, on_intent),
         }
         for panel in self.panels.values():
             panel.grid(row=0, column=0, sticky="nsew")
@@ -142,9 +150,9 @@ class GameShell(ttk.Frame):
     def render(self, snapshot: GameSnapshot) -> None:
         self.header.render(snapshot)
         self.player_rail.render(snapshot)
+        self.board_view.render(snapshot)
         self.market_panel.render(snapshot)
         self.log_panel.render(snapshot)
-        self.inspector_panel.render(snapshot)
         for panel in self.panels.values():
             panel.grid_remove()
         if snapshot.state.pending_decision is not None:
@@ -156,12 +164,13 @@ class GameShell(ttk.Frame):
 
 
 class PowerGridApp(ttk.Frame):
-    def __init__(self, master) -> None:
+    def __init__(self, master, *, board_render_mode: str = "drawn") -> None:
         super().__init__(master, padding=0)
         self.master = master
+        self.board_render_mode = board_render_mode
         self.session: GameSession | None = None
         self.launcher = LauncherFrame(self, self.start_new_game, self.load_scenario)
-        self.shell = GameShell(self, self.dispatch_intent)
+        self.shell = GameShell(self, self.dispatch_intent, board_render_mode=board_render_mode)
         self.launcher.grid(row=0, column=0, sticky="nsew")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -202,8 +211,8 @@ def create_root() -> tk.Tk:
     return root
 
 
-def launch_app() -> PowerGridApp:
+def launch_app(*, board_render_mode: str = "drawn") -> PowerGridApp:
     root = create_root()
-    app = PowerGridApp(root)
+    app = PowerGridApp(root, board_render_mode=board_render_mode)
     app.pack(fill="both", expand=True)
     return app

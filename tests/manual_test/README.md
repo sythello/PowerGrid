@@ -52,6 +52,12 @@ You can also jump straight into a specific phase-oriented scenario:
 PYTHONPATH=src python tests/manual_test/run_gui_app.py --scenario build_test
 ```
 
+To switch between image-backed and programmatically drawn boards:
+
+```bash
+PYTHONPATH=src python tests/manual_test/run_gui_app.py --scenario build_test --board-render-mode drawn
+```
+
 And you can use a non-interactive smoke check in automation:
 
 ```bash
@@ -69,27 +75,27 @@ The GUI manual test lets you:
 Run:
 
 ```bash
-PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map germany
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map test
 ```
 
-You can override the image path if you are calibrating against a local file:
+To preview one of the real maps with the same drawn board component:
 
 ```bash
-PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map usa --image /absolute/path/to/usa-board.png
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map germany --board-render-mode drawn
 ```
 
 You can also use a non-interactive smoke check:
 
 ```bash
-PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map germany --smoke-test
+PYTHONPATH=src python tests/manual_test/run_board_layout_preview.py --map test --smoke-test
 ```
 
 The preview tool will:
 - load `src/powergrid/data/gui_layouts/board_layout_placeholders.json`
-- draw the configured board image when available, or a fallback calibration grid when it is not
-- render only the non-null city anchors, house slots, and resource market slots
-- label overlays so you can quickly verify position accuracy while tuning coordinates
-- support scrolling for large board images
+- render the same drawn board component used by the main GUI
+- use the `test` map coordinates out of the box so city, pipe, house, resource, and card art are immediately visible
+- use real-map coordinates as you fill them in for `germany` and `usa`
+- switch between `drawn` and `asset` modes with `--board-render-mode`
 
 ## Auction Phase Manual Test
 
