@@ -120,6 +120,7 @@ class BoardView(ttk.Frame):
         self._draw_resource_market(state, map_layout, width, height)
         self._draw_cities(state, map_layout, positions)
         self._draw_houses(state, map_layout, positions)
+        self._draw_unplayed_city_clouds(state, positions)
         self.canvas.configure(scrollregion=(0, 0, width, height))
         missing = len(state.game_map.cities) - len(positions)
         image_status = (
@@ -728,6 +729,66 @@ class BoardView(ttk.Frame):
             (center_x - 18, center_y + 16),
             (center_x + 18, center_y + 16),
         ]
+
+    def _draw_unplayed_city_clouds(
+        self,
+        state: GameState,
+        positions: dict[str, tuple[float, float]],
+    ) -> None:
+        if not state.selected_regions:
+            return
+        selected_regions = set(state.selected_regions)
+        for city in state.game_map.cities:
+            if city.region in selected_regions:
+                continue
+            point = positions.get(city.id)
+            if point is None:
+                continue
+            self._draw_cloud_mask(point[0], point[1])
+
+    def _draw_cloud_mask(self, center_x: float, center_y: float) -> None:
+        offsets = (
+            (-34, 10, 28, 22),
+            (-10, -12, 26, 24),
+            (18, 8, 30, 22),
+            (-4, 20, 40, 18),
+        )
+        bounds = [center_x - 52, center_y - 28, center_x + 56, center_y + 44]
+        item_ids: list[int] = []
+        for offset_x, offset_y, radius_x, radius_y in offsets:
+            left = center_x + offset_x - radius_x
+            top = center_y + offset_y - radius_y
+            right = center_x + offset_x + radius_x
+            bottom = center_y + offset_y + radius_y
+            bounds[0] = min(bounds[0], left)
+            bounds[1] = min(bounds[1], top)
+            bounds[2] = max(bounds[2], right)
+            bounds[3] = max(bounds[3], bottom)
+            item_ids.append(
+                self.canvas.create_oval(
+                    left,
+                    top,
+                    right,
+                    bottom,
+                    fill="#ffffff",
+                    outline="#111111",
+                    width=2,
+                )
+            )
+        item_ids.append(
+            self.canvas.create_rectangle(
+                bounds[0] + 8,
+                center_y + 8,
+                bounds[2] - 8,
+                bounds[3] - 4,
+                fill="#ffffff",
+                outline="#111111",
+                width=2,
+            )
+        )
+        for item_id in item_ids[:-1]:
+            self.canvas.tag_raise(item_id)
+        self.canvas.tag_raise(item_ids[-1])
 
     def _bind_items_click(self, item_ids: list[int], callback) -> None:
         for item_id in item_ids:

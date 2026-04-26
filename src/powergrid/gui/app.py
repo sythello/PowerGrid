@@ -145,11 +145,11 @@ class GameShell(ttk.Frame):
         self.right_column.grid_rowconfigure(0, weight=0)
         self.right_column.grid_rowconfigure(1, weight=1)
         self.panels = {
-            "auction": AuctionPanel(self.phase_controls, on_intent),
-            "buy_resources": ResourcePanel(self.phase_controls, on_intent),
-            "build_houses": BuildPanel(self.phase_controls, on_intent),
-            "bureaucracy": BureaucracyPanel(self.phase_controls, on_intent),
-            "pending": PendingDecisionPanel(self.phase_controls, on_intent),
+            "auction": AuctionPanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
+            "buy_resources": ResourcePanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
+            "build_houses": BuildPanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
+            "bureaucracy": BureaucracyPanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
+            "pending": PendingDecisionPanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
         }
         for panel in self.panels.values():
             panel.grid(row=0, column=0, sticky="nsew")
@@ -184,6 +184,10 @@ class GameShell(ttk.Frame):
     def _handle_market_plant_click(self, plant_price: int) -> None:
         panel = self.panels[self._current_panel_key]
         if panel.handle_market_plant_click(plant_price) and self._last_snapshot is not None:
+            self.render(self._last_snapshot)
+
+    def _rerender_last_snapshot(self) -> None:
+        if self._last_snapshot is not None:
             self.render(self._last_snapshot)
 
 

@@ -4,22 +4,40 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
-from ..model import GameState, ModelValidationError, PlantRunPlan, RESOURCE_TYPES, apply_builds
+from ..model import (
+    GameState,
+    ModelValidationError,
+    PlantRunPlan,
+    RESOURCE_TYPES,
+    apply_builds,
+    choose_plants_to_run,
+)
 from ..session import GameSnapshot, GuiIntent
 from .components import SnapshotRenderable
 
 
 IntentCallback = Callable[[GuiIntent], None]
+LocalChangeCallback = Callable[[], None]
 
 
 class BasePhasePanel(SnapshotRenderable):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
         super().__init__(master, padding=(10, 8))
         self._on_intent = on_intent
+        self._on_local_change = on_local_change
         self._snapshot: GameSnapshot | None = None
 
     def render(self, snapshot: GameSnapshot) -> None:
         self._snapshot = snapshot
+
+    def _notify_local_change(self) -> None:
+        if self._on_local_change is not None:
+            self._on_local_change()
 
     def board_interaction_state(self) -> dict[str, object]:
         return {}
@@ -38,8 +56,13 @@ class BasePhasePanel(SnapshotRenderable):
 
 
 class AuctionPanel(BasePhasePanel):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
-        super().__init__(master, on_intent)
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
+        super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
         self.selection_var = tk.StringVar(value="Click a plant in the current market")
@@ -142,12 +165,20 @@ class AuctionPanel(BasePhasePanel):
         self._selected_plant_price = int(plant_price)
         action = self._start_actions_by_price[self._selected_plant_price]
         self.selection_var.set(f"Plant {self._selected_plant_price}")
-        self._configure_bid_bounds((int(action.payload["min_bid"]), int(action.payload["max_bid"])))
+        self._configure_bid_bounds(
+            (int(action.payload["min_bid"]), int(action.payload["max_bid"])),
+            force_minimum=True,
+        )
         self.confirm_button.configure(state="normal", text="Start Auction")
         self.bid_spin.focus_set()
         return True
 
-    def _configure_bid_bounds(self, bounds: tuple[int, int] | None) -> None:
+    def _configure_bid_bounds(
+        self,
+        bounds: tuple[int, int] | None,
+        *,
+        force_minimum: bool = False,
+    ) -> None:
         self._bid_bounds = bounds
         if bounds is None:
             self.bid_spin.configure(state="disabled", from_=0, to=0)
@@ -157,7 +188,7 @@ class AuctionPanel(BasePhasePanel):
         minimum, maximum = bounds
         self.bid_spin.configure(state="readonly", from_=minimum, to=maximum)
         current = int(self.bid_var.get())
-        if current < minimum or current > maximum:
+        if force_minimum or current < minimum or current > maximum:
             self.bid_var.set(minimum)
         self.range_var.set(f"Legal range: {minimum} - {maximum}")
 
@@ -180,24 +211,31 @@ class AuctionPanel(BasePhasePanel):
 
 
 class ResourcePanel(BasePhasePanel):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
-        super().__init__(master, on_intent)
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
+        super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
         self._buy_actions_by_resource: dict[str, object] = {}
+        self.grid_columnconfigure(0, weight=1)
         ttk.Label(self, text="Buy Resources", font=("Helvetica", 12, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(self, textvariable=self.help_var, wraplength=420, justify="left").grid(
-            row=1, column=0, columnspan=4, sticky="w", pady=(6, 10)
+            row=1, column=0, sticky="w", pady=(6, 10)
         )
         self.button_row = ttk.Frame(self)
-        self.button_row.grid(row=2, column=0, columnspan=4, sticky="ew")
+        self.button_row.grid(row=2, column=0, sticky="ew")
         self.resource_buttons: dict[str, ttk.Button] = {}
         for index, resource in enumerate(RESOURCE_TYPES):
+            self.button_row.grid_columnconfigure(index, weight=1, uniform="resource")
             button = ttk.Button(
                 self.button_row,
                 text=resource.title(),
                 command=lambda resource=resource: self.handle_resource_click(resource),
-                width=13,
+                width=14,
             )
             button.grid(row=0, column=index, sticky="ew", padx=(0, 8 if index < len(RESOURCE_TYPES) - 1 else 0))
             self.resource_buttons[resource] = button
@@ -231,7 +269,7 @@ class ResourcePanel(BasePhasePanel):
             button.configure(
                 text=(
                     f"{resource.title()}\n"
-                    f"1st {first_price}e | max {action.payload['max_affordable_units']}"
+                    f"${first_price} | max {action.payload['max_affordable_units']}"
                 ),
                 state="normal",
             )
@@ -253,8 +291,13 @@ class ResourcePanel(BasePhasePanel):
 
 
 class BuildPanel(BasePhasePanel):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
-        super().__init__(master, on_intent)
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
+        super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
         self.quote_var = tk.StringVar(value="No quote yet. Click a legal city on the board.")
@@ -358,14 +401,20 @@ class BuildPanel(BasePhasePanel):
     def _cancel_quote(self) -> None:
         self._selected_city_ids = []
         self._refresh_quote_summary()
+        self._notify_local_change()
 
     def _submit_done(self) -> None:
         self._on_intent(GuiIntent.finish_building(self.player_id))
 
 
 class PendingDecisionPanel(BasePhasePanel):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
-        super().__init__(master, on_intent)
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
+        super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
         ttk.Label(self, text="Pending Decision", font=("Helvetica", 12, "bold")).pack(anchor="w")
@@ -405,8 +454,13 @@ class PendingDecisionPanel(BasePhasePanel):
 
 
 class BureaucracyPanel(BasePhasePanel):
-    def __init__(self, master, on_intent: IntentCallback) -> None:
-        super().__init__(master, on_intent)
+    def __init__(
+        self,
+        master,
+        on_intent: IntentCallback,
+        on_local_change: LocalChangeCallback | None = None,
+    ) -> None:
+        super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
         ttk.Label(self, text="Bureaucracy", font=("Helvetica", 12, "bold")).pack(anchor="w")
@@ -418,6 +472,7 @@ class BureaucracyPanel(BasePhasePanel):
         ttk.Button(button_row, text="Submit Runs", command=self._submit_runs).pack(side="left")
         ttk.Button(button_row, text="Skip", command=self._submit_skip).pack(side="left", padx=(8, 0))
         self._plant_controls: dict[int, dict[str, object]] = {}
+        self._player_resource_totals = {resource: 0 for resource in RESOURCE_TYPES}
 
     def render(self, snapshot: GameSnapshot) -> None:
         super().render(snapshot)
@@ -441,23 +496,26 @@ class BureaucracyPanel(BasePhasePanel):
         if request is None:
             return
         player = next(player for player in snapshot.state.players if player.player_id == self.player_id)
+        self._player_resource_totals = player.resource_storage.resource_totals()
         for row_index, plant in enumerate(sorted(player.power_plants, key=lambda item: item.price)):
             if plant.is_step_3_placeholder:
                 continue
             previous = previous_state.get(plant.price, {})
             selected_var = tk.BooleanVar(value=bool(previous.get("selected", False)))
-            ttk.Checkbutton(
+            toggle = ttk.Checkbutton(
                 self.rows,
                 text=_format_plant_toggle_label(plant),
                 variable=selected_var,
                 style="Toolbutton",
-                command=lambda plant_price=plant.price: self._sync_hybrid_controls(plant_price),
-            ).grid(row=row_index, column=0, sticky="w")
+                command=lambda plant_price=plant.price: self._handle_toggle_change(plant_price),
+            )
+            toggle.grid(row=row_index, column=0, sticky="w")
             coal_var = tk.IntVar(value=0)
             oil_var = tk.StringVar(value="0")
+            note_var = tk.StringVar(value="")
             coal_spin = None
             if plant.is_hybrid:
-                max_coal = min(plant.resource_cost, player.resource_storage.total("coal"))
+                max_coal = min(plant.resource_cost, self._player_resource_totals["coal"])
                 default_coal = int(previous.get("coal", max_coal))
                 default_coal = max(0, min(default_coal, plant.resource_cost))
                 coal_var.set(default_coal)
@@ -470,54 +528,166 @@ class BureaucracyPanel(BasePhasePanel):
                     textvariable=coal_var,
                     width=4,
                     state="readonly",
-                    command=lambda plant_price=plant.price: self._update_hybrid_mix(plant_price),
+                    command=lambda plant_price=plant.price: self._handle_hybrid_mix_change(plant_price),
                 )
                 coal_spin.grid(row=row_index, column=2, sticky="w")
                 ttk.Label(self.rows, text="Oil").grid(row=row_index, column=3, sticky="w", padx=(10, 0))
                 ttk.Label(self.rows, textvariable=oil_var).grid(row=row_index, column=4, sticky="w")
+                ttk.Label(self.rows, textvariable=note_var).grid(row=row_index, column=5, sticky="w", padx=(10, 0))
+            else:
+                ttk.Label(self.rows, textvariable=note_var).grid(
+                    row=row_index, column=1, columnspan=3, sticky="w", padx=(10, 0)
+                )
             self._plant_controls[plant.price] = {
                 "plant": plant,
                 "selected": selected_var,
                 "coal": coal_var,
                 "oil": oil_var,
                 "coal_spin": coal_spin,
+                "toggle": toggle,
+                "note": note_var,
             }
-            self._sync_hybrid_controls(plant.price)
+        self._reconcile_plant_controls()
 
-    def _sync_hybrid_controls(self, plant_price: int) -> None:
-        control = self._plant_controls[plant_price]
-        coal_spin = control["coal_spin"]
-        if coal_spin is None:
-            return
-        coal_spin.configure(state="readonly" if bool(control["selected"].get()) else "disabled")
-        self._update_hybrid_mix(plant_price)
+    def _handle_toggle_change(self, plant_price: int) -> None:
+        self._reconcile_plant_controls(changed_plant_price=plant_price)
 
-    def _update_hybrid_mix(self, plant_price: int) -> None:
+    def _handle_hybrid_mix_change(self, plant_price: int) -> None:
+        self._reconcile_plant_controls(changed_plant_price=plant_price)
+
+    def _reconcile_plant_controls(self, changed_plant_price: int | None = None) -> None:
+        for _ in range(max(1, len(self._plant_controls))):
+            changed = False
+            for plant_price, control in sorted(self._plant_controls.items()):
+                plant = control["plant"]
+                selected = bool(control["selected"].get())
+                toggle = control["toggle"]
+                coal_spin = control["coal_spin"]
+                note_var = control["note"]
+
+                if plant.is_ecological:
+                    toggle.configure(state="normal")
+                    note_var.set("No fuel needed")
+                    if coal_spin is not None:
+                        coal_spin.configure(state="disabled")
+                    continue
+
+                if plant.is_hybrid:
+                    legal_range = self._hybrid_legal_range(plant_price)
+                    if legal_range is None:
+                        if selected:
+                            control["selected"].set(False)
+                            selected = False
+                            changed = True
+                        toggle.configure(state="disabled")
+                        note_var.set("Not enough coal/oil")
+                        control["coal"].set(0)
+                        control["oil"].set("0")
+                        if coal_spin is not None:
+                            coal_spin.configure(state="disabled", from_=0, to=0)
+                        continue
+                    minimum_coal, maximum_coal = legal_range
+                    current_coal = max(0, min(int(control["coal"].get()), plant.resource_cost))
+                    clamped_coal = min(max(current_coal, minimum_coal), maximum_coal)
+                    if clamped_coal != current_coal:
+                        control["coal"].set(clamped_coal)
+                        changed = True
+                    control["oil"].set(str(plant.resource_cost - clamped_coal))
+                    toggle.configure(state="normal")
+                    note_var.set(
+                        f"Coal {minimum_coal}-{maximum_coal} | Oil {plant.resource_cost - maximum_coal}-{plant.resource_cost - minimum_coal}"
+                    )
+                    if coal_spin is not None:
+                        coal_spin.configure(
+                            state="readonly" if selected else "disabled",
+                            from_=minimum_coal,
+                            to=maximum_coal,
+                        )
+                    continue
+
+                resource = plant.resource_types[0]
+                remaining = self._player_resource_totals[resource] - self._resource_usage(exclude_price=plant_price)[resource]
+                can_run = remaining >= plant.resource_cost
+                if not can_run and selected:
+                    control["selected"].set(False)
+                    changed = True
+                toggle.configure(state=("normal" if can_run else "disabled"))
+                note_var.set(
+                    f"Need {plant.resource_cost} {resource}"
+                    if can_run
+                    else f"Need {plant.resource_cost} {resource} | unavailable"
+                )
+
+            if not changed:
+                break
+
+        if changed_plant_price is not None and self._snapshot is not None:
+            try:
+                choose_plants_to_run(self._snapshot.state, self.player_id, self._current_run_selection())
+            except ModelValidationError:
+                control = self._plant_controls.get(changed_plant_price)
+                if control is not None:
+                    control["selected"].set(False)
+                    if control["coal_spin"] is not None:
+                        control["coal"].set(0)
+                        control["oil"].set("0")
+                self._reconcile_plant_controls()
+
+    def _resource_usage(self, exclude_price: int | None = None) -> dict[str, int]:
+        usage = {resource: 0 for resource in RESOURCE_TYPES}
+        for plant_price, control in self._plant_controls.items():
+            if plant_price == exclude_price or not bool(control["selected"].get()):
+                continue
+            plant = control["plant"]
+            if plant.is_ecological:
+                continue
+            if plant.is_hybrid:
+                usage["coal"] += int(control["coal"].get())
+                usage["oil"] += int(control["oil"].get())
+                continue
+            usage[plant.resource_types[0]] += plant.resource_cost
+        return usage
+
+    def _hybrid_legal_range(self, plant_price: int) -> tuple[int, int] | None:
         control = self._plant_controls[plant_price]
         plant = control["plant"]
-        if not plant.is_hybrid:
-            return
-        coal_amount = max(0, min(int(control["coal"].get()), plant.resource_cost))
-        control["coal"].set(coal_amount)
-        control["oil"].set(str(plant.resource_cost - coal_amount))
+        usage = self._resource_usage(exclude_price=plant_price)
+        coal_left = self._player_resource_totals["coal"] - usage["coal"]
+        oil_left = self._player_resource_totals["oil"] - usage["oil"]
+        if coal_left < 0 or oil_left < 0 or coal_left + oil_left < plant.resource_cost:
+            return None
+        minimum_coal = max(0, plant.resource_cost - oil_left)
+        maximum_coal = min(plant.resource_cost, coal_left)
+        if minimum_coal > maximum_coal:
+            return None
+        return minimum_coal, maximum_coal
 
-    def _submit_runs(self) -> None:
-        plans = []
+    def _current_run_selection(self) -> list[PlantRunPlan]:
+        selection: list[PlantRunPlan] = []
         for plant_price, control in sorted(self._plant_controls.items()):
             if not bool(control["selected"].get()):
                 continue
             plant = control["plant"]
+            mix = {}
             if plant.is_hybrid:
                 coal = int(control["coal"].get())
                 oil = int(control["oil"].get())
-                mix = {}
                 if coal:
                     mix["coal"] = coal
                 if oil:
                     mix["oil"] = oil
-                plans.append(PlantRunPlan(plant_price=plant_price, resource_mix=mix))
-                continue
-            plans.append(PlantRunPlan(plant_price=plant_price, resource_mix={}))
+            selection.append(PlantRunPlan(plant_price=plant_price, resource_mix=mix))
+        return selection
+
+    def _submit_runs(self) -> None:
+        if self._snapshot is None:
+            return
+        plans = self._current_run_selection()
+        try:
+            choose_plants_to_run(self._snapshot.state, self.player_id, plans)
+        except ModelValidationError as exc:
+            self.help_var.set(f"Cannot submit runs: {exc}")
+            return
         self._on_intent(GuiIntent.run_plants(self.player_id, plans))
 
     def _submit_skip(self) -> None:
