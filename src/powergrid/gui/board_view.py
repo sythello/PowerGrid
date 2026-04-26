@@ -35,6 +35,13 @@ RESOURCE_LABEL_MAP = {
     "garbage": "garbage",
     "uranium": "uranium",
 }
+RESOURCE_MARKET_PRICE_COLUMNS = (1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16)
+RESOURCE_MARKET_VALID_PRICES = {
+    "coal": set(range(1, 9)),
+    "oil": set(range(1, 9)),
+    "garbage": set(range(1, 9)),
+    "uranium": set(RESOURCE_MARKET_PRICE_COLUMNS),
+}
 BOARD_BG = "#d8cfbe"
 BOARD_PANEL = "#ece4d3"
 PIPE_FILL = "#d1d5db"
@@ -48,6 +55,11 @@ CITY_NAME_TEXT = "#111827"
 INACTIVE_CITY_FILL = "#9ca3af"
 INACTIVE_CITY_SLOT = "#e5e7eb"
 BOARD_TEXT = "#1f2937"
+RESOURCE_MARKET_PANEL_FILL = "#efe8db"
+RESOURCE_MARKET_HEADER_FILL = "#ddd0b8"
+RESOURCE_MARKET_CELL_FILL = "#f8f4ea"
+RESOURCE_MARKET_DISABLED_FILL = "#ddd3c0"
+RESOURCE_MARKET_BORDER = "#c4b79f"
 
 
 class BoardView(ttk.Frame):
@@ -247,63 +259,143 @@ class BoardView(ttk.Frame):
         )
 
     def _draw_resource_market(self, state: GameState, map_layout: dict, width: int, height: int) -> None:
-        has_layout_slots = bool(map_layout.get("resource_market"))
+        has_layout_slots = self._has_concrete_resource_market_slots(map_layout)
         if not has_layout_slots:
-            panel_x = width - 372
-            panel_y = height - 268
-            self.canvas.create_rectangle(
-                panel_x,
-                panel_y,
-                panel_x + 340,
-                panel_y + 220,
-                fill="#efe8db",
-                outline="#c4b79f",
-                width=2,
-            )
-            self.canvas.create_text(
-                panel_x + 16,
-                panel_y + 18,
-                text="Resource Market",
-                anchor="w",
-                fill=BOARD_TEXT,
-                font=("Helvetica", 12, "bold"),
-            )
+            self._draw_resource_market_table(width, height)
         for row_index, resource in enumerate(RESOURCE_TYPES):
-            if not has_layout_slots:
-                panel_x = width - 372
-                panel_y = height - 268
-                self.canvas.create_text(
-                    panel_x + 16,
-                    panel_y + 54 + row_index * 48,
-                    text=resource,
-                    anchor="w",
-                    fill=BOARD_TEXT,
-                    font=("Helvetica", 10, "bold"),
-                )
             for price in sorted(state.resource_market.market[resource]):
                 amount = state.resource_market.market[resource][price]
-                first_point: tuple[float, float] | None = None
-                for index in range(amount):
-                    point = self._resource_slot_point(
-                        map_layout,
-                        width,
-                        height,
-                        resource,
-                        price,
-                        index,
-                        row_index,
-                    )
-                    if first_point is None:
-                        first_point = point
-                    self._draw_resource_token(resource, point[0], point[1])
-                if first_point is not None:
-                    self.canvas.create_text(
-                        first_point[0],
-                        first_point[1] + 20,
-                        text=str(price),
-                        fill=BOARD_TEXT,
-                        font=("Helvetica", 8, "bold"),
-                    )
+                if has_layout_slots:
+                    for index in range(amount):
+                        point = self._resource_slot_point(
+                            map_layout,
+                            width,
+                            height,
+                            resource,
+                            price,
+                            index,
+                            row_index,
+                        )
+                        self._draw_resource_token(resource, point[0], point[1], scale=0.7)
+                    continue
+                for point in self._resource_table_cell_points(resource, price, amount, row_index, width, height):
+                    self._draw_resource_token(resource, point[0], point[1], scale=0.58)
+
+    def _has_concrete_resource_market_slots(self, map_layout: dict) -> bool:
+        market_layout = map_layout.get("resource_market")
+        if not isinstance(market_layout, dict):
+            return False
+        found_any = False
+        for resource_slots in market_layout.values():
+            if not isinstance(resource_slots, dict):
+                continue
+            for slots in resource_slots.values():
+                for slot in slots or ():
+                    found_any = True
+                    if slot.get("x") is None or slot.get("y") is None:
+                        return False
+        return found_any
+
+    def _draw_resource_market_table(self, width: int, height: int) -> None:
+        geometry = _resource_market_table_geometry(width, height)
+        panel_x = geometry["panel_x"]
+        panel_y = geometry["panel_y"]
+        panel_width = geometry["panel_width"]
+        panel_height = geometry["panel_height"]
+        grid_x = geometry["grid_x"]
+        grid_y = geometry["grid_y"]
+        label_width = geometry["label_width"]
+        header_height = geometry["header_height"]
+        cell_width = geometry["cell_width"]
+        cell_height = geometry["cell_height"]
+
+        self.canvas.create_rectangle(
+            panel_x,
+            panel_y,
+            panel_x + panel_width,
+            panel_y + panel_height,
+            fill=RESOURCE_MARKET_PANEL_FILL,
+            outline=RESOURCE_MARKET_BORDER,
+            width=2,
+        )
+        self.canvas.create_text(
+            panel_x + 14,
+            panel_y + 16,
+            text="Resource Market",
+            anchor="w",
+            fill=BOARD_TEXT,
+            font=("Helvetica", 12, "bold"),
+        )
+
+        self.canvas.create_rectangle(
+            grid_x,
+            grid_y,
+            grid_x + label_width,
+            grid_y + header_height,
+            fill=RESOURCE_MARKET_HEADER_FILL,
+            outline=RESOURCE_MARKET_BORDER,
+            width=1,
+        )
+        self.canvas.create_text(
+            grid_x + label_width / 2,
+            grid_y + header_height / 2,
+            text="Type",
+            fill=BOARD_TEXT,
+            font=("Helvetica", 9, "bold"),
+        )
+        for price_index, price in enumerate(RESOURCE_MARKET_PRICE_COLUMNS):
+            cell_x = grid_x + label_width + price_index * cell_width
+            self.canvas.create_rectangle(
+                cell_x,
+                grid_y,
+                cell_x + cell_width,
+                grid_y + header_height,
+                fill=RESOURCE_MARKET_HEADER_FILL,
+                outline=RESOURCE_MARKET_BORDER,
+                width=1,
+            )
+            self.canvas.create_text(
+                cell_x + cell_width / 2,
+                grid_y + header_height / 2,
+                text=str(price),
+                fill=BOARD_TEXT,
+                font=("Helvetica", 8, "bold"),
+            )
+
+        for row_index, resource in enumerate(RESOURCE_TYPES):
+            row_y = grid_y + header_height + row_index * cell_height
+            self.canvas.create_rectangle(
+                grid_x,
+                row_y,
+                grid_x + label_width,
+                row_y + cell_height,
+                fill=RESOURCE_MARKET_HEADER_FILL,
+                outline=RESOURCE_MARKET_BORDER,
+                width=1,
+            )
+            self.canvas.create_text(
+                grid_x + label_width / 2,
+                row_y + cell_height / 2,
+                text=resource.title(),
+                fill=BOARD_TEXT,
+                font=("Helvetica", 9, "bold"),
+            )
+            for price_index, price in enumerate(RESOURCE_MARKET_PRICE_COLUMNS):
+                cell_x = grid_x + label_width + price_index * cell_width
+                fill = (
+                    RESOURCE_MARKET_CELL_FILL
+                    if price in RESOURCE_MARKET_VALID_PRICES[resource]
+                    else RESOURCE_MARKET_DISABLED_FILL
+                )
+                self.canvas.create_rectangle(
+                    cell_x,
+                    row_y,
+                    cell_x + cell_width,
+                    row_y + cell_height,
+                    fill=fill,
+                    outline=RESOURCE_MARKET_BORDER,
+                    width=1,
+                )
 
     def _resource_slot_point(
         self,
@@ -329,31 +421,78 @@ class BoardView(ttk.Frame):
                 return concrete[index]
         return _fallback_resource_slot(resource, price, index, row_index, width, height)
 
-    def _draw_resource_token(self, resource: str, x: float, y: float) -> None:
+    def _resource_table_cell_points(
+        self,
+        resource: str,
+        price: int,
+        amount: int,
+        row_index: int,
+        width: int,
+        height: int,
+    ) -> list[tuple[float, float]]:
+        if amount <= 0:
+            return []
+        geometry = _resource_market_table_geometry(width, height)
+        price_index = RESOURCE_MARKET_PRICE_COLUMNS.index(price)
+        center_x = (
+            geometry["grid_x"]
+            + geometry["label_width"]
+            + price_index * geometry["cell_width"]
+            + geometry["cell_width"] / 2
+        )
+        center_y = (
+            geometry["grid_y"]
+            + geometry["header_height"]
+            + row_index * geometry["cell_height"]
+            + geometry["cell_height"] / 2
+        )
+        if resource == "uranium" or amount == 1:
+            offsets = [(0.0, 0.0)]
+        elif amount == 2:
+            offsets = [(-6.0, 0.0), (6.0, 0.0)]
+        else:
+            offsets = [(-7.0, 6.0), (0.0, -6.0), (7.0, 6.0)]
+        return [(center_x + offset_x, center_y + offset_y) for offset_x, offset_y in offsets[:amount]]
+
+    def _draw_resource_token(self, resource: str, x: float, y: float, *, scale: float = 1.0) -> None:
         color = RESOURCE_COLOR_MAP[resource]
         if resource == "coal":
-            points = _regular_polygon_points(x, y, 10, 6, rotation=math.pi / 6)
+            points = _regular_polygon_points(x, y, 10 * scale, 6, rotation=math.pi / 6)
             self.canvas.create_polygon(points, fill=color, outline="#1f2937")
         elif resource == "oil":
             points = [
                 x,
-                y - 12,
-                x + 8,
+                y - 12 * scale,
+                x + 8 * scale,
                 y,
-                x + 5,
-                y + 10,
+                x + 5 * scale,
+                y + 10 * scale,
                 x,
-                y + 14,
-                x - 5,
-                y + 10,
-                x - 8,
+                y + 14 * scale,
+                x - 5 * scale,
+                y + 10 * scale,
+                x - 8 * scale,
                 y,
             ]
             self.canvas.create_polygon(points, fill=color, outline="#374151", smooth=True)
         elif resource == "garbage":
-            self.canvas.create_rectangle(x - 5, y - 11, x + 5, y + 11, fill=color, outline="#374151")
+            self.canvas.create_rectangle(
+                x - 5 * scale,
+                y - 11 * scale,
+                x + 5 * scale,
+                y + 11 * scale,
+                fill=color,
+                outline="#374151",
+            )
         else:
-            self.canvas.create_oval(x - 9, y - 9, x + 9, y + 9, fill=color, outline="#7f1d1d")
+            self.canvas.create_oval(
+                x - 9 * scale,
+                y - 9 * scale,
+                x + 9 * scale,
+                y + 9 * scale,
+                fill=color,
+                outline="#7f1d1d",
+            )
 
     def _draw_cities(
         self,
@@ -691,19 +830,51 @@ def _fallback_resource_slot(
     width: int,
     height: int,
 ) -> tuple[float, float]:
-    panel_x = width - 360
-    panel_y = height - 250
-    column_prices = {
-        "coal": [1, 2, 3, 4, 5, 6, 7, 8],
-        "oil": [1, 2, 3, 4, 5, 6, 7, 8],
-        "garbage": [1, 2, 3, 4, 5, 6, 7, 8],
-        "uranium": [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16],
-    }
-    price_index = column_prices[resource].index(price)
-    group_spacing = 24 if resource != "uranium" else 18
-    group_x = panel_x + 64 + price_index * group_spacing
-    row_y = panel_y + 54 + row_index * 48
+    geometry = _resource_market_table_geometry(width, height)
+    price_index = RESOURCE_MARKET_PRICE_COLUMNS.index(price)
+    group_x = (
+        geometry["grid_x"]
+        + geometry["label_width"]
+        + price_index * geometry["cell_width"]
+        + geometry["cell_width"] / 2
+    )
+    row_y = (
+        geometry["grid_y"]
+        + geometry["header_height"]
+        + row_index * geometry["cell_height"]
+        + geometry["cell_height"] / 2
+    )
     if resource == "uranium":
         return group_x, row_y
-    offsets = (-7, 0, 7)
-    return group_x, row_y + offsets[index]
+    offsets = ((0, 0), (-6, 0), (6, 0))
+    offset_x, offset_y = offsets[min(index, len(offsets) - 1)]
+    return group_x + offset_x, row_y + offset_y
+
+
+def _resource_market_table_geometry(width: int, height: int) -> dict[str, float]:
+    padding = 12
+    title_height = 22
+    title_gap = 10
+    label_width = 82
+    header_height = 26
+    cell_width = 24
+    cell_height = 44
+    grid_width = label_width + len(RESOURCE_MARKET_PRICE_COLUMNS) * cell_width
+    panel_width = grid_width + padding * 2
+    panel_height = padding + title_height + title_gap + header_height + len(RESOURCE_TYPES) * cell_height + padding
+    panel_x = max(24, width - panel_width - 24)
+    panel_y = max(96, height - panel_height - 24)
+    grid_x = panel_x + padding
+    grid_y = panel_y + padding + title_height + title_gap
+    return {
+        "panel_x": panel_x,
+        "panel_y": panel_y,
+        "panel_width": panel_width,
+        "panel_height": panel_height,
+        "grid_x": grid_x,
+        "grid_y": grid_y,
+        "label_width": label_width,
+        "header_height": header_height,
+        "cell_width": cell_width,
+        "cell_height": cell_height,
+    }
