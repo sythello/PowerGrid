@@ -11,7 +11,7 @@ from ..session_types import GameSnapshot
 
 
 DRAWN_BOARD_SIZES = {
-    "germany": (1800, 1120),
+    "germany": (1424, 2000),
     "usa": (1800, 1120),
     "test": (1200, 780),
 }
@@ -361,14 +361,24 @@ class BoardView(ttk.Frame):
         map_layout: dict,
         positions: dict[str, tuple[float, float]],
     ) -> None:
+        city_defaults = map_layout.get("city_defaults", {})
         for city in state.game_map.cities:
             point = positions.get(city.id)
             if point is None:
                 continue
+            city_payload = map_layout.get("cities", {}).get(city.id, {})
             is_active_region = not state.selected_regions or city.region in state.selected_regions
-            self._draw_city(point[0], point[1], city.name, is_active_region)
+            self._draw_city(point[0], point[1], city.name, is_active_region, city_payload, city_defaults)
 
-    def _draw_city(self, x: float, y: float, name: str, is_active_region: bool) -> None:
+    def _draw_city(
+        self,
+        x: float,
+        y: float,
+        name: str,
+        is_active_region: bool,
+        city_payload: dict,
+        city_defaults: dict,
+    ) -> None:
         radius = 34
         fill = CITY_FILL if is_active_region else INACTIVE_CITY_FILL
         slot_fill = CITY_SLOT_FILL if is_active_region else INACTIVE_CITY_SLOT
@@ -423,18 +433,35 @@ class BoardView(ttk.Frame):
             fill=BOARD_TEXT,
             font=("Helvetica", 8, "bold"),
         )
-        label_y = y + radius * 0.84
+        label_x, label_y = self._city_label_center(x, y, radius, city_payload, city_defaults)
         half_width = max(34, min(70, len(name) * 4.5))
         self.canvas.create_rectangle(
-            x - half_width,
+            label_x - half_width,
             label_y - 11,
-            x + half_width,
+            label_x + half_width,
             label_y + 11,
             fill=CITY_NAME_FILL,
             outline=CITY_OUTLINE,
             width=1,
         )
-        self.canvas.create_text(x, label_y, text=name, fill=CITY_NAME_TEXT, font=("Helvetica", 9, "bold"))
+        self.canvas.create_text(label_x, label_y, text=name, fill=CITY_NAME_TEXT, font=("Helvetica", 9, "bold"))
+
+    def _city_label_center(
+        self,
+        center_x: float,
+        center_y: float,
+        radius: float,
+        city_payload: dict,
+        city_defaults: dict,
+    ) -> tuple[float, float]:
+        return resolve_city_label_center(
+            center_x,
+            center_y,
+            self._board_size,
+            city_payload,
+            city_defaults,
+            fallback_radius=radius,
+        )
 
     def _draw_houses(
         self,
@@ -618,6 +645,27 @@ def _draw_outlined_text(
     for offset_x, offset_y in ((-1, 0), (1, 0), (0, -1), (0, 1)):
         canvas.create_text(x + offset_x, y + offset_y, text=text, fill=outline, font=font)
     canvas.create_text(x, y, text=text, fill=fill, font=font)
+
+
+def resolve_city_label_center(
+    center_x: float,
+    center_y: float,
+    board_size: tuple[int, int],
+    city_payload: dict,
+    city_defaults: dict,
+    *,
+    fallback_radius: float = 34,
+) -> tuple[float, float]:
+    offset_payload = city_payload.get("label_offset") or city_defaults.get("label_offset") or {}
+    offset_x = offset_payload.get("x")
+    offset_y = offset_payload.get("y")
+    board_width, board_height = board_size
+    if isinstance(offset_x, (int, float)) and isinstance(offset_y, (int, float)):
+        return (
+            center_x + float(offset_x) * board_width,
+            center_y + float(offset_y) * board_height,
+        )
+    return center_x, center_y + fallback_radius * 0.84
 
 
 def _regular_polygon_points(
