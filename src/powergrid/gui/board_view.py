@@ -69,12 +69,17 @@ class BoardView(ttk.Frame):
         *,
         board_render_mode: str = "drawn",
         layout_path: str | Path | None = None,
+        on_city_click=None,
+        on_resource_click=None,
     ) -> None:
         super().__init__(master, padding=(0, 0))
         self._layout_path = layout_path
         self._board_render_mode = board_render_mode
+        self._on_city_click = on_city_click
+        self._on_resource_click = on_resource_click
         self._images: dict[Path, tk.PhotoImage] = {}
         self._board_size = DRAWN_BOARD_SIZES["germany"]
+        self._interaction_state: dict[str, object] = {}
         self.summary_var = tk.StringVar()
         ttk.Label(self, textvariable=self.summary_var, anchor="w").grid(
             row=0, column=0, columnspan=2, sticky="ew", padx=8, pady=(6, 0)
@@ -92,8 +97,9 @@ class BoardView(ttk.Frame):
     def set_render_mode(self, board_render_mode: str) -> None:
         self._board_render_mode = board_render_mode
 
-    def render(self, snapshot: GameSnapshot) -> None:
+    def render(self, snapshot: GameSnapshot, interaction_state: dict[str, object] | None = None) -> None:
         state = snapshot.state
+        self._interaction_state = dict(interaction_state or {})
         try:
             map_layout = load_board_layout(state.game_map.id, self._layout_path)
         except ValueError:
@@ -260,8 +266,15 @@ class BoardView(ttk.Frame):
 
     def _draw_resource_market(self, state: GameState, map_layout: dict, width: int, height: int) -> None:
         has_layout_slots = self._has_concrete_resource_market_slots(map_layout)
+        buyable_resources = set(self._interaction_state.get("buyable_resources", ()))
+        resource_phase_active = bool(self._interaction_state.get("resource_phase_active"))
         if not has_layout_slots:
-            self._draw_resource_market_table(width, height)
+            self._draw_resource_market_table(
+                width,
+                height,
+                buyable_resources=buyable_resources,
+                resource_phase_active=resource_phase_active,
+            )
         for row_index, resource in enumerate(RESOURCE_TYPES):
             for price in sorted(state.resource_market.market[resource]):
                 amount = state.resource_market.market[resource][price]
@@ -276,10 +289,28 @@ class BoardView(ttk.Frame):
                             index,
                             row_index,
                         )
-                        self._draw_resource_token(resource, point[0], point[1], scale=0.7)
+                        tags = ()
+                        if (
+                            resource_phase_active
+                            and resource in buyable_resources
+                            and self._on_resource_click is not None
+                        ):
+                            tags = (f"resource:{resource}:{price}:{index}",)
+                        item_ids = self._draw_resource_token(resource, point[0], point[1], scale=0.7, tags=tags)
+                        if tags:
+                            self._bind_items_click(item_ids, lambda _event, resource=resource: self._on_resource_click(resource))
                     continue
                 for point in self._resource_table_cell_points(resource, price, amount, row_index, width, height):
-                    self._draw_resource_token(resource, point[0], point[1], scale=0.58)
+                    tags = ()
+                    if (
+                        resource_phase_active
+                        and resource in buyable_resources
+                        and self._on_resource_click is not None
+                    ):
+                        tags = (f"resource:{resource}:{price}:{point[0]:.1f}:{point[1]:.1f}",)
+                    item_ids = self._draw_resource_token(resource, point[0], point[1], scale=0.58, tags=tags)
+                    if tags:
+                        self._bind_items_click(item_ids, lambda _event, resource=resource: self._on_resource_click(resource))
 
     def _has_concrete_resource_market_slots(self, map_layout: dict) -> bool:
         market_layout = map_layout.get("resource_market")
@@ -296,7 +327,14 @@ class BoardView(ttk.Frame):
                         return False
         return found_any
 
-    def _draw_resource_market_table(self, width: int, height: int) -> None:
+    def _draw_resource_market_table(
+        self,
+        width: int,
+        height: int,
+        *,
+        buyable_resources: set[str],
+        resource_phase_active: bool,
+    ) -> None:
         geometry = _resource_market_table_geometry(width, height)
         panel_x = geometry["panel_x"]
         panel_y = geometry["panel_y"]
@@ -364,12 +402,15 @@ class BoardView(ttk.Frame):
 
         for row_index, resource in enumerate(RESOURCE_TYPES):
             row_y = grid_y + header_height + row_index * cell_height
+            is_buyable = not resource_phase_active or resource in buyable_resources
+            label_fill = RESOURCE_MARKET_HEADER_FILL if is_buyable else RESOURCE_MARKET_DISABLED_FILL
+            label_text = BOARD_TEXT if is_buyable else "#6b7280"
             self.canvas.create_rectangle(
                 grid_x,
                 row_y,
                 grid_x + label_width,
                 row_y + cell_height,
-                fill=RESOURCE_MARKET_HEADER_FILL,
+                fill=label_fill,
                 outline=RESOURCE_MARKET_BORDER,
                 width=1,
             )
@@ -377,7 +418,7 @@ class BoardView(ttk.Frame):
                 grid_x + label_width / 2,
                 row_y + cell_height / 2,
                 text=resource.title(),
-                fill=BOARD_TEXT,
+                fill=label_text,
                 font=("Helvetica", 9, "bold"),
             )
             for price_index, price in enumerate(RESOURCE_MARKET_PRICE_COLUMNS):
@@ -387,6 +428,8 @@ class BoardView(ttk.Frame):
                     if price in RESOURCE_MARKET_VALID_PRICES[resource]
                     else RESOURCE_MARKET_DISABLED_FILL
                 )
+                if resource_phase_active and resource not in buyable_resources and price in RESOURCE_MARKET_VALID_PRICES[resource]:
+                    fill = RESOURCE_MARKET_DISABLED_FILL
                 self.canvas.create_rectangle(
                     cell_x,
                     row_y,
@@ -454,11 +497,19 @@ class BoardView(ttk.Frame):
             offsets = [(-7.0, 6.0), (0.0, -6.0), (7.0, 6.0)]
         return [(center_x + offset_x, center_y + offset_y) for offset_x, offset_y in offsets[:amount]]
 
-    def _draw_resource_token(self, resource: str, x: float, y: float, *, scale: float = 1.0) -> None:
+    def _draw_resource_token(
+        self,
+        resource: str,
+        x: float,
+        y: float,
+        *,
+        scale: float = 1.0,
+        tags: tuple[str, ...] = (),
+    ) -> list[int]:
         color = RESOURCE_COLOR_MAP[resource]
         if resource == "coal":
             points = _regular_polygon_points(x, y, 10 * scale, 6, rotation=math.pi / 6)
-            self.canvas.create_polygon(points, fill=color, outline="#1f2937")
+            return [self.canvas.create_polygon(points, fill=color, outline="#1f2937", tags=tags)]
         elif resource == "oil":
             points = [
                 x,
@@ -474,25 +525,26 @@ class BoardView(ttk.Frame):
                 x - 8 * scale,
                 y,
             ]
-            self.canvas.create_polygon(points, fill=color, outline="#374151", smooth=True)
+            return [self.canvas.create_polygon(points, fill=color, outline="#374151", smooth=True, tags=tags)]
         elif resource == "garbage":
-            self.canvas.create_rectangle(
+            return [self.canvas.create_rectangle(
                 x - 5 * scale,
                 y - 11 * scale,
                 x + 5 * scale,
                 y + 11 * scale,
                 fill=color,
                 outline="#374151",
-            )
-        else:
-            self.canvas.create_oval(
+                tags=tags,
+            )]
+        return [self.canvas.create_oval(
                 x - 9 * scale,
                 y - 9 * scale,
                 x + 9 * scale,
                 y + 9 * scale,
                 fill=color,
                 outline="#7f1d1d",
-            )
+                tags=tags,
+            )]
 
     def _draw_cities(
         self,
@@ -501,13 +553,26 @@ class BoardView(ttk.Frame):
         positions: dict[str, tuple[float, float]],
     ) -> None:
         city_defaults = map_layout.get("city_defaults", {})
+        selected_city_ids = set(self._interaction_state.get("selected_city_ids", ()))
+        clickable_city_ids = set(self._interaction_state.get("clickable_city_ids", ()))
         for city in state.game_map.cities:
             point = positions.get(city.id)
             if point is None:
                 continue
             city_payload = map_layout.get("cities", {}).get(city.id, {})
             is_active_region = not state.selected_regions or city.region in state.selected_regions
-            self._draw_city(point[0], point[1], city.name, is_active_region, city_payload, city_defaults)
+            item_ids = self._draw_city(
+                point[0],
+                point[1],
+                city.name,
+                is_active_region,
+                city_payload,
+                city_defaults,
+                is_selected=(city.id in selected_city_ids),
+                is_clickable=(city.id in clickable_city_ids),
+            )
+            if city.id in clickable_city_ids and self._on_city_click is not None:
+                self._bind_items_click(item_ids, lambda _event, city_id=city.id: self._on_city_click(city_id))
 
     def _draw_city(
         self,
@@ -517,12 +582,28 @@ class BoardView(ttk.Frame):
         is_active_region: bool,
         city_payload: dict,
         city_defaults: dict,
-    ) -> None:
+        *,
+        is_selected: bool,
+        is_clickable: bool,
+    ) -> list[int]:
         radius = 34
         fill = CITY_FILL if is_active_region else INACTIVE_CITY_FILL
         slot_fill = CITY_SLOT_FILL if is_active_region else INACTIVE_CITY_SLOT
-        self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=fill, outline=CITY_OUTLINE, width=2)
-        self.canvas.create_arc(
+        outline = "#d97706" if is_selected else ("#2563eb" if is_clickable else CITY_OUTLINE)
+        outline_width = 3 if is_selected else (2.5 if is_clickable else 2)
+        item_ids = [
+            self.canvas.create_oval(
+                x - radius,
+                y - radius,
+                x + radius,
+                y + radius,
+                fill=fill,
+                outline=outline,
+                width=outline_width,
+            )
+        ]
+        item_ids.append(
+            self.canvas.create_arc(
             x - radius,
             y - radius,
             x + radius,
@@ -530,10 +611,10 @@ class BoardView(ttk.Frame):
             start=35,
             extent=110,
             fill=slot_fill,
-            outline=CITY_OUTLINE,
+            outline=outline,
             style="pieslice",
-        )
-        self.canvas.create_arc(
+        ))
+        item_ids.append(self.canvas.create_arc(
             x - radius,
             y - radius,
             x + radius,
@@ -541,10 +622,10 @@ class BoardView(ttk.Frame):
             start=150,
             extent=85,
             fill=slot_fill,
-            outline=CITY_OUTLINE,
+            outline=outline,
             style="pieslice",
-        )
-        self.canvas.create_arc(
+        ))
+        item_ids.append(self.canvas.create_arc(
             x - radius,
             y - radius,
             x + radius,
@@ -552,38 +633,43 @@ class BoardView(ttk.Frame):
             start=305,
             extent=85,
             fill=slot_fill,
-            outline=CITY_OUTLINE,
+            outline=outline,
             style="pieslice",
-        )
+        ))
         inner = radius * 0.56
-        self.canvas.create_oval(x - inner, y - inner, x + inner, y + inner, fill=fill, outline="")
-        self.canvas.create_text(x, y - radius * 0.43, text="10", fill=BOARD_TEXT, font=("Helvetica", 8, "bold"))
-        self.canvas.create_text(
+        item_ids.append(self.canvas.create_oval(x - inner, y - inner, x + inner, y + inner, fill=fill, outline=""))
+        item_ids.append(
+            self.canvas.create_text(x, y - radius * 0.43, text="10", fill=BOARD_TEXT, font=("Helvetica", 8, "bold"))
+        )
+        item_ids.append(self.canvas.create_text(
             x - radius * 0.42,
             y + radius * 0.28,
             text="15",
             fill=BOARD_TEXT,
             font=("Helvetica", 8, "bold"),
-        )
-        self.canvas.create_text(
+        ))
+        item_ids.append(self.canvas.create_text(
             x + radius * 0.42,
             y + radius * 0.28,
             text="20",
             fill=BOARD_TEXT,
             font=("Helvetica", 8, "bold"),
-        )
+        ))
         label_x, label_y = self._city_label_center(x, y, radius, city_payload, city_defaults)
         half_width = max(34, min(70, len(name) * 4.5))
-        self.canvas.create_rectangle(
+        item_ids.append(self.canvas.create_rectangle(
             label_x - half_width,
             label_y - 11,
             label_x + half_width,
             label_y + 11,
             fill=CITY_NAME_FILL,
-            outline=CITY_OUTLINE,
+            outline=outline if is_selected else CITY_OUTLINE,
             width=1,
+        ))
+        item_ids.append(
+            self.canvas.create_text(label_x, label_y, text=name, fill=CITY_NAME_TEXT, font=("Helvetica", 9, "bold"))
         )
-        self.canvas.create_text(label_x, label_y, text=name, fill=CITY_NAME_TEXT, font=("Helvetica", 9, "bold"))
+        return item_ids
 
     def _city_label_center(
         self,
@@ -643,25 +729,48 @@ class BoardView(ttk.Frame):
             (center_x + 18, center_y + 16),
         ]
 
+    def _bind_items_click(self, item_ids: list[int], callback) -> None:
+        for item_id in item_ids:
+            self.canvas.tag_bind(item_id, "<Button-1>", callback)
+
 
 class PowerPlantMarketView(ttk.Frame):
-    def __init__(self, master) -> None:
+    def __init__(self, master, *, on_plant_click=None) -> None:
         super().__init__(master, padding=(8, 8))
+        self._on_plant_click = on_plant_click
         ttk.Label(self, text="Power Plant Market", font=("Helvetica", 12, "bold")).pack(anchor="w")
         self.canvas = tk.Canvas(self, width=360, height=330, background="#f4efe6", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, pady=(8, 0))
 
-    def render(self, snapshot: GameSnapshot) -> None:
+    def render(self, snapshot: GameSnapshot, interaction_state: dict[str, object] | None = None) -> None:
         state = snapshot.state
         auction_state = state.auction_state
         discount_price = auction_state.discount_token_plant_price if auction_state is not None else None
+        interaction_state = dict(interaction_state or {})
+        selected_price = interaction_state.get("selected_plant_price")
+        clickable_prices = set(interaction_state.get("clickable_plant_prices", ()))
         self.canvas.delete("all")
         self.canvas.create_text(18, 18, text="Current", anchor="w", fill=BOARD_TEXT, font=("Helvetica", 10, "bold"))
         self.canvas.create_text(18, 156, text="Future", anchor="w", fill=BOARD_TEXT, font=("Helvetica", 10, "bold"))
         for index, plant in enumerate(state.current_market):
             x = 18 + index * 84
             y = 28
-            draw_power_plant_card(self.canvas, x, y, plant, discount_token=(discount_price == plant.price))
+            item_ids = draw_power_plant_card(
+                self.canvas,
+                x,
+                y,
+                plant,
+                discount_token=(discount_price == plant.price),
+                selected=(selected_price == plant.price),
+                clickable=(plant.price in clickable_prices),
+            )
+            if plant.price in clickable_prices and self._on_plant_click is not None:
+                for item_id in item_ids:
+                    self.canvas.tag_bind(
+                        item_id,
+                        "<Button-1>",
+                        lambda _event, price=plant.price: self._on_plant_click(price),
+                    )
         for index, plant in enumerate(state.future_market):
             x = 18 + index * 84
             y = 166
@@ -698,42 +807,55 @@ def draw_power_plant_card(
     *,
     size: int = 72,
     discount_token: bool = False,
-) -> None:
+    selected: bool = False,
+    clickable: bool = False,
+) -> list[int]:
     fill = "#fffaf0" if not plant.is_step_3_placeholder else "#d6d3d1"
-    outline = "#334155"
-    canvas.create_rectangle(x, y, x + size, y + size, fill=fill, outline=outline, width=2)
+    outline = "#d97706" if selected else ("#2563eb" if clickable else "#334155")
+    width = 3 if selected else (2.5 if clickable else 2)
+    item_ids: list[int] = []
+    item_ids.append(canvas.create_rectangle(x, y, x + size, y + size, fill=fill, outline=outline, width=width))
     price_text = "STEP3" if plant.is_step_3_placeholder else str(plant.price)
-    canvas.create_text(x + 8, y + 8, text=price_text, anchor="nw", fill=BOARD_TEXT, font=("Helvetica", 12, "bold"))
+    item_ids.append(canvas.create_text(x + 8, y + 8, text=price_text, anchor="nw", fill=BOARD_TEXT, font=("Helvetica", 12, "bold")))
     if plant.is_step_3_placeholder:
-        canvas.create_text(x + size / 2, y + size / 2, text="Deck\nShift", fill=BOARD_TEXT, font=("Helvetica", 10, "bold"))
+        item_ids.append(
+            canvas.create_text(x + size / 2, y + size / 2, text="Deck\nShift", fill=BOARD_TEXT, font=("Helvetica", 10, "bold"))
+        )
     else:
         resource_text = "eco" if plant.is_ecological else "/".join(RESOURCE_LABEL_MAP[item] for item in plant.resource_types)
-        canvas.create_text(
-            x + size / 2,
-            y + size / 2 - 4,
-            text=resource_text,
-            fill=BOARD_TEXT,
-            font=("Helvetica", 9, "bold"),
-            width=size - 12,
+        item_ids.append(
+            canvas.create_text(
+                x + size / 2,
+                y + size / 2 - 4,
+                text=resource_text,
+                fill=BOARD_TEXT,
+                font=("Helvetica", 9, "bold"),
+                width=size - 12,
+            )
         )
-        canvas.create_text(
-            x + 8,
-            y + size - 10,
-            text=f"r {plant.resource_cost}",
-            anchor="sw",
-            fill=BOARD_TEXT,
-            font=("Helvetica", 10, "bold"),
+        item_ids.append(
+            canvas.create_text(
+                x + 8,
+                y + size - 10,
+                text=f"r {plant.resource_cost}",
+                anchor="sw",
+                fill=BOARD_TEXT,
+                font=("Helvetica", 10, "bold"),
+            )
         )
-        canvas.create_text(
-            x + size - 8,
-            y + size - 10,
-            text=f"h {plant.output_cities}",
-            anchor="se",
-            fill=BOARD_TEXT,
-            font=("Helvetica", 10, "bold"),
+        item_ids.append(
+            canvas.create_text(
+                x + size - 8,
+                y + size - 10,
+                text=f"h {plant.output_cities}",
+                anchor="se",
+                fill=BOARD_TEXT,
+                font=("Helvetica", 10, "bold"),
+            )
         )
     if discount_token:
-        canvas.create_oval(x + size - 18, y + 6, x + size - 4, y + 20, fill="#d4a017", outline="#7c5d0d", width=2)
+        item_ids.append(canvas.create_oval(x + size - 18, y + 6, x + size - 4, y + 20, fill="#d4a017", outline="#7c5d0d", width=2))
+    return item_ids
 
 
 def _draw_deck_back_card(

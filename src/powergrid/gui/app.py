@@ -112,19 +112,26 @@ class LauncherFrame(ttk.Frame):
 class GameShell(ttk.Frame):
     def __init__(self, master, on_intent, *, board_render_mode: str = "drawn") -> None:
         super().__init__(master, padding=8)
+        self._last_snapshot: GameSnapshot | None = None
+        self._current_panel_key = "auction"
         self.header = HeaderView(self)
         self.header.grid(row=0, column=0, columnspan=3, sticky="ew")
         self.player_rail = PlayerRail(self)
         self.player_rail.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
         self.workspace = ttk.Frame(self)
         self.workspace.grid(row=1, column=1, sticky="nsew", padx=(0, 8))
-        self.board_view = BoardView(self.workspace, board_render_mode=board_render_mode)
+        self.board_view = BoardView(
+            self.workspace,
+            board_render_mode=board_render_mode,
+            on_city_click=self._handle_city_click,
+            on_resource_click=self._handle_resource_click,
+        )
         self.board_view.grid(row=0, column=0, sticky="nsew")
         self.phase_controls = ttk.Frame(self.workspace, padding=(0, 8, 0, 0))
         self.phase_controls.grid(row=1, column=0, sticky="ew")
         self.right_column = ttk.Frame(self)
         self.right_column.grid(row=1, column=2, sticky="nsew")
-        self.market_panel = PowerPlantMarketView(self.right_column)
+        self.market_panel = PowerPlantMarketView(self.right_column, on_plant_click=self._handle_market_plant_click)
         self.market_panel.grid(row=0, column=0, sticky="nsew")
         self.log_panel = EventLogView(self.right_column)
         self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
@@ -148,19 +155,36 @@ class GameShell(ttk.Frame):
             panel.grid(row=0, column=0, sticky="nsew")
 
     def render(self, snapshot: GameSnapshot) -> None:
+        self._last_snapshot = snapshot
         self.header.render(snapshot)
         self.player_rail.render(snapshot)
-        self.board_view.render(snapshot)
-        self.market_panel.render(snapshot)
-        self.log_panel.render(snapshot)
         for panel in self.panels.values():
             panel.grid_remove()
         if snapshot.state.pending_decision is not None:
-            panel = self.panels["pending"]
+            panel_key = "pending"
         else:
-            panel = self.panels.get(snapshot.state.phase, self.panels["auction"])
+            panel_key = snapshot.state.phase if snapshot.state.phase in self.panels else "auction"
+        self._current_panel_key = panel_key
+        panel = self.panels[panel_key]
         panel.grid()
         panel.render(snapshot)
+        self.board_view.render(snapshot, interaction_state=panel.board_interaction_state())
+        self.market_panel.render(snapshot, interaction_state=panel.market_interaction_state())
+        self.log_panel.render(snapshot)
+
+    def _handle_city_click(self, city_id: str) -> None:
+        panel = self.panels[self._current_panel_key]
+        if panel.handle_city_click(city_id) and self._last_snapshot is not None:
+            self.render(self._last_snapshot)
+
+    def _handle_resource_click(self, resource: str) -> None:
+        panel = self.panels[self._current_panel_key]
+        panel.handle_resource_click(resource)
+
+    def _handle_market_plant_click(self, plant_price: int) -> None:
+        panel = self.panels[self._current_panel_key]
+        if panel.handle_market_plant_click(plant_price) and self._last_snapshot is not None:
+            self.render(self._last_snapshot)
 
 
 class PowerGridApp(ttk.Frame):
