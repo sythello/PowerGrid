@@ -117,7 +117,6 @@ class BoardView(ttk.Frame):
 
         positions = self._city_positions(state, map_layout, width, height)
         self._draw_connections(state, positions)
-        self._draw_resource_market(state, map_layout, width, height)
         self._draw_cities(state, map_layout, positions)
         self._draw_houses(state, map_layout, positions)
         self._draw_unplayed_city_clouds(state, positions)
@@ -507,45 +506,7 @@ class BoardView(ttk.Frame):
         scale: float = 1.0,
         tags: tuple[str, ...] = (),
     ) -> list[int]:
-        color = RESOURCE_COLOR_MAP[resource]
-        if resource == "coal":
-            points = _regular_polygon_points(x, y, 10 * scale, 6, rotation=math.pi / 6)
-            return [self.canvas.create_polygon(points, fill=color, outline="#1f2937", tags=tags)]
-        elif resource == "oil":
-            points = [
-                x,
-                y - 12 * scale,
-                x + 8 * scale,
-                y,
-                x + 5 * scale,
-                y + 10 * scale,
-                x,
-                y + 14 * scale,
-                x - 5 * scale,
-                y + 10 * scale,
-                x - 8 * scale,
-                y,
-            ]
-            return [self.canvas.create_polygon(points, fill=color, outline="#374151", smooth=True, tags=tags)]
-        elif resource == "garbage":
-            return [self.canvas.create_rectangle(
-                x - 5 * scale,
-                y - 11 * scale,
-                x + 5 * scale,
-                y + 11 * scale,
-                fill=color,
-                outline="#374151",
-                tags=tags,
-            )]
-        return [self.canvas.create_oval(
-                x - 9 * scale,
-                y - 9 * scale,
-                x + 9 * scale,
-                y + 9 * scale,
-                fill=color,
-                outline="#7f1d1d",
-                tags=tags,
-            )]
+        return _draw_resource_token_on_canvas(self.canvas, resource, x, y, scale=scale, tags=tags)
 
     def _draw_cities(
         self,
@@ -791,8 +752,7 @@ class BoardView(ttk.Frame):
         self.canvas.tag_raise(item_ids[-1])
 
     def _bind_items_click(self, item_ids: list[int], callback) -> None:
-        for item_id in item_ids:
-            self.canvas.tag_bind(item_id, "<Button-1>", callback)
+        _bind_canvas_items_click(self.canvas, item_ids, callback)
 
 
 class PowerPlantMarketView(ttk.Frame):
@@ -858,6 +818,33 @@ class PowerPlantMarketView(ttk.Frame):
             fill=BOARD_TEXT,
             font=("Helvetica", 10),
         )
+
+
+class ResourceMarketView(ttk.Frame):
+    def __init__(self, master, *, on_resource_click=None) -> None:
+        super().__init__(master, padding=(8, 8))
+        self._on_resource_click = on_resource_click
+        ttk.Label(self, text="Resource Market", font=("Helvetica", 12, "bold")).pack(anchor="w")
+        self.canvas = tk.Canvas(self, width=360, height=228, background="#f4efe6", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True, pady=(8, 0))
+
+    def render(self, snapshot: GameSnapshot, interaction_state: dict[str, object] | None = None) -> None:
+        interaction_state = dict(interaction_state or {})
+        buyable_resources = set(interaction_state.get("buyable_resources", ()))
+        resource_phase_active = bool(interaction_state.get("resource_phase_active"))
+        width = max(336, self.canvas.winfo_width())
+        height = max(214, self.canvas.winfo_height())
+        self.canvas.delete("all")
+        _draw_resource_market_sidebar(
+            self.canvas,
+            snapshot.state,
+            width,
+            height,
+            buyable_resources=buyable_resources,
+            resource_phase_active=resource_phase_active,
+            on_resource_click=self._on_resource_click,
+        )
+        self.canvas.configure(scrollregion=(0, 0, width, height))
 
 
 def draw_power_plant_card(
@@ -931,6 +918,190 @@ def _draw_deck_back_card(
     canvas.create_text(x + 36, y + 28, text="deck", fill="#f8fafc", font=("Helvetica", 11, "bold"))
     canvas.create_text(x + 36, y + 46, text=label, fill="#f8fafc", font=("Helvetica", 10))
     canvas.create_text(x + 36, y + 61, text=f"{deck_count} left", fill="#f8fafc", font=("Helvetica", 9))
+
+
+def _draw_resource_market_sidebar(
+    canvas: tk.Canvas,
+    state: GameState,
+    width: int,
+    height: int,
+    *,
+    buyable_resources: set[str],
+    resource_phase_active: bool,
+    on_resource_click,
+) -> None:
+    geometry = _resource_market_sidebar_geometry(width, height)
+    panel_x = geometry["panel_x"]
+    panel_y = geometry["panel_y"]
+    panel_width = geometry["panel_width"]
+    panel_height = geometry["panel_height"]
+    grid_x = geometry["grid_x"]
+    grid_y = geometry["grid_y"]
+    label_width = geometry["label_width"]
+    header_height = geometry["header_height"]
+    cell_width = geometry["cell_width"]
+    cell_height = geometry["cell_height"]
+
+    canvas.create_rectangle(
+        panel_x,
+        panel_y,
+        panel_x + panel_width,
+        panel_y + panel_height,
+        fill=RESOURCE_MARKET_PANEL_FILL,
+        outline=RESOURCE_MARKET_BORDER,
+        width=2,
+    )
+    canvas.create_text(
+        panel_x + 12,
+        panel_y + 14,
+        text="Type",
+        anchor="w",
+        fill=BOARD_TEXT,
+        font=("Helvetica", 10, "bold"),
+    )
+    for price_index, price in enumerate(RESOURCE_MARKET_PRICE_COLUMNS):
+        cell_x = grid_x + label_width + price_index * cell_width
+        canvas.create_rectangle(
+            cell_x,
+            grid_y,
+            cell_x + cell_width,
+            grid_y + header_height,
+            fill=RESOURCE_MARKET_HEADER_FILL,
+            outline=RESOURCE_MARKET_BORDER,
+            width=1,
+        )
+        canvas.create_text(
+            cell_x + cell_width / 2,
+            grid_y + header_height / 2,
+            text=str(price),
+            fill=BOARD_TEXT,
+            font=("Helvetica", 7, "bold"),
+        )
+    canvas.create_rectangle(
+        grid_x,
+        grid_y,
+        grid_x + label_width,
+        grid_y + header_height,
+        fill=RESOURCE_MARKET_HEADER_FILL,
+        outline=RESOURCE_MARKET_BORDER,
+        width=1,
+    )
+    canvas.create_text(
+        grid_x + label_width / 2,
+        grid_y + header_height / 2,
+        text="Resource",
+        fill=BOARD_TEXT,
+        font=("Helvetica", 8, "bold"),
+    )
+
+    for row_index, resource in enumerate(RESOURCE_TYPES):
+        row_y = grid_y + header_height + row_index * cell_height
+        is_buyable = not resource_phase_active or resource in buyable_resources
+        label_fill = RESOURCE_MARKET_HEADER_FILL if is_buyable else RESOURCE_MARKET_DISABLED_FILL
+        label_text = BOARD_TEXT if is_buyable else "#6b7280"
+        canvas.create_rectangle(
+            grid_x,
+            row_y,
+            grid_x + label_width,
+            row_y + cell_height,
+            fill=label_fill,
+            outline=RESOURCE_MARKET_BORDER,
+            width=1,
+        )
+        canvas.create_text(
+            grid_x + label_width / 2,
+            row_y + cell_height / 2,
+            text=resource.title(),
+            fill=label_text,
+            font=("Helvetica", 8, "bold"),
+        )
+        for price_index, price in enumerate(RESOURCE_MARKET_PRICE_COLUMNS):
+            cell_x = grid_x + label_width + price_index * cell_width
+            fill = (
+                RESOURCE_MARKET_CELL_FILL
+                if price in RESOURCE_MARKET_VALID_PRICES[resource]
+                else RESOURCE_MARKET_DISABLED_FILL
+            )
+            if resource_phase_active and resource not in buyable_resources and price in RESOURCE_MARKET_VALID_PRICES[resource]:
+                fill = RESOURCE_MARKET_DISABLED_FILL
+            canvas.create_rectangle(
+                cell_x,
+                row_y,
+                cell_x + cell_width,
+                row_y + cell_height,
+                fill=fill,
+                outline=RESOURCE_MARKET_BORDER,
+                width=1,
+            )
+            amount = state.resource_market.market[resource].get(price, 0)
+            if amount <= 0:
+                continue
+            for point in _sidebar_resource_cell_points(geometry, resource, price, amount, row_index):
+                tags = ()
+                if resource_phase_active and resource in buyable_resources and on_resource_click is not None:
+                    tags = (f"resource:{resource}:{price}:{point[0]:.1f}:{point[1]:.1f}",)
+                item_ids = _draw_resource_token_on_canvas(canvas, resource, point[0], point[1], scale=0.48, tags=tags)
+                if tags:
+                    _bind_canvas_items_click(
+                        canvas,
+                        item_ids,
+                        lambda _event, resource=resource: on_resource_click(resource),
+                    )
+
+
+def _draw_resource_token_on_canvas(
+    canvas: tk.Canvas,
+    resource: str,
+    x: float,
+    y: float,
+    *,
+    scale: float = 1.0,
+    tags: tuple[str, ...] = (),
+) -> list[int]:
+    color = RESOURCE_COLOR_MAP[resource]
+    if resource == "coal":
+        points = _regular_polygon_points(x, y, 10 * scale, 6, rotation=math.pi / 6)
+        return [canvas.create_polygon(points, fill=color, outline="#1f2937", tags=tags)]
+    if resource == "oil":
+        points = [
+            x,
+            y - 12 * scale,
+            x + 8 * scale,
+            y,
+            x + 5 * scale,
+            y + 10 * scale,
+            x,
+            y + 14 * scale,
+            x - 5 * scale,
+            y + 10 * scale,
+            x - 8 * scale,
+            y,
+        ]
+        return [canvas.create_polygon(points, fill=color, outline="#374151", smooth=True, tags=tags)]
+    if resource == "garbage":
+        return [canvas.create_rectangle(
+            x - 5 * scale,
+            y - 11 * scale,
+            x + 5 * scale,
+            y + 11 * scale,
+            fill=color,
+            outline="#374151",
+            tags=tags,
+        )]
+    return [canvas.create_oval(
+        x - 9 * scale,
+        y - 9 * scale,
+        x + 9 * scale,
+        y + 9 * scale,
+        fill=color,
+        outline="#7f1d1d",
+        tags=tags,
+    )]
+
+
+def _bind_canvas_items_click(canvas: tk.Canvas, item_ids: list[int], callback) -> None:
+    for item_id in item_ids:
+        canvas.tag_bind(item_id, "<Button-1>", callback)
 
 
 def _draw_house_icon(canvas: tk.Canvas, x: float, y: float, fill: str) -> None:
@@ -1061,3 +1232,63 @@ def _resource_market_table_geometry(width: int, height: int) -> dict[str, float]
         "cell_width": cell_width,
         "cell_height": cell_height,
     }
+
+
+def _resource_market_sidebar_geometry(width: int, height: int) -> dict[str, float]:
+    padding = 10
+    label_width = 72
+    header_height = 24
+    cell_width = max(18, min(22, (width - padding * 2 - label_width) / len(RESOURCE_MARKET_PRICE_COLUMNS)))
+    cell_height = 36
+    grid_width = label_width + len(RESOURCE_MARKET_PRICE_COLUMNS) * cell_width
+    panel_width = grid_width + padding * 2
+    panel_height = header_height + len(RESOURCE_TYPES) * cell_height + padding * 2
+    panel_x = max(0, (width - panel_width) / 2)
+    panel_y = max(0, (height - panel_height) / 2)
+    grid_x = panel_x + padding
+    grid_y = panel_y + padding
+    return {
+        "panel_x": panel_x,
+        "panel_y": panel_y,
+        "panel_width": panel_width,
+        "panel_height": panel_height,
+        "grid_x": grid_x,
+        "grid_y": grid_y,
+        "label_width": label_width,
+        "header_height": header_height,
+        "cell_width": cell_width,
+        "cell_height": cell_height,
+    }
+
+
+def _sidebar_resource_cell_points(
+    geometry: dict[str, float],
+    resource: str,
+    price: int,
+    amount: int,
+    row_index: int,
+) -> list[tuple[float, float]]:
+    if amount <= 0:
+        return []
+    price_index = RESOURCE_MARKET_PRICE_COLUMNS.index(price)
+    center_x = (
+        geometry["grid_x"]
+        + geometry["label_width"]
+        + price_index * geometry["cell_width"]
+        + geometry["cell_width"] / 2
+    )
+    center_y = (
+        geometry["grid_y"]
+        + geometry["header_height"]
+        + row_index * geometry["cell_height"]
+        + geometry["cell_height"] / 2
+    )
+    horizontal = geometry["cell_width"] * 0.22
+    vertical = geometry["cell_height"] * 0.16
+    if resource == "uranium" or amount == 1:
+        offsets = [(0.0, 0.0)]
+    elif amount == 2:
+        offsets = [(-horizontal, 0.0), (horizontal, 0.0)]
+    else:
+        offsets = [(-horizontal, vertical), (0.0, -vertical), (horizontal, vertical)]
+    return [(center_x + offset_x, center_y + offset_y) for offset_x, offset_y in offsets[:amount]]

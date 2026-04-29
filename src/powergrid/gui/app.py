@@ -6,7 +6,7 @@ from tkinter import ttk
 from ..model import GameConfig, SeatConfig
 from ..scenarios import SCENARIO_NAMES
 from ..session import GameSession, GameSnapshot, GuiIntent
-from .board_view import BoardView, PowerPlantMarketView
+from .board_view import BoardView, PowerPlantMarketView, ResourceMarketView
 from .components import EventLogView, HeaderView, PlayerRail
 from .panels import AuctionPanel, BuildPanel, BureaucracyPanel, PendingDecisionPanel, ResourcePanel
 
@@ -133,8 +133,10 @@ class GameShell(ttk.Frame):
         self.right_column.grid(row=1, column=2, sticky="nsew")
         self.market_panel = PowerPlantMarketView(self.right_column, on_plant_click=self._handle_market_plant_click)
         self.market_panel.grid(row=0, column=0, sticky="nsew")
+        self.resource_market_panel = ResourceMarketView(self.right_column, on_resource_click=self._handle_resource_click)
+        self.resource_market_panel.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self.log_panel = EventLogView(self.right_column)
-        self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        self.log_panel.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(2, weight=0)
@@ -143,7 +145,8 @@ class GameShell(ttk.Frame):
         self.workspace.grid_rowconfigure(0, weight=1)
         self.right_column.grid_columnconfigure(0, weight=1)
         self.right_column.grid_rowconfigure(0, weight=0)
-        self.right_column.grid_rowconfigure(1, weight=1)
+        self.right_column.grid_rowconfigure(1, weight=0)
+        self.right_column.grid_rowconfigure(2, weight=1)
         self.panels = {
             "auction": AuctionPanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
             "buy_resources": ResourcePanel(self.phase_controls, on_intent, self._rerender_last_snapshot),
@@ -170,6 +173,7 @@ class GameShell(ttk.Frame):
         panel.render(snapshot)
         self.board_view.render(snapshot, interaction_state=panel.board_interaction_state())
         self.market_panel.render(snapshot, interaction_state=panel.market_interaction_state())
+        self.resource_market_panel.render(snapshot, interaction_state=panel.board_interaction_state())
         self.log_panel.render(snapshot)
 
     def _handle_city_click(self, city_id: str) -> None:

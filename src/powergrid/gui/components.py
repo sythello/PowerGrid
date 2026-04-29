@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import math
 import tkinter as tk
 from tkinter import ttk
 
 from ..session import GameSnapshot
+from .board_view import PLAYER_COLOR_MAP, draw_power_plant_card
 
 
 class SnapshotRenderable(ttk.Frame):
@@ -37,38 +39,143 @@ class HeaderView(SnapshotRenderable):
 class PlayerRail(SnapshotRenderable):
     def __init__(self, master) -> None:
         super().__init__(master, padding=(10, 8))
-        ttk.Label(self, text="Players", font=("Helvetica", 12, "bold")).pack(anchor="w")
-        self.body = tk.Text(self, width=36, height=20, wrap="word")
-        self.body.pack(fill="both", expand=True, pady=(8, 0))
-        self.body.configure(state="disabled")
+        ttk.Label(self, text="Players", font=("Helvetica", 12, "bold")).grid(row=0, column=0, sticky="w")
+        self.canvas = tk.Canvas(self, width=270, background="#f3ede1", highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        self.scrollbar.grid(row=1, column=1, sticky="ns", pady=(8, 0))
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.cards = tk.Frame(self.canvas, bg="#f3ede1")
+        self._cards_window = self.canvas.create_window((0, 0), window=self.cards, anchor="nw")
+        self.cards.bind("<Configure>", self._sync_scrollregion)
+        self.canvas.bind("<Configure>", self._sync_window_width)
 
     def render(self, snapshot: GameSnapshot) -> None:
-        lines = []
         active = snapshot.active_request.player_id if snapshot.active_request is not None else None
+        for child in self.cards.winfo_children():
+            child.destroy()
         for player in sorted(snapshot.state.players, key=lambda item: item.turn_order_position):
-            prefix = "> " if player.player_id == active else "  "
-            lines.append(
-                prefix
-                + f"{player.turn_order_position}. {player.player_id} {player.name} [{player.controller}]"
-            )
-            lines.append(
-                f"   Elektro={player.elektro} Cities={player.connected_city_count} Houses={player.houses_in_supply}"
-            )
-            plants = ", ".join(str(plant.price) for plant in player.power_plants) or "-"
-            storage = ", ".join(
-                f"{resource}={player.resource_storage.total(resource)}"
-                for resource in ("coal", "oil", "garbage", "uranium")
-            )
-            lines.append(f"   Plants={plants}")
-            lines.append(f"   Storage={storage}")
-            lines.append("")
-        self._set_text("\n".join(lines).rstrip())
+            self._render_player_card(player, is_active=(player.player_id == active))
+        self.canvas.update_idletasks()
+        self._sync_scrollregion()
 
-    def _set_text(self, text: str) -> None:
-        self.body.configure(state="normal")
-        self.body.delete("1.0", "end")
-        self.body.insert("1.0", text)
-        self.body.configure(state="disabled")
+    def _render_player_card(self, player, *, is_active: bool) -> None:
+        border_color = "#d97706" if is_active else PLAYER_COLOR_MAP.get(player.color, "#475569")
+        card = tk.Frame(
+            self.cards,
+            bg="#fffaf0",
+            highlightbackground=border_color,
+            highlightcolor=border_color,
+            highlightthickness=3 if is_active else 2,
+            bd=0,
+        )
+        card.pack(fill="x", pady=(0, 10))
+
+        header = tk.Frame(card, bg="#fffaf0")
+        header.pack(fill="x", padx=8, pady=(8, 6))
+        title_text = f"{player.turn_order_position}. {player.name}"
+        tk.Label(
+            header,
+            text=title_text,
+            bg="#fffaf0",
+            fg="#111827",
+            font=("Helvetica", 11, "bold"),
+            anchor="w",
+        ).pack(side="left")
+        if is_active:
+            tk.Label(
+                header,
+                text="ACTIVE",
+                bg="#fbbf24",
+                fg="#111827",
+                font=("Helvetica", 8, "bold"),
+                padx=6,
+                pady=2,
+            ).pack(side="right")
+
+        tk.Label(
+            card,
+            text=f"{player.player_id} [{player.controller}]",
+            bg="#fffaf0",
+            fg="#475569",
+            font=("Helvetica", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8)
+        tk.Label(
+            card,
+            text=f"Elektro ${player.elektro}    Cities {player.connected_city_count}",
+            bg="#fffaf0",
+            fg="#111827",
+            font=("Helvetica", 10, "bold"),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(4, 0))
+        tk.Label(
+            card,
+            text=(
+                f"Coal {player.resource_storage.total('coal')}   "
+                f"Oil {player.resource_storage.total('oil')}"
+            ),
+            bg="#fffaf0",
+            fg="#1f2937",
+            font=("Helvetica", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(4, 0))
+        tk.Label(
+            card,
+            text=(
+                f"Garbage {player.resource_storage.total('garbage')}   "
+                f"Uranium {player.resource_storage.total('uranium')}"
+            ),
+            bg="#fffaf0",
+            fg="#1f2937",
+            font=("Helvetica", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8)
+
+        plants = sorted(player.power_plants, key=lambda item: item.price)
+        tk.Label(
+            card,
+            text="Power Plants",
+            bg="#fffaf0",
+            fg="#334155",
+            font=("Helvetica", 9, "bold"),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(8, 4))
+        self._render_power_plants(card, plants)
+
+    def _render_power_plants(self, parent, plants) -> None:
+        columns = 4
+        size = 50
+        gap = 8
+        rows = max(1, math.ceil(max(1, len(plants)) / columns))
+        canvas_height = rows * (size + gap) + 8
+        canvas_width = columns * (size + gap) + 8
+        canvas = tk.Canvas(parent, height=canvas_height, width=canvas_width, bg="#fffaf0", highlightthickness=0)
+        canvas.pack(fill="x", padx=8, pady=(0, 8))
+        if not plants:
+            canvas.create_text(
+                canvas_width / 2,
+                canvas_height / 2,
+                text="No plants",
+                fill="#64748b",
+                font=("Helvetica", 9, "italic"),
+            )
+            return
+        for index, plant in enumerate(plants):
+            row = index // columns
+            column = index % columns
+            x = 4 + column * (size + gap)
+            y = 4 + row * (size + gap)
+            draw_power_plant_card(canvas, x, y, plant, size=size)
+        canvas.configure(scrollregion=(0, 0, canvas_width, canvas_height))
+
+    def _sync_scrollregion(self, _event=None) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _sync_window_width(self, event) -> None:
+        self.canvas.itemconfigure(self._cards_window, width=event.width)
 
 
 class MarketPanel(SnapshotRenderable):

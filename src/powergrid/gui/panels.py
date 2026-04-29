@@ -254,7 +254,7 @@ class ResourcePanel(BasePhasePanel):
         for action in request.legal_actions:
             if action.action_type == "buy_resource":
                 self._buy_actions_by_resource[str(action.payload["resource"])] = action
-        self.help_var.set(request.prompt + " Click a resource token on the board or a resource button below.")
+        self.help_var.set(request.prompt + " Click a resource token in the market or a resource button below.")
         for resource in RESOURCE_TYPES:
             button = self.resource_buttons[resource]
             action = self._buy_actions_by_resource.get(resource)
