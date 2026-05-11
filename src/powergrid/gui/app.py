@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from ..ai import AI_CONTROLLER_REGISTRY
 from ..model import GameConfig, SeatConfig
 from ..scenarios import SCENARIO_NAMES
 from ..session import GameSession, GameSnapshot, GuiIntent
@@ -21,6 +22,11 @@ class LauncherFrame(ttk.Frame):
         self.map_var = tk.StringVar(value="germany")
         self.scenario_var = tk.StringVar(value=SCENARIO_NAMES[0])
         self.seat_type_vars = [tk.StringVar(value="human") for _ in range(6)]
+        self.ai_version_vars = [tk.StringVar(value="ai") for _ in range(6)]
+        self.ai_version_boxes: list[ttk.Combobox | None] = [None for _ in range(6)]
+        self.ai_controller_names = _available_ai_controller_names()
+        for seat_type_var in self.seat_type_vars:
+            seat_type_var.trace_add("write", self._handle_seat_type_change)
         ttk.Label(self, text="PowerGrid GUI", font=("Helvetica", 18, "bold")).grid(
             row=0, column=0, columnspan=3, sticky="w"
         )
@@ -76,16 +82,36 @@ class LauncherFrame(ttk.Frame):
     def _render_seat_controls(self) -> None:
         for child in self.seat_frame.winfo_children():
             child.destroy()
+        self.ai_version_boxes = [None for _ in range(6)]
         count = int(self.player_count_var.get())
         for index in range(count):
-            ttk.Label(self.seat_frame, text=f"Seat {index + 1}").grid(row=index, column=0, sticky="w")
-            ttk.Combobox(
+            base_row = index * 2
+            ttk.Label(self.seat_frame, text=f"Seat {index + 1}").grid(row=base_row, column=0, sticky="w")
+            seat_type_box = ttk.Combobox(
                 self.seat_frame,
                 textvariable=self.seat_type_vars[index],
                 values=("human", "ai"),
                 state="readonly",
                 width=10,
-            ).grid(row=index, column=1, sticky="w", padx=(8, 0))
+            )
+            seat_type_box.grid(row=base_row, column=1, sticky="w", padx=(8, 0))
+            if self.seat_type_vars[index].get() != "ai":
+                continue
+            ttk.Label(self.seat_frame, text="AI Version").grid(
+                row=base_row + 1, column=1, sticky="w", padx=(8, 0), pady=(4, 0)
+            )
+            version_box = ttk.Combobox(
+                self.seat_frame,
+                textvariable=self.ai_version_vars[index],
+                values=self.ai_controller_names,
+                state="readonly",
+                width=18,
+            )
+            version_box.grid(row=base_row + 1, column=2, sticky="w", padx=(8, 0), pady=(4, 0))
+            self.ai_version_boxes[index] = version_box
+
+    def _handle_seat_type_change(self, *_args) -> None:
+        self._render_seat_controls()
 
     def _load_scenario(self) -> None:
         self._on_scenario(self.scenario_var.get(), int(self.seed_var.get()))
@@ -96,7 +122,11 @@ class LauncherFrame(ttk.Frame):
             SeatConfig(
                 player_id=f"p{index + 1}",
                 name=f"Player {index + 1}",
-                controller=self.seat_type_vars[index].get(),
+                controller=(
+                    self.ai_version_vars[index].get()
+                    if self.seat_type_vars[index].get() == "ai"
+                    else "human"
+                ),
             )
             for index in range(count)
         )
@@ -200,6 +230,8 @@ class PowerGridApp(ttk.Frame):
         super().__init__(master, padding=0)
         self.master = master
         self.board_render_mode = board_render_mode
+        self.ai_action_delay_ms = 900
+        self._pending_auto_advance_id: str | None = None
         self.session: GameSession | None = None
         self.launcher = LauncherFrame(self, self.start_new_game, self.load_scenario)
         self.shell = GameShell(self, self.dispatch_intent, board_render_mode=board_render_mode)
@@ -210,30 +242,71 @@ class PowerGridApp(ttk.Frame):
         self.show_launcher()
 
     def show_launcher(self) -> None:
+        self._cancel_auto_advance()
         self.shell.grid_remove()
         self.launcher.grid()
         self.launcher.render()
 
     def start_new_game(self, config: GameConfig) -> None:
+        self._cancel_auto_advance()
         self.session = GameSession.new_game(config)
         self._render_session()
 
     def load_scenario(self, scenario_name: str, seed: int = 7) -> None:
+        self._cancel_auto_advance()
         self.session = GameSession.from_scenario(scenario_name, seed=seed)
         self._render_session()
 
     def dispatch_intent(self, intent: GuiIntent) -> None:
         if self.session is None:
             return
-        self.session.submit_intent(intent)
+        self._cancel_auto_advance()
+        self.session.submit_intent(intent, auto_advance=False)
         self._render_session()
 
-    def _render_session(self) -> None:
+    def _render_session(self, snapshot: GameSnapshot | None = None, *, schedule_auto: bool = True) -> None:
         assert self.session is not None
-        snapshot = self.session.advance_until_blocked()
+        if snapshot is None:
+            snapshot = self.session.snapshot()
         self.launcher.grid_remove()
         self.shell.grid()
         self.shell.render(snapshot)
+        if not schedule_auto:
+            return
+        if not self._snapshot_needs_auto_progress(snapshot):
+            return
+        delay_ms = self.ai_action_delay_ms if snapshot.active_request is not None else 1
+        self._schedule_auto_advance(delay_ms)
+
+    def _schedule_auto_advance(self, delay_ms: int) -> None:
+        self._cancel_auto_advance()
+        self._pending_auto_advance_id = self.after(delay_ms, self._advance_one_ai_action)
+
+    def _cancel_auto_advance(self) -> None:
+        if self._pending_auto_advance_id is not None:
+            self.after_cancel(self._pending_auto_advance_id)
+            self._pending_auto_advance_id = None
+
+    def _advance_one_ai_action(self) -> None:
+        self._pending_auto_advance_id = None
+        if self.session is None:
+            return
+        snapshot, action_applied = self.session.advance_one_ai_action()
+        self._render_session(snapshot, schedule_auto=False)
+        if not self._snapshot_needs_auto_progress(snapshot):
+            return
+        delay_ms = self.ai_action_delay_ms if action_applied else 1
+        self._schedule_auto_advance(delay_ms)
+
+    def _snapshot_needs_auto_progress(self, snapshot: GameSnapshot) -> bool:
+        if self.session is None or snapshot.winner_result is not None:
+            return False
+        if snapshot.active_request is None:
+            return True
+        active_player = next(
+            player for player in snapshot.state.players if player.player_id == snapshot.active_request.player_id
+        )
+        return active_player.controller != "human"
 
 
 def create_root() -> tk.Tk:
@@ -248,3 +321,11 @@ def launch_app(*, board_render_mode: str = "drawn") -> PowerGridApp:
     app = PowerGridApp(root, board_render_mode=board_render_mode)
     app.pack(fill="both", expand=True)
     return app
+
+
+def _available_ai_controller_names() -> tuple[str, ...]:
+    names = tuple(AI_CONTROLLER_REGISTRY)
+    others = tuple(sorted(name for name in names if name != "ai"))
+    if "ai" in names:
+        return ("ai", *others)
+    return others

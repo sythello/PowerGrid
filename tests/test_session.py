@@ -111,6 +111,27 @@ class GameSessionTests(unittest.TestCase):
         self.assertEqual(snapshot.active_request.decision_type, "auction_bid")
         self.assertGreaterEqual(len(snapshot.event_log), 2)
 
+    def test_advance_one_ai_action_applies_single_ai_step(self) -> None:
+        session = GameSession.from_scenario(
+            "opening",
+            seed=7,
+            seat_agents={
+                "p1": DeterministicAiSeat(),
+                "p2": DeterministicAiSeat(),
+                "p3": DeterministicAiSeat(),
+            },
+        )
+
+        snapshot, action_applied = session.advance_one_ai_action()
+
+        self.assertTrue(action_applied)
+        self.assertTrue(snapshot.event_log)
+        self.assertEqual(snapshot.event_log[-1].message, "AI opened bidding for plant 6 at 1 Elektro.")
+        self.assertIsNotNone(snapshot.active_request)
+        assert snapshot.active_request is not None
+        self.assertEqual(snapshot.active_request.player_id, "p1")
+        self.assertEqual(snapshot.active_request.decision_type, "auction_bid")
+
     def test_later_round_auction_pass_advances_to_next_chooser(self) -> None:
         session = GameSession.from_scenario("auction_step3", seed=7)
         first_request = session.snapshot().active_request
@@ -192,6 +213,31 @@ class GameSessionTests(unittest.TestCase):
         self.assertIsNotNone(snapshot.active_request)
         assert snapshot.active_request is not None
         self.assertNotEqual(snapshot.active_request.player_id, active_player_id)
+
+    def test_submit_intent_can_skip_auto_advance(self) -> None:
+        session = GameSession.from_scenario(
+            "opening",
+            seed=7,
+            seat_agents={
+                "p1": DeterministicAiSeat(),
+                "p2": DeterministicAiSeat(),
+                "p3": HumanSeat(),
+            },
+        )
+
+        snapshot = session.submit_intent(
+            GuiIntent.auction_start("p3", plant_price=6, bid=1),
+            auto_advance=False,
+        )
+
+        self.assertIsNotNone(snapshot.active_request)
+        assert snapshot.active_request is not None
+        self.assertEqual(snapshot.active_request.player_id, "p1")
+        self.assertEqual(snapshot.active_request.decision_type, "auction_bid")
+        self.assertEqual(
+            snapshot.event_log[-1].message,
+            "Opened bidding for plant 6 at 1 Elektro.",
+        )
 
     def test_build_phase_quote_is_non_mutating_and_commit_build_updates_state(self) -> None:
         session = GameSession.from_scenario("build_test", seed=7)

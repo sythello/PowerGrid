@@ -48,7 +48,7 @@ class GameSession:
             raise ModelValidationError("seat agents must match the active game state's player ids exactly")
         for player in state.players:
             agent = seat_agents[player.player_id]
-            if player.controller == "ai" and not isinstance(agent, BaseAiController):
+            if player.controller != "human" and not isinstance(agent, BaseAiController):
                 raise ModelValidationError(
                     f"AI-controlled seat {player.player_id} must use a BaseAiController instance"
                 )
@@ -158,25 +158,34 @@ class GameSession:
 
     def advance_until_blocked(self) -> GameSnapshot:
         while True:
+            snapshot, action_applied = self.advance_one_ai_action()
+            if not action_applied:
+                return snapshot
+
+    def advance_one_ai_action(self) -> tuple[GameSnapshot, bool]:
+        while True:
             self._sync_phase_cursor()
             if self._state.phase in {"setup", "determine_order"}:
                 self._state = advance_phase(self._state)
                 self._sync_phase_cursor(force_reset=True)
                 continue
             if self._winner_result is not None:
-                return self.snapshot()
+                return self.snapshot(), False
             request = self.current_request()
             if request is None:
-                return self.snapshot()
+                return self.snapshot(), False
             seat = self._seat_agents[request.player_id]
             if isinstance(seat, HumanSeat):
-                return self.snapshot()
+                return self.snapshot(), False
             intent = seat.choose_intent(request, self.snapshot())
             if not self._apply_and_log(intent, auto_generated=True):
-                return self.snapshot()
+                return self.snapshot(), False
+            return self.snapshot(), True
 
-    def submit_intent(self, intent: GuiIntent) -> GameSnapshot:
+    def submit_intent(self, intent: GuiIntent, *, auto_advance: bool = True) -> GameSnapshot:
         self._apply_and_log(intent, auto_generated=False)
+        if not auto_advance:
+                return self.snapshot()
         return self.advance_until_blocked()
 
     def _apply_and_log(self, intent: GuiIntent, *, auto_generated: bool) -> bool:
@@ -202,13 +211,12 @@ class GameSession:
                 )
             )
             return False
-        descriptor = "AI accepted" if auto_generated else "Accepted"
         self._event_log.append(
             SessionEvent(
                 level="info",
-                message=f"{descriptor}: {intent.intent_type}",
+                message=_describe_intent(before_state, self._state, intent, auto_generated=auto_generated),
                 player_id=intent.player_id,
-                phase=self._state.phase,
+                phase=before_state.phase,
             )
         )
         return True
@@ -488,3 +496,97 @@ def _get_player(state: GameState, player_id: str):
         if player.player_id == player_id:
             return player
     raise ModelValidationError(f"unknown player {player_id!r}")
+
+
+def _describe_intent(
+    before_state: GameState,
+    after_state: GameState,
+    intent: GuiIntent,
+    *,
+    auto_generated: bool,
+) -> str:
+    def actor_message(body: str) -> str:
+        return f"AI {body}" if auto_generated else body[:1].upper() + body[1:]
+
+    if intent.intent_type == "auction_start":
+        return actor_message(
+            f"opened bidding for plant {intent.payload['plant_price']} "
+            f"at {intent.payload['bid']} Elektro."
+        )
+    if intent.intent_type == "auction_bid":
+        return actor_message(
+            f"raised the bid to {intent.payload['bid']} Elektro"
+            + _describe_active_auction_suffix(before_state)
+        )
+    if intent.intent_type == "auction_pass":
+        return actor_message(_describe_auction_pass(before_state))
+    if intent.intent_type == "buy_resource":
+        resource = str(intent.payload["resource"])
+        amount = int(intent.payload["amount"])
+        total_cost = before_state.resource_market.quote_purchase_cost(resource, amount)
+        return actor_message(f"bought {amount} {resource} for {total_cost} Elektro.")
+    if intent.intent_type == "finish_buying":
+        return actor_message("finished buying resources.")
+    if intent.intent_type == "quote_build":
+        city_names = _city_labels(before_state, intent.payload.get("city_ids", []))
+        return f"Requested a build quote for {', '.join(city_names)}."
+    if intent.intent_type == "commit_build":
+        city_names = _city_labels(before_state, intent.payload.get("city_ids", []))
+        before_player = _get_player(before_state, intent.player_id)
+        after_player = _get_player(after_state, intent.player_id)
+        total_cost = before_player.elektro - after_player.elektro
+        return actor_message(
+            f"built in {', '.join(city_names)} for {total_cost} Elektro."
+        )
+    if intent.intent_type == "finish_building":
+        return actor_message("finished building.")
+    if intent.intent_type == "run_plants":
+        plans = tuple(
+            PlantRunPlan.from_dict(payload)
+            for payload in intent.payload.get("plans", [])
+        )
+        if not plans:
+            return actor_message("selected no plants to run.")
+        powered = compute_powered_cities(before_state, intent.player_id, plans)
+        income = pay_income(before_state.rules, powered)
+        prices = ", ".join(str(plan.plant_price) for plan in plans)
+        return actor_message(
+            f"selected plants {prices} to power {powered} cities "
+            f"for {income} Elektro."
+        )
+    if intent.intent_type == "skip_bureaucracy":
+        return actor_message("skipped plant operation selection.")
+    if intent.intent_type == "discard_power_plant":
+        return actor_message(f"discarded plant {intent.payload['plant_price']}.")
+    if intent.intent_type == "discard_hybrid_resources":
+        return actor_message(
+            f"discarded {intent.payload.get('coal', 0)} coal and "
+            f"{intent.payload.get('oil', 0)} oil to fit storage."
+        )
+    return actor_message(f"took action {intent.intent_type}.")
+
+
+def _describe_active_auction_suffix(state: GameState) -> str:
+    auction_state = state.auction_state
+    if auction_state is None or auction_state.active_plant_price is None:
+        return "."
+    return f" for plant {auction_state.active_plant_price}."
+
+
+def _describe_auction_pass(state: GameState) -> str:
+    auction_state = state.auction_state
+    if auction_state is None or not auction_state.has_active_auction:
+        return "passed on starting an auction this round."
+    return (
+        f"passed on bidding for plant {auction_state.active_plant_price} "
+        f"at {auction_state.current_bid} Elektro."
+    )
+
+
+def _city_labels(state: GameState, city_ids) -> list[str]:
+    labels = []
+    names = {city.id: city.name for city in state.game_map.cities}
+    for city_id in city_ids:
+        city_key = str(city_id)
+        labels.append(names.get(city_key, city_key))
+    return labels

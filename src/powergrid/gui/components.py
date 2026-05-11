@@ -227,17 +227,31 @@ class EventLogView(SnapshotRenderable):
         if not snapshot.event_log:
             self._set_text("No session events yet.")
             return
+        player_names = {
+            player.player_id: player.name
+            for player in snapshot.state.players
+        }
         lines = []
         for event in snapshot.event_log[-20:]:
-            actor = f" player={event.player_id}" if event.player_id else ""
-            phase = f" phase={event.phase}" if event.phase else ""
-            lines.append(f"[{event.level}]{phase}{actor} {event.message}")
+            labels = []
+            if event.phase:
+                labels.append(event.phase.replace("_", " ").title())
+            if event.player_id:
+                labels.append(player_names.get(event.player_id, event.player_id))
+            if event.level != "info":
+                labels.append(event.level.upper())
+            prefix = " | ".join(labels)
+            if prefix:
+                lines.append(f"{prefix}: {event.message}")
+            else:
+                lines.append(event.message)
         self._set_text("\n".join(lines))
 
     def _set_text(self, text: str) -> None:
         self.body.configure(state="normal")
         self.body.delete("1.0", "end")
         self.body.insert("1.0", text)
+        self.body.see("end")
         self.body.configure(state="disabled")
 
 

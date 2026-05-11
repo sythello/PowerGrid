@@ -3,12 +3,14 @@ from __future__ import annotations
 from ..model import ModelValidationError
 from .base import BaseAiController
 from .deterministic import DeterministicAiController
+from .strategic import StrategicAiController
 
 
 DeterministicAiSeat = DeterministicAiController
 
 AI_CONTROLLER_REGISTRY: dict[str, type[BaseAiController]] = {
-    "ai": DeterministicAiController,
+    "ai": StrategicAiController,
+    "ai_deterministic": DeterministicAiController,
 }
 
 
@@ -32,6 +34,7 @@ __all__ = [
     "BaseAiController",
     "DeterministicAiController",
     "DeterministicAiSeat",
+    "StrategicAiController",
     "build_ai_controller",
     "register_ai_controller",
 ]

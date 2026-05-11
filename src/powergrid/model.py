@@ -43,9 +43,9 @@ class SeatConfig:
             raise ModelValidationError("player_id must be non-empty")
         if not self.name:
             raise ModelValidationError("player name must be non-empty")
-        if self.controller not in CONTROLLER_TYPES:
+        if not _is_valid_controller_name(self.controller):
             raise ModelValidationError(
-                f"controller must be one of {CONTROLLER_TYPES}, got {self.controller!r}"
+                "controller must be 'human' or a non-empty AI controller name"
             )
 
     def to_dict(self) -> dict[str, Any]:
@@ -427,8 +427,10 @@ class PlayerState:
         self.power_plants = tuple(self.power_plants)
         if not isinstance(self.resource_storage, ResourceStorage):
             self.resource_storage = ResourceStorage.from_dict(dict(self.resource_storage))
-        if self.controller not in CONTROLLER_TYPES:
-            raise ModelValidationError("player controller must be human or ai")
+        if not _is_valid_controller_name(self.controller):
+            raise ModelValidationError(
+                "player controller must be 'human' or a non-empty AI controller name"
+            )
         if self.elektro < 0:
             raise ModelValidationError("player elektro cannot be negative")
         if self.houses_in_supply < 0:
@@ -1900,6 +1902,10 @@ def _require_auction_phase(state: GameState) -> GameState:
     if state.auction_state is not None:
         return state
     return replace(state, auction_state=_create_auction_state(state, state.player_order[0]))
+
+
+def _is_valid_controller_name(controller: str) -> bool:
+    return bool(controller)
 
 
 def _get_player(state: GameState, player_id: str) -> PlayerState:

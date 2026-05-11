@@ -6,6 +6,7 @@ from .ai import (
     DeterministicAiController,
     DeterministicAiSeat,
     register_ai_controller,
+    StrategicAiController,
 )
 from .cli import (
     CLIController,
@@ -179,6 +180,7 @@ __all__ = [
     "pass_auction",
     "raise_bid",
     "register_ai_controller",
+    "StrategicAiController",
     "replace_plant_if_needed",
     "resolve_bureaucracy",
     "resolve_auction_round",
