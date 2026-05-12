@@ -27,7 +27,7 @@ def main() -> None:
             SeatConfig(
                 player_id=f"p{index + 1}",
                 name=f"Player {index + 1}",
-                controller="ai" if index < args.ai_players else "human",
+                controller="ai_deterministic" if index < args.ai_players else "human",
             )
             for index in range(args.players)
         )

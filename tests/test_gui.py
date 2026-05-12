@@ -89,6 +89,19 @@ class PowerGridGuiTests(unittest.TestCase):
         self.assertEqual(app.session.snapshot().state.config.players[0].controller, "ai_deterministic")
         self.assertIsInstance(app.session._seat_agents["p1"], DeterministicAiController)
 
+    def test_launcher_lists_ai_heuristics_as_primary_ai_version(self) -> None:
+        app = PowerGridApp(self.root)
+        app.pack(fill="both", expand=True)
+        app.launcher.seat_type_vars[0].set("ai")
+
+        self.root.update_idletasks()
+        self.root.update()
+
+        values = tuple(app.launcher.ai_version_boxes[0].cget("values"))
+        self.assertEqual(app.launcher.ai_version_vars[0].get(), "ai_heuristics")
+        self.assertEqual(values[:2], ("ai_heuristics", "ai_deterministic"))
+        self.assertNotIn("ai", values)
+
     def test_gui_ai_actions_are_not_auto_played_synchronously(self) -> None:
         app = PowerGridApp(self.root)
         app.ai_action_delay_ms = 60_000
@@ -96,9 +109,9 @@ class PowerGridGuiTests(unittest.TestCase):
         config = GameConfig(
             map_id="germany",
             players=(
-                SeatConfig("p1", "Player 1", controller="ai"),
-                SeatConfig("p2", "Player 2", controller="ai"),
-                SeatConfig("p3", "Player 3", controller="ai"),
+                SeatConfig("p1", "Player 1", controller="ai_heuristics"),
+                SeatConfig("p2", "Player 2", controller="ai_heuristics"),
+                SeatConfig("p3", "Player 3", controller="ai_heuristics"),
             ),
             seed=7,
         )
@@ -112,6 +125,7 @@ class PowerGridGuiTests(unittest.TestCase):
         snapshot = app.session.snapshot()
         self.assertFalse(snapshot.event_log)
         self.assertIsNotNone(snapshot.active_request)
+        self.assertEqual(app.shell.header.ai_control_var.get(), "Pause AI")
 
         app._advance_one_ai_action()
         self.root.update_idletasks()
@@ -120,6 +134,41 @@ class PowerGridGuiTests(unittest.TestCase):
         snapshot = app.session.snapshot()
         self.assertTrue(snapshot.event_log)
         self.assertIn("AI opened bidding", snapshot.event_log[-1].message)
+
+    def test_gui_pause_button_can_pause_and_resume_ai_progress(self) -> None:
+        app = PowerGridApp(self.root)
+        app.ai_action_delay_ms = 60_000
+        app.pack(fill="both", expand=True)
+        config = GameConfig(
+            map_id="germany",
+            players=(
+                SeatConfig("p1", "Player 1", controller="ai_heuristics"),
+                SeatConfig("p2", "Player 2", controller="ai_heuristics"),
+                SeatConfig("p3", "Player 3", controller="ai_heuristics"),
+            ),
+            seed=7,
+        )
+
+        app.start_new_game(config)
+        self.root.update_idletasks()
+        self.root.update()
+
+        self.assertIsNotNone(app._pending_auto_advance_id)
+        self.assertEqual(app.shell.header.ai_control_var.get(), "Pause AI")
+
+        app.toggle_ai_pause()
+        self.root.update_idletasks()
+        self.root.update()
+
+        self.assertIsNone(app._pending_auto_advance_id)
+        self.assertEqual(app.shell.header.ai_control_var.get(), "Resume AI")
+
+        app.toggle_ai_pause()
+        self.root.update_idletasks()
+        self.root.update()
+
+        self.assertIsNotNone(app._pending_auto_advance_id)
+        self.assertEqual(app.shell.header.ai_control_var.get(), "Pause AI")
 
     def test_shell_renders_multiple_phase_snapshots(self) -> None:
         app = PowerGridApp(self.root)

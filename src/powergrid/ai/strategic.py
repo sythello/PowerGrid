@@ -164,6 +164,8 @@ class _AuctionStartOption:
 
 
 class StrategicAiController(BaseAiController):
+    controller = "ai_heuristics"
+
     def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
         state = snapshot.state
         if state.pending_decision is not None:

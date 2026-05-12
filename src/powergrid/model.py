@@ -964,7 +964,7 @@ def make_default_seat_configs(player_count: int, ai_players: int = 0) -> tuple[S
         raise ModelValidationError("ai_players must be between 0 and player_count")
     seats = []
     for index in range(player_count):
-        controller = "ai" if index < ai_players else "human"
+        controller = "ai_deterministic" if index < ai_players else "human"
         seats.append(
             SeatConfig(
                 player_id=f"p{index + 1}",

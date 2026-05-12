@@ -9,8 +9,9 @@ from .strategic import StrategicAiController
 DeterministicAiSeat = DeterministicAiController
 
 AI_CONTROLLER_REGISTRY: dict[str, type[BaseAiController]] = {
-    "ai": StrategicAiController,
+    "ai_heuristics": StrategicAiController,
     "ai_deterministic": DeterministicAiController,
+    "ai": DeterministicAiController,
 }
 
 

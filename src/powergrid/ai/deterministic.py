@@ -14,6 +14,8 @@ from .base import BaseAiController
 
 
 class DeterministicAiController(BaseAiController):
+    controller = "ai_deterministic"
+
     def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
         state = snapshot.state
         if state.pending_decision is not None:

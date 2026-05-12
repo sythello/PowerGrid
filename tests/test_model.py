@@ -251,6 +251,9 @@ class ModelTests(unittest.TestCase):
             {player.player_id: player.turn_order_position for player in state.players},
             {"p1": 2, "p2": 3, "p3": 1},
         )
+        self.assertEqual(config.players[0].controller, "ai_deterministic")
+        self.assertEqual(config.players[1].controller, "human")
+        self.assertEqual(config.players[2].controller, "human")
 
     def test_prepare_plant_deck_three_players(self) -> None:
         deck = prepare_plant_deck(3, seed=7)

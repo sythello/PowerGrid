@@ -30,10 +30,16 @@ from powergrid.session_types import HumanSeat
 
 class AiFrameworkTests(unittest.TestCase):
     def test_build_ai_controller_returns_registered_base_ai_controller(self) -> None:
-        controller = build_ai_controller("ai")
+        controller = build_ai_controller("ai_heuristics")
 
         self.assertIsInstance(controller, BaseAiController)
         self.assertIsInstance(controller, StrategicAiController)
+
+    def test_generic_ai_alias_builds_deterministic_ai_controller(self) -> None:
+        controller = build_ai_controller("ai")
+
+        self.assertIsInstance(controller, BaseAiController)
+        self.assertIsInstance(controller, DeterministicAiController)
 
     def test_deterministic_ai_remains_available_via_fallback_alias(self) -> None:
         controller = build_ai_controller("ai_deterministic")
@@ -49,7 +55,7 @@ class AiFrameworkTests(unittest.TestCase):
         config = GameConfig(
             map_id="germany",
             players=(
-                SeatConfig("p1", "Player 1", controller="ai"),
+                SeatConfig("p1", "Player 1", controller="ai_heuristics"),
                 SeatConfig("p2", "Player 2", controller="human"),
                 SeatConfig("p3", "Player 3", controller="human"),
             ),

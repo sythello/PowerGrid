@@ -15,25 +15,54 @@ class SnapshotRenderable(ttk.Frame):
 
 
 class HeaderView(SnapshotRenderable):
-    def __init__(self, master) -> None:
+    def __init__(self, master, on_ai_pause_toggle=None) -> None:
         super().__init__(master, padding=(10, 8))
         self.status_var = tk.StringVar()
         self.summary_var = tk.StringVar()
-        ttk.Label(self, textvariable=self.status_var, font=("Helvetica", 16, "bold")).pack(
-            anchor="w"
+        self.ai_control_var = tk.StringVar(value="Pause AI")
+        self._on_ai_pause_toggle = on_ai_pause_toggle
+        self.columnconfigure(0, weight=1)
+        top_row = ttk.Frame(self)
+        top_row.grid(row=0, column=0, sticky="ew")
+        top_row.columnconfigure(0, weight=1)
+        ttk.Label(
+            top_row,
+            textvariable=self.status_var,
+            font=("Helvetica", 16, "bold"),
+        ).grid(row=0, column=0, sticky="w")
+        self.ai_control_button = ttk.Button(
+            top_row,
+            textvariable=self.ai_control_var,
+            command=self._handle_ai_pause_toggle,
+            width=12,
         )
-        ttk.Label(self, textvariable=self.summary_var).pack(anchor="w", pady=(4, 0))
+        ttk.Label(self, textvariable=self.summary_var).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-    def render(self, snapshot: GameSnapshot) -> None:
+    def render(
+        self,
+        snapshot: GameSnapshot,
+        *,
+        ai_control_label: str | None = None,
+        ai_control_visible: bool = False,
+    ) -> None:
         state = snapshot.state
         active = snapshot.active_request.player_id if snapshot.active_request is not None else "-"
         self.status_var.set(
             f"Round {state.round_number} | {state.phase.replace('_', ' ').title()} | Step {state.step}"
         )
+        if ai_control_visible and ai_control_label:
+            self.ai_control_var.set(ai_control_label)
+            self.ai_control_button.grid(row=0, column=1, sticky="e")
+        else:
+            self.ai_control_button.grid_remove()
         if snapshot.winner_result is not None:
             self.summary_var.set("Winner: " + ", ".join(snapshot.winner_result.winner_ids))
             return
         self.summary_var.set(f"Active player: {active}")
+
+    def _handle_ai_pause_toggle(self) -> None:
+        if self._on_ai_pause_toggle is not None:
+            self._on_ai_pause_toggle()
 
 
 class PlayerRail(SnapshotRenderable):

@@ -49,7 +49,7 @@ class GameSessionTests(unittest.TestCase):
         config = GameConfig(
             map_id="germany",
             players=(
-                SeatConfig("p1", "Player 1", controller="ai"),
+                SeatConfig("p1", "Player 1", controller="ai_heuristics"),
                 SeatConfig("p2", "Player 2", controller="human"),
                 SeatConfig("p3", "Player 3", controller="human"),
             ),
@@ -306,7 +306,10 @@ class GameSessionTests(unittest.TestCase):
             config = replace(
                 config,
                 players=tuple(
-                    replace(seat, controller="human" if index == player_count - 1 else "ai")
+                    replace(
+                        seat,
+                        controller="human" if index == player_count - 1 else "ai_heuristics",
+                    )
                     for index, seat in enumerate(config.players)
                 ),
             )

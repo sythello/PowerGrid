@@ -22,7 +22,7 @@ class LauncherFrame(ttk.Frame):
         self.map_var = tk.StringVar(value="germany")
         self.scenario_var = tk.StringVar(value=SCENARIO_NAMES[0])
         self.seat_type_vars = [tk.StringVar(value="human") for _ in range(6)]
-        self.ai_version_vars = [tk.StringVar(value="ai") for _ in range(6)]
+        self.ai_version_vars = [tk.StringVar(value="ai_heuristics") for _ in range(6)]
         self.ai_version_boxes: list[ttk.Combobox | None] = [None for _ in range(6)]
         self.ai_controller_names = _available_ai_controller_names()
         for seat_type_var in self.seat_type_vars:
@@ -140,11 +140,11 @@ class LauncherFrame(ttk.Frame):
 
 
 class GameShell(ttk.Frame):
-    def __init__(self, master, on_intent, *, board_render_mode: str = "drawn") -> None:
+    def __init__(self, master, on_intent, on_ai_pause_toggle, *, board_render_mode: str = "drawn") -> None:
         super().__init__(master, padding=8)
         self._last_snapshot: GameSnapshot | None = None
         self._current_panel_key = "auction"
-        self.header = HeaderView(self)
+        self.header = HeaderView(self, on_ai_pause_toggle)
         self.header.grid(row=0, column=0, columnspan=3, sticky="ew")
         self.player_rail = PlayerRail(self)
         self.player_rail.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
@@ -187,9 +187,19 @@ class GameShell(ttk.Frame):
         for panel in self.panels.values():
             panel.grid(row=0, column=0, sticky="nsew")
 
-    def render(self, snapshot: GameSnapshot) -> None:
+    def render(
+        self,
+        snapshot: GameSnapshot,
+        *,
+        ai_control_label: str | None = None,
+        ai_control_visible: bool = False,
+    ) -> None:
         self._last_snapshot = snapshot
-        self.header.render(snapshot)
+        self.header.render(
+            snapshot,
+            ai_control_label=ai_control_label,
+            ai_control_visible=ai_control_visible,
+        )
         self.player_rail.render(snapshot)
         for panel in self.panels.values():
             panel.grid_remove()
@@ -232,9 +242,15 @@ class PowerGridApp(ttk.Frame):
         self.board_render_mode = board_render_mode
         self.ai_action_delay_ms = 900
         self._pending_auto_advance_id: str | None = None
+        self._auto_advance_paused = False
         self.session: GameSession | None = None
         self.launcher = LauncherFrame(self, self.start_new_game, self.load_scenario)
-        self.shell = GameShell(self, self.dispatch_intent, board_render_mode=board_render_mode)
+        self.shell = GameShell(
+            self,
+            self.dispatch_intent,
+            self.toggle_ai_pause,
+            board_render_mode=board_render_mode,
+        )
         self.launcher.grid(row=0, column=0, sticky="nsew")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -243,17 +259,20 @@ class PowerGridApp(ttk.Frame):
 
     def show_launcher(self) -> None:
         self._cancel_auto_advance()
+        self._auto_advance_paused = False
         self.shell.grid_remove()
         self.launcher.grid()
         self.launcher.render()
 
     def start_new_game(self, config: GameConfig) -> None:
         self._cancel_auto_advance()
+        self._auto_advance_paused = False
         self.session = GameSession.new_game(config)
         self._render_session()
 
     def load_scenario(self, scenario_name: str, seed: int = 7) -> None:
         self._cancel_auto_advance()
+        self._auto_advance_paused = False
         self.session = GameSession.from_scenario(scenario_name, seed=seed)
         self._render_session()
 
@@ -261,6 +280,7 @@ class PowerGridApp(ttk.Frame):
         if self.session is None:
             return
         self._cancel_auto_advance()
+        self._auto_advance_paused = False
         self.session.submit_intent(intent, auto_advance=False)
         self._render_session()
 
@@ -268,12 +288,20 @@ class PowerGridApp(ttk.Frame):
         assert self.session is not None
         if snapshot is None:
             snapshot = self.session.snapshot()
+        auto_progress_needed = self._snapshot_needs_auto_progress(snapshot)
+        if not auto_progress_needed:
+            self._auto_advance_paused = False
+        ai_control_label, ai_control_visible = self._ai_control_state(auto_progress_needed)
         self.launcher.grid_remove()
         self.shell.grid()
-        self.shell.render(snapshot)
+        self.shell.render(
+            snapshot,
+            ai_control_label=ai_control_label,
+            ai_control_visible=ai_control_visible,
+        )
         if not schedule_auto:
             return
-        if not self._snapshot_needs_auto_progress(snapshot):
+        if not auto_progress_needed or self._auto_advance_paused:
             return
         delay_ms = self.ai_action_delay_ms if snapshot.active_request is not None else 1
         self._schedule_auto_advance(delay_ms)
@@ -298,6 +326,22 @@ class PowerGridApp(ttk.Frame):
         delay_ms = self.ai_action_delay_ms if action_applied else 1
         self._schedule_auto_advance(delay_ms)
 
+    def toggle_ai_pause(self) -> None:
+        if self.session is None:
+            return
+        snapshot = self.session.snapshot()
+        if not self._snapshot_needs_auto_progress(snapshot):
+            return
+        if self._auto_advance_paused:
+            self._auto_advance_paused = False
+            self._render_session(snapshot, schedule_auto=False)
+            delay_ms = self.ai_action_delay_ms if snapshot.active_request is not None else 1
+            self._schedule_auto_advance(delay_ms)
+            return
+        self._auto_advance_paused = True
+        self._cancel_auto_advance()
+        self._render_session(snapshot, schedule_auto=False)
+
     def _snapshot_needs_auto_progress(self, snapshot: GameSnapshot) -> bool:
         if self.session is None or snapshot.winner_result is not None:
             return False
@@ -307,6 +351,13 @@ class PowerGridApp(ttk.Frame):
             player for player in snapshot.state.players if player.player_id == snapshot.active_request.player_id
         )
         return active_player.controller != "human"
+
+    def _ai_control_state(self, auto_progress_needed: bool) -> tuple[str | None, bool]:
+        if not auto_progress_needed:
+            return None, False
+        if self._auto_advance_paused:
+            return "Resume AI", True
+        return "Pause AI", True
 
 
 def create_root() -> tk.Tk:
@@ -324,8 +375,7 @@ def launch_app(*, board_render_mode: str = "drawn") -> PowerGridApp:
 
 
 def _available_ai_controller_names() -> tuple[str, ...]:
-    names = tuple(AI_CONTROLLER_REGISTRY)
-    others = tuple(sorted(name for name in names if name != "ai"))
-    if "ai" in names:
-        return ("ai", *others)
-    return others
+    names = tuple(name for name in AI_CONTROLLER_REGISTRY if name != "ai")
+    preferred = tuple(name for name in ("ai_heuristics", "ai_deterministic") if name in names)
+    others = tuple(sorted(name for name in names if name not in preferred))
+    return (*preferred, *others)
