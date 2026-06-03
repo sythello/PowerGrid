@@ -11,6 +11,7 @@ Whenever an agent changes any of the following, it should also update this docum
 - controller names, aliases, or defaults
 - registry wiring
 - session/controller integration behavior
+- AI logging or analysis interfaces
 - major AI decision logic
 - heuristic evaluation dimensions
 - search depth or search structure
@@ -41,6 +42,7 @@ The AI layer is intentionally small at the public seam:
   - `GameSession.default_seat_agents()` resolves non-human controllers through `build_ai_controller(...)`
   - `advance_one_ai_action()` and `advance_until_blocked()` call `choose_intent(...)`
   - The AI layer does not mutate session state directly; it only returns intents
+  - `GameSnapshot.analysis_log` exposes an AI-safe structured logging hook for diagnostics
 
 This means the core contract is:
 
@@ -55,6 +57,53 @@ This means the core contract is:
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py): registry and controller construction
+
+## AI Logging And Game Logs
+
+The game engine now has two separate logging layers:
+
+- `event_log`
+  - lightweight user-facing session transcript
+  - used by the GUI and simple status views
+- structured `game_log`
+  - analysis-oriented JSON log maintained by `GameSession`
+  - compact format: static map/rules/player metadata is stored once at the top level, while per-entry `state_snapshot` payloads only contain dynamic state
+  - available through:
+    - `GameSession.game_log_entries()`
+    - `GameSession.game_log_payload()`
+    - `GameSession.dump_game_log(path)`
+
+Current structured game-log behavior:
+
+- session start is logged
+- automatic phase transitions like setup/determine-order advancement are logged
+- applied intents and intent errors are logged with structured payloads
+- bureaucracy summaries are logged
+- AI custom diagnostic entries can be appended during `choose_intent(...)`
+- full AI-vs-AI runs can be dumped from the CLI with:
+  - `PYTHONPATH=src python -m powergrid.tools.run_ai_game --controllers ai_deterministic ai_heuristics ai_deterministic`
+
+AI-facing interface:
+
+- `GameSnapshot.analysis_log`
+  - exposes:
+    - `record(...)`
+    - `record_state(...)`
+- `BaseAiController`
+  - exposes convenience helpers:
+    - `log_message(...)`
+    - `log_state(...)`
+
+Recommended usage inside controllers:
+
+- log compact, decision-relevant state only
+- prefer JSON-serializable payloads
+- use `log_state(...)` for search summaries, candidate rankings, reserve calculations, chosen plans, or other custom reasoning state
+- do not log huge cloned states unless they are genuinely needed for later analysis
+
+Current shipped AIs:
+
+- both deterministic and heuristic controllers emit one structured AI decision log entry per chosen intent
 
 ## Current Controller Behavior
 
@@ -336,6 +385,7 @@ Current AI tests already cover:
 - final-round bureaucracy behavior
 - AI-vs-AI smoke completion
 - Elo evaluation helpers, reporting, and CLI output
+- custom AI state logging and structured game-log dumping
 
 When changing behavior, extend [../../../tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py) first.
 
@@ -373,5 +423,5 @@ PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation tests.t
 If the change is isolated to AI logic, start with:
 
 ```bash
-PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation -q
+PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation tests.test_session -q
 ```

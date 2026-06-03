@@ -19,19 +19,44 @@ class DeterministicAiController(BaseAiController):
     def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
         state = snapshot.state
         if state.pending_decision is not None:
-            return _choose_pending_intent(state)
+            intent = _choose_pending_intent(state)
+            self._log_decision(snapshot, request, intent)
+            return intent
         if request.phase == "auction":
-            return _choose_auction_intent(request)
+            intent = _choose_auction_intent(request)
+            self._log_decision(snapshot, request, intent)
+            return intent
         if request.phase == "buy_resources":
-            return _choose_resource_intent(state, request.player_id)
+            intent = _choose_resource_intent(state, request.player_id)
+            self._log_decision(snapshot, request, intent)
+            return intent
         if request.phase == "build_houses":
-            return _choose_build_intent(state, request.player_id)
+            intent = _choose_build_intent(state, request.player_id)
+            self._log_decision(snapshot, request, intent)
+            return intent
         if request.phase == "bureaucracy":
             plans = _choose_best_generation_plans(state, request.player_id)
             if plans:
-                return GuiIntent.run_plants(request.player_id, plans)
-            return GuiIntent.skip_bureaucracy(request.player_id)
+                intent = GuiIntent.run_plants(request.player_id, plans)
+                self._log_decision(snapshot, request, intent)
+                return intent
+            intent = GuiIntent.skip_bureaucracy(request.player_id)
+            self._log_decision(snapshot, request, intent)
+            return intent
         raise ModelValidationError(f"unsupported request phase {request.phase!r}")
+
+    def _log_decision(self, snapshot: GameSnapshot, request: TurnRequest, intent: GuiIntent) -> None:
+        self.log_state(
+            snapshot,
+            request,
+            label="deterministic_decision",
+            state={
+                "decision_type": request.decision_type,
+                "intent_type": intent.intent_type,
+                "intent_payload": dict(intent.payload),
+            },
+            message="Deterministic AI selected an intent.",
+        )
 
 
 def _get_player(state: GameState, player_id: str):

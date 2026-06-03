@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from .ai import BaseAiController, DeterministicAiController, build_ai_controller
 from .model import (
     Action,
+    BureaucracySummary,
     GameConfig,
     GameState,
     ModelValidationError,
+    PowerPlantCard,
     PlantRunPlan,
+    ResourceMarket,
+    ResourceStorage,
+    AuctionState,
+    DecisionRequest,
+    PlayerState,
     advance_phase,
     apply_builds,
     build_city,
@@ -26,8 +36,11 @@ from .model import (
     start_auction,
     WinnerResult,
 )
+from .rules_data import load_power_plants
 from .scenarios import build_game_scenario
 from .session_types import (
+    AnalysisLogWriter,
+    GameLogEntry,
     GameSnapshot,
     GuiIntent,
     HumanSeat,
@@ -55,12 +68,28 @@ class GameSession:
         self._state = state
         self._seat_agents = dict(seat_agents)
         self._event_log: list[SessionEvent] = []
+        self._game_log: list[GameLogEntry] = []
+        self._static_log_data = _build_static_log_data(state)
         self._last_round_summary = None
+        self._round_summaries: list[BureaucracySummary] = []
         self._winner_result: WinnerResult | None = None
         self._phase_marker: tuple[int, str, int] | None = None
         self._active_index = 0
         self._bureaucracy_choices: dict[str, tuple[PlantRunPlan, ...]] = {}
         self._sync_phase_cursor()
+        self._append_game_log(
+            source="session",
+            event_type="session_start",
+            level="info",
+            message="Game session created.",
+            payload={
+                "map_id": self._state.game_map.id,
+                "player_count": len(self._state.players),
+                "resolved_selected_regions": list(self._state.selected_regions),
+            },
+            state=self._state,
+            include_state_snapshot=True,
+        )
 
     @classmethod
     def new_game(
@@ -91,6 +120,7 @@ class GameSession:
             event_log=tuple(self._event_log),
             last_round_summary=self._last_round_summary,
             winner_result=self._winner_result,
+            analysis_log=self._make_analysis_log_writer(),
         )
 
     def current_request(self) -> TurnRequest | None:
@@ -166,7 +196,24 @@ class GameSession:
         while True:
             self._sync_phase_cursor()
             if self._state.phase in {"setup", "determine_order"}:
+                before_state = self._state
                 self._state = advance_phase(self._state)
+                self._append_game_log(
+                    source="session",
+                    event_type="phase_transition",
+                    level="info",
+                    message=f"Automatically advanced from {before_state.phase} to {self._state.phase}.",
+                    payload={
+                        "from_phase": before_state.phase,
+                        "to_phase": self._state.phase,
+                        "from_round_number": before_state.round_number,
+                        "to_round_number": self._state.round_number,
+                        "from_step": before_state.step,
+                        "to_step": self._state.step,
+                    },
+                    state=self._state,
+                    include_state_snapshot=True,
+                )
                 self._sync_phase_cursor(force_reset=True)
                 continue
             if self._winner_result is not None:
@@ -185,7 +232,7 @@ class GameSession:
     def submit_intent(self, intent: GuiIntent, *, auto_advance: bool = True) -> GameSnapshot:
         self._apply_and_log(intent, auto_generated=False)
         if not auto_advance:
-                return self.snapshot()
+            return self.snapshot()
         return self.advance_until_blocked()
 
     def _apply_and_log(self, intent: GuiIntent, *, auto_generated: bool) -> bool:
@@ -202,22 +249,32 @@ class GameSession:
             self._last_round_summary = before_summary
             self._winner_result = before_winner
             self._bureaucracy_choices = before_choices
-            self._event_log.append(
-                SessionEvent(
-                    level="error",
-                    message=str(exc),
-                    player_id=intent.player_id,
-                    phase=before_state.phase,
-                )
-            )
-            return False
-        self._event_log.append(
-            SessionEvent(
-                level="info",
-                message=_describe_intent(before_state, self._state, intent, auto_generated=auto_generated),
+            self._append_session_event(
+                level="error",
+                message=str(exc),
                 player_id=intent.player_id,
                 phase=before_state.phase,
+                state=before_state,
+                event_type="intent_error",
+                payload={
+                    "auto_generated": auto_generated,
+                    "intent": _serialize_intent(intent),
+                },
+                include_state_snapshot=True,
             )
+            return False
+        self._append_session_event(
+            level="info",
+            message=_describe_intent(before_state, self._state, intent, auto_generated=auto_generated),
+            player_id=intent.player_id,
+            phase=before_state.phase,
+            state=self._state,
+            event_type="intent_applied",
+            payload={
+                "auto_generated": auto_generated,
+                "intent": _serialize_intent(intent),
+            },
+            include_state_snapshot=True,
         )
         return True
 
@@ -312,16 +369,20 @@ class GameSession:
             player_before = _get_player(quoted, intent.player_id)
             quoted = apply_builds(quoted, intent.player_id, city_ids)
             player_after = _get_player(quoted, intent.player_id)
-            self._event_log.append(
-                SessionEvent(
-                    level="info",
-                    message=(
-                        f"Quote for {intent.player_id}: cost={player_before.elektro - player_after.elektro} "
-                        f"cities={', '.join(city_ids)}"
-                    ),
-                    player_id=intent.player_id,
-                    phase=self._state.phase,
-                )
+            self._append_session_event(
+                level="info",
+                message=(
+                    f"Quote for {intent.player_id}: cost={player_before.elektro - player_after.elektro} "
+                    f"cities={', '.join(city_ids)}"
+                ),
+                player_id=intent.player_id,
+                phase=self._state.phase,
+                state=self._state,
+                event_type="build_quote",
+                payload={
+                    "city_ids": list(city_ids),
+                    "quoted_cost": player_before.elektro - player_after.elektro,
+                },
             )
             return
         if intent.intent_type == "commit_build":
@@ -348,16 +409,21 @@ class GameSession:
             validated = choose_plants_to_run(self._state, intent.player_id, plans)
             self._bureaucracy_choices[intent.player_id] = validated
             powered = compute_powered_cities(self._state, intent.player_id, validated)
-            self._event_log.append(
-                SessionEvent(
-                    level="info",
-                    message=(
-                        f"{intent.player_id} will power {powered} cities and receive "
-                        f"{pay_income(self._state.rules, powered)} Elektro."
-                    ),
-                    player_id=intent.player_id,
-                    phase=self._state.phase,
-                )
+            self._append_session_event(
+                level="info",
+                message=(
+                    f"{intent.player_id} will power {powered} cities and receive "
+                    f"{pay_income(self._state.rules, powered)} Elektro."
+                ),
+                player_id=intent.player_id,
+                phase=self._state.phase,
+                state=self._state,
+                event_type="bureaucracy_plan",
+                payload={
+                    "plans": [plan.to_dict() for plan in validated],
+                    "powered_cities": powered,
+                    "income": pay_income(self._state.rules, powered),
+                },
             )
         else:
             raise ModelValidationError("unsupported bureaucracy intent")
@@ -368,7 +434,21 @@ class GameSession:
             self._state,
             generation_choices=dict(self._bureaucracy_choices),
         )
+        self._round_summaries.append(self._last_round_summary)
         self._winner_result = self._last_round_summary.winner_result
+        self._append_game_log(
+            source="session",
+            event_type="round_summary",
+            level="info",
+            message=(
+                f"Resolved bureaucracy for round {self._state.round_number}."
+                if self._winner_result is None
+                else "Resolved final bureaucracy and winner."
+            ),
+            payload=self._last_round_summary.to_dict(),
+            state=self._state,
+            include_state_snapshot=True,
+        )
         self._sync_phase_cursor(force_reset=True)
 
     def _sync_phase_cursor(self, *, force_reset: bool = False) -> None:
@@ -384,6 +464,135 @@ class GameSession:
             raise ModelValidationError("player order may not be empty")
         bounded_index = min(self._active_index, len(ordered) - 1)
         return ordered[bounded_index]
+
+    def game_log_entries(self) -> tuple[GameLogEntry, ...]:
+        return tuple(self._game_log)
+
+    def game_log_payload(self) -> dict[str, object]:
+        active_request = self.current_request()
+        return {
+            "format_version": 2,
+            "state_snapshot_format": "compact_v1",
+            "config": self._state.config.to_dict(),
+            "static_data": dict(self._static_log_data),
+            "final_state": _serialize_compact_state_snapshot(self._state),
+            "current_state": _serialize_compact_state_snapshot(self._state),
+            "active_request": (
+                _serialize_turn_request_compact(active_request) if active_request is not None else None
+            ),
+            "winner_result": self._winner_result.to_dict() if self._winner_result is not None else None,
+            "last_round_summary": (
+                self._last_round_summary.to_dict() if self._last_round_summary is not None else None
+            ),
+            "round_summaries": [summary.to_dict() for summary in self._round_summaries],
+            "event_log": [event.to_dict() for event in self._event_log],
+            "game_log": [entry.to_dict() for entry in self._game_log],
+        }
+
+    def dump_game_log(self, path: str | Path) -> Path:
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as handle:
+            json.dump(self.game_log_payload(), handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        return output_path
+
+    def _make_analysis_log_writer(self) -> AnalysisLogWriter:
+        return AnalysisLogWriter(self._record_ai_analysis_log)
+
+    def _record_ai_analysis_log(
+        self,
+        *,
+        source: str,
+        event_type: str,
+        level: str,
+        message: str,
+        player_id: str | None,
+        phase: str | None,
+        payload: dict[str, object],
+        include_state_snapshot: bool,
+    ) -> None:
+        self._append_game_log(
+            source=source,
+            event_type=event_type,
+            level=level,
+            message=message,
+                player_id=player_id,
+                phase=phase,
+                payload=payload,
+                state=self._state,
+                include_state_snapshot=include_state_snapshot,
+        )
+
+    def _append_session_event(
+        self,
+        *,
+        level: str,
+        message: str,
+        player_id: str | None = None,
+        phase: str | None = None,
+        state: GameState | None = None,
+        event_type: str = "session_event",
+        payload: dict[str, object] | None = None,
+        include_state_snapshot: bool = False,
+    ) -> None:
+        reference_state = state or self._state
+        event = SessionEvent(
+            level=level,
+            message=message,
+            player_id=player_id,
+            phase=phase if phase is not None else reference_state.phase,
+            event_type=event_type,
+            round_number=reference_state.round_number,
+            step=reference_state.step,
+            payload=dict(payload or {}),
+        )
+        self._event_log.append(event)
+        self._append_game_log(
+            source="session",
+            event_type=event.event_type,
+            level=event.level,
+            message=event.message,
+                player_id=event.player_id,
+                phase=event.phase,
+                payload=event.payload,
+                state=reference_state,
+                include_state_snapshot=include_state_snapshot,
+        )
+
+    def _append_game_log(
+        self,
+        *,
+        source: str,
+        event_type: str,
+        level: str,
+        message: str,
+        player_id: str | None = None,
+        phase: str | None = None,
+        payload: dict[str, object] | None = None,
+        state: GameState | None = None,
+        include_state_snapshot: bool = False,
+    ) -> None:
+        reference_state = state or self._state
+        self._game_log.append(
+            GameLogEntry(
+                index=len(self._game_log),
+                source=source,
+                event_type=event_type,
+                level=level,
+                message=message,
+                player_id=player_id,
+                phase=phase if phase is not None else reference_state.phase,
+                round_number=reference_state.round_number,
+                step=reference_state.step,
+                payload=dict(payload or {}),
+                state_snapshot=(
+                    _serialize_compact_state_snapshot(reference_state)
+                    if include_state_snapshot
+                    else None
+                ),
+            )
+        )
 
 
 def default_seat_agents(config: GameConfig) -> dict[str, SeatAgent]:
@@ -590,3 +799,179 @@ def _city_labels(state: GameState, city_ids) -> list[str]:
         city_key = str(city_id)
         labels.append(names.get(city_key, city_key))
     return labels
+
+
+def _serialize_intent(intent: GuiIntent) -> dict[str, object]:
+    return intent.to_dict()
+
+
+def _build_static_log_data(state: GameState) -> dict[str, object]:
+    return {
+        "game_map": _serialize_game_map_for_log(state),
+        "rules": _serialize_rules_for_log(state),
+        "resolved_selected_regions": list(state.selected_regions),
+        "players": [
+            {
+                "player_id": player.player_id,
+                "name": player.name,
+                "controller": player.controller,
+                "color": player.color,
+            }
+            for player in state.players
+        ],
+        "power_plant_catalog": _serialize_power_plant_catalog(),
+    }
+
+
+def _serialize_power_plant_catalog() -> dict[str, dict[str, object]]:
+    catalog = {
+        str(definition.price): {
+            "price": definition.price,
+            "resource_types": list(definition.resource_types),
+            "resource_cost": definition.resource_cost,
+            "output_cities": definition.output_cities,
+            "deck_back": definition.deck_back,
+            "is_hybrid": definition.is_hybrid,
+            "is_ecological": definition.is_ecological,
+        }
+        for definition in load_power_plants()
+    }
+    placeholder = PowerPlantCard.step_3_placeholder()
+    catalog[str(placeholder.price)] = placeholder.to_dict()
+    return catalog
+
+
+def _serialize_game_map_for_log(state: GameState) -> dict[str, object]:
+    return {
+        "id": state.game_map.id,
+        "name": state.game_map.name,
+        "regions": [
+            {"id": region.id, "label": region.label, "color": region.color}
+            for region in state.game_map.regions
+        ],
+        "cities": [
+            {"id": city.id, "name": city.name, "region": city.region}
+            for city in state.game_map.cities
+        ],
+        "connections": [
+            {"city_1": connection.city_1, "city_2": connection.city_2, "cost": connection.cost}
+            for connection in state.game_map.connections
+        ],
+        "region_adjacency": {
+            region: list(neighbors) for region, neighbors in state.game_map.region_adjacency.items()
+        },
+        "special_rules": list(state.game_map.special_rules),
+    }
+
+
+def _serialize_rules_for_log(state: GameState) -> dict[str, object]:
+    return {
+        "starting_money": state.rules.starting_money,
+        "houses_per_player": state.rules.houses_per_player,
+        "resource_supply": dict(state.rules.resource_supply),
+        "resource_market_tracks": state.rules.resource_market_tracks,
+        "payment_schedule": {
+            str(key): value for key, value in state.rules.payment_schedule.items()
+        },
+        "player_count_rules": {
+            str(key): value for key, value in state.rules.player_count_rules.items()
+        },
+        "setup": state.rules.setup,
+    }
+
+
+def _serialize_compact_state_snapshot(state: GameState) -> dict[str, object]:
+    return {
+        "players": [_serialize_player_state_compact(player) for player in state.players],
+        "player_order": list(state.player_order),
+        "resource_market": _serialize_resource_market_compact(state.resource_market),
+        "current_market_prices": [plant.price for plant in state.current_market],
+        "future_market_prices": [plant.price for plant in state.future_market],
+        "power_plant_draw_stack_prices": [plant.price for plant in state.power_plant_draw_stack],
+        "power_plant_bottom_stack_prices": [plant.price for plant in state.power_plant_bottom_stack],
+        "step_3_card_pending": state.step_3_card_pending,
+        "auction_step_3_pending": state.auction_step_3_pending,
+        "round_number": state.round_number,
+        "step": state.step,
+        "phase": state.phase,
+        "auction_state": _serialize_auction_state_compact(state.auction_state),
+        "pending_decision": _serialize_decision_request_compact(state.pending_decision),
+        "last_powered_cities": dict(state.last_powered_cities),
+        "last_income_paid": dict(state.last_income_paid),
+    }
+
+
+def _serialize_player_state_compact(player: PlayerState) -> dict[str, object]:
+    return {
+        "player_id": player.player_id,
+        "elektro": player.elektro,
+        "houses_in_supply": player.houses_in_supply,
+        "network_city_ids": list(player.network_city_ids),
+        "power_plant_prices": [plant.price for plant in player.power_plants],
+        "resource_storage": _serialize_resource_storage_compact(player.resource_storage),
+        "turn_order_position": player.turn_order_position,
+    }
+
+
+def _serialize_resource_storage_compact(storage: ResourceStorage) -> dict[str, int]:
+    values = storage.to_dict()
+    return {name: amount for name, amount in values.items() if amount}
+
+
+def _serialize_resource_market_compact(resource_market: ResourceMarket) -> dict[str, object]:
+    return {
+        "market": {
+            resource: {
+                str(price): amount
+                for price, amount in price_bands.items()
+                if amount
+            }
+            for resource, price_bands in resource_market.market.items()
+        },
+        "supply": dict(resource_market.supply),
+    }
+
+
+def _serialize_auction_state_compact(auction_state: AuctionState | None) -> dict[str, object] | None:
+    if auction_state is None:
+        return None
+    return auction_state.to_dict()
+
+
+def _serialize_decision_request_compact(
+    decision: DecisionRequest | None,
+) -> dict[str, object] | None:
+    if decision is None:
+        return None
+    return {
+        "player_id": decision.player_id,
+        "decision_type": decision.decision_type,
+        "prompt": decision.prompt,
+        "legal_actions": [
+            _serialize_action_compact(action)
+            for action in decision.legal_actions
+        ],
+        "metadata": dict(decision.metadata),
+    }
+
+
+def _serialize_turn_request_compact(request: TurnRequest) -> dict[str, object]:
+    return {
+        "player_id": request.player_id,
+        "phase": request.phase,
+        "decision_type": request.decision_type,
+        "prompt": request.prompt,
+        "legal_actions": [_serialize_action_compact(action) for action in request.legal_actions],
+        "metadata": dict(request.metadata),
+    }
+
+
+def _serialize_action_compact(action: Action) -> dict[str, object]:
+    payload = dict(action.payload)
+    if action.action_type == "run_plant" and "plant_price" in payload:
+        payload = {"plant_price": int(payload["plant_price"])}
+    return {
+        "action_type": action.action_type,
+        "player_id": action.player_id,
+        "payload": payload,
+    }

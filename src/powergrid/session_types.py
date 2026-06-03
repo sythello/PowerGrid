@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from .model import Action, GameState, ModelValidationError, PlantRunPlan, WinnerResult
 
@@ -18,6 +18,13 @@ class GuiIntent:
         if not self.player_id:
             raise ModelValidationError("player_id must be non-empty")
         object.__setattr__(self, "payload", dict(self.payload))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "intent_type": self.intent_type,
+            "player_id": self.player_id,
+            "payload": dict(self.payload),
+        }
 
     @classmethod
     def auction_start(cls, player_id: str, plant_price: int, bid: int) -> "GuiIntent":
@@ -113,6 +120,16 @@ class TurnRequest:
         object.__setattr__(self, "legal_actions", tuple(self.legal_actions))
         object.__setattr__(self, "metadata", dict(self.metadata))
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "player_id": self.player_id,
+            "phase": self.phase,
+            "decision_type": self.decision_type,
+            "prompt": self.prompt,
+            "legal_actions": [action.to_dict() for action in self.legal_actions],
+            "metadata": dict(self.metadata),
+        }
+
 
 @dataclass(frozen=True)
 class SessionEvent:
@@ -120,6 +137,120 @@ class SessionEvent:
     message: str
     player_id: str | None = None
     phase: str | None = None
+    event_type: str = "session_event"
+    round_number: int | None = None
+    step: int | None = None
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "payload", dict(self.payload))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "level": self.level,
+            "message": self.message,
+            "player_id": self.player_id,
+            "phase": self.phase,
+            "event_type": self.event_type,
+            "round_number": self.round_number,
+            "step": self.step,
+            "payload": dict(self.payload),
+        }
+
+
+@dataclass(frozen=True)
+class GameLogEntry:
+    index: int
+    source: str
+    event_type: str
+    level: str
+    message: str
+    player_id: str | None = None
+    phase: str | None = None
+    round_number: int | None = None
+    step: int | None = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    state_snapshot: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "payload", dict(self.payload))
+        object.__setattr__(
+            self,
+            "state_snapshot",
+            dict(self.state_snapshot) if self.state_snapshot is not None else None,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "source": self.source,
+            "event_type": self.event_type,
+            "level": self.level,
+            "message": self.message,
+            "player_id": self.player_id,
+            "phase": self.phase,
+            "round_number": self.round_number,
+            "step": self.step,
+            "payload": dict(self.payload),
+            "state_snapshot": dict(self.state_snapshot) if self.state_snapshot is not None else None,
+        }
+
+
+class AnalysisLogWriter:
+    def __init__(
+        self,
+        emit_fn: Callable[..., None] | None = None,
+    ) -> None:
+        self._emit_fn = emit_fn
+
+    def record(
+        self,
+        *,
+        message: str,
+        payload: dict[str, Any] | None = None,
+        player_id: str | None = None,
+        phase: str | None = None,
+        event_type: str = "analysis",
+        level: str = "info",
+        include_state_snapshot: bool = False,
+    ) -> None:
+        if self._emit_fn is None:
+            return
+        self._emit_fn(
+            source="ai",
+            event_type=event_type,
+            level=level,
+            message=message,
+            player_id=player_id,
+            phase=phase,
+            payload=dict(payload or {}),
+            include_state_snapshot=include_state_snapshot,
+        )
+
+    def record_state(
+        self,
+        *,
+        label: str,
+        state: dict[str, Any] | None = None,
+        player_id: str | None = None,
+        phase: str | None = None,
+        controller: str | None = None,
+        message: str | None = None,
+        level: str = "debug",
+        include_state_snapshot: bool = False,
+    ) -> None:
+        payload = {"label": label, "state": dict(state or {})}
+        if controller is not None:
+            payload["controller"] = controller
+        self.record(
+            message=message or f"AI state: {label}",
+            payload=payload,
+            player_id=player_id,
+            phase=phase,
+            event_type="ai_state",
+            level=level,
+            include_state_snapshot=include_state_snapshot,
+        )
 
 
 @dataclass(frozen=True)
@@ -129,6 +260,7 @@ class GameSnapshot:
     event_log: tuple[SessionEvent, ...]
     last_round_summary: Any | None = None
     winner_result: WinnerResult | None = None
+    analysis_log: AnalysisLogWriter | None = None
 
 
 class SeatAgent:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
+from tempfile import TemporaryDirectory
 import unittest
 
+from powergrid.ai import BaseAiController
 from powergrid.model import (
     Action,
     add_power_plant_to_player,
@@ -31,6 +34,27 @@ def _human_seats(state: GameState) -> dict[str, HumanSeat]:
 
 def _player(state: GameState, player_id: str):
     return next(player for player in state.players if player.player_id == player_id)
+
+
+class _LoggingAiSeat(BaseAiController):
+    controller = "ai_heuristics"
+
+    def choose_intent(self, request, snapshot):
+        self.log_state(
+            snapshot,
+            request,
+            label="custom_test_state",
+            state={"marker": "seen_request", "legal_action_count": len(request.legal_actions)},
+            message="Custom AI trace emitted.",
+        )
+        action = request.legal_actions[0]
+        if action.action_type == "auction_start":
+            return GuiIntent.auction_start(
+                request.player_id,
+                int(action.payload["plant_price"]),
+                int(action.payload["min_bid"]),
+            )
+        raise AssertionError(f"unexpected test action type {action.action_type}")
 
 
 class GameSessionTests(unittest.TestCase):
@@ -238,6 +262,73 @@ class GameSessionTests(unittest.TestCase):
             snapshot.event_log[-1].message,
             "Opened bidding for plant 6 at 1 Elektro.",
         )
+
+    def test_ai_can_dump_custom_state_into_game_log(self) -> None:
+        config = GameConfig(
+            map_id="germany",
+            players=(
+                SeatConfig("p1", "Player 1", controller="human"),
+                SeatConfig("p2", "Player 2", controller="human"),
+                SeatConfig("p3", "Player 3", controller="ai_heuristics"),
+            ),
+            seed=7,
+        )
+        session = GameSession.new_game(
+            config,
+            seat_agents={
+                "p1": HumanSeat(),
+                "p2": HumanSeat(),
+                "p3": _LoggingAiSeat(),
+            },
+        )
+
+        snapshot, action_applied = session.advance_one_ai_action()
+
+        self.assertTrue(action_applied)
+        self.assertTrue(all(event.event_type != "ai_state" for event in snapshot.event_log))
+        ai_entries = [entry for entry in session.game_log_entries() if entry.source == "ai"]
+        self.assertTrue(ai_entries)
+        self.assertEqual(ai_entries[-1].event_type, "ai_state")
+        self.assertEqual(ai_entries[-1].payload["label"], "custom_test_state")
+        self.assertEqual(ai_entries[-1].payload["state"]["marker"], "seen_request")
+
+    def test_dump_game_log_writes_structured_json(self) -> None:
+        session = GameSession.from_scenario("opening", seed=7)
+        session.submit_intent(GuiIntent.auction_start("p3", plant_price=6, bid=1), auto_advance=False)
+
+        with TemporaryDirectory() as tempdir:
+            output_path = session.dump_game_log(f"{tempdir}/game_log.json")
+            with output_path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+
+        self.assertEqual(payload["config"]["map_id"], "germany")
+        self.assertEqual(payload["format_version"], 2)
+        self.assertEqual(payload["state_snapshot_format"], "compact_v1")
+        self.assertIn("static_data", payload)
+        self.assertIn("final_state", payload)
+        self.assertIn("event_log", payload)
+        self.assertIn("game_log", payload)
+        self.assertTrue(payload["event_log"])
+        self.assertTrue(payload["game_log"])
+        self.assertIn("game_map", payload["static_data"])
+        self.assertIn("rules", payload["static_data"])
+        self.assertIn("power_plant_catalog", payload["static_data"])
+        self.assertIn("resolved_selected_regions", payload["static_data"])
+        self.assertNotIn("game_map", payload["current_state"])
+        self.assertNotIn("rules", payload["current_state"])
+        self.assertNotIn("config", payload["current_state"])
+        self.assertEqual(payload["game_log"][0]["event_type"], "session_start")
+        self.assertEqual(payload["game_log"][-1]["event_type"], "intent_applied")
+        self.assertEqual(payload["game_log"][-1]["payload"]["intent"]["intent_type"], "auction_start")
+        state_snapshots = [
+            entry["state_snapshot"]
+            for entry in payload["game_log"]
+            if entry["state_snapshot"] is not None
+        ]
+        self.assertTrue(state_snapshots)
+        self.assertTrue(all("game_map" not in snapshot for snapshot in state_snapshots))
+        self.assertTrue(all("rules" not in snapshot for snapshot in state_snapshots))
+        self.assertTrue(all("config" not in snapshot for snapshot in state_snapshots))
 
     def test_build_phase_quote_is_non_mutating_and_commit_build_updates_state(self) -> None:
         session = GameSession.from_scenario("build_test", seed=7)

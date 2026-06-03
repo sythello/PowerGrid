@@ -87,6 +87,8 @@ from .rules_data import (
 )
 from .scenarios import SCENARIO_NAMES, build_game_scenario
 from .session_types import (
+    AnalysisLogWriter,
+    GameLogEntry,
     GameSnapshot,
     GuiIntent,
     HumanSeat,
@@ -106,6 +108,7 @@ __all__ = [
     "apply_builds",
     "advance_phase",
     "advance_round",
+    "AnalysisLogWriter",
     "BaseAiController",
     "build_ai_controller",
     "AuctionState",
@@ -131,6 +134,7 @@ __all__ = [
     "DeterministicAiSeat",
     "DecisionRequest",
     "GameConfig",
+    "GameLogEntry",
     "GameSession",
     "GameSnapshot",
     "GameRunResult",
