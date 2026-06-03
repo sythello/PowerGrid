@@ -1,0 +1,2201 @@
+{
+  "algorithm": {
+    "draw_rule": "equal powered_cities/money/connected_cities is treated as a draw",
+    "name": "pairwise_elo",
+    "pair_k_formula": "base_k / (distinct_controller_count - 1)",
+    "rating_scale": 400.0
+  },
+  "bucket": {
+    "controller_names": [
+      "ai_deterministic",
+      "ai_heuristics"
+    ],
+    "games_per_lineup": 20,
+    "initial_rating": 1500.0,
+    "k_factor": 24.0,
+    "map_id": "germany",
+    "player_count": 3,
+    "resolved_selected_regions": [
+      "black",
+      "blue",
+      "magenta"
+    ],
+    "seed_start": 1,
+    "selected_regions": []
+  },
+  "controller_pairs": [
+    {
+      "actual_score_average_for_a": 0.8,
+      "actual_score_total_for_a": 32.0,
+      "controller_a": "ai_deterministic",
+      "controller_b": "ai_heuristics",
+      "expected_score_average_for_a": 0.654096,
+      "expected_score_total_for_a": 26.163825,
+      "games": 40,
+      "rating_delta_total_for_a": 140.068206,
+      "seat_pair_comparisons": 80,
+      "seat_pair_draws": 0,
+      "seat_pair_losses_for_a": 16,
+      "seat_pair_wins_for_a": 64
+    }
+  ],
+  "controllers": [
+    {
+      "average_finish": 1.6,
+      "controller_name": "ai_deterministic",
+      "controller_wins": 37,
+      "first_place_seats": 37,
+      "games": 40,
+      "rating": 1640.068206,
+      "seat_appearances": 60
+    },
+    {
+      "average_finish": 2.4,
+      "controller_name": "ai_heuristics",
+      "controller_wins": 3,
+      "first_place_seats": 3,
+      "games": 40,
+      "rating": 1359.931794,
+      "seat_appearances": 60
+    }
+  ],
+  "games": [
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 3,
+        "p3": 10
+      },
+      "game_index": 1,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 153,
+        "p2": 49,
+        "p3": 109
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 3,
+        "p3": 10
+      },
+      "seed": 1,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 153,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 10,
+          "controller_name": "ai_heuristics",
+          "money": 109,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 10
+        },
+        {
+          "connected_cities": 3,
+          "controller_name": "ai_deterministic",
+          "money": 49,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 3
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 12,
+        "p3": 10
+      },
+      "game_index": 2,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 171,
+        "p2": 132,
+        "p3": 119
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 12,
+        "p3": 10
+      },
+      "seed": 2,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 171,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_deterministic",
+          "money": 132,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 10,
+          "controller_name": "ai_heuristics",
+          "money": 119,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 10
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 4,
+        "p2": 17,
+        "p3": 8
+      },
+      "game_index": 3,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 72,
+        "p2": 144,
+        "p3": 108
+      },
+      "powered_cities": {
+        "p1": 4,
+        "p2": 17,
+        "p3": 8
+      },
+      "seed": 3,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 144,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 108,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 8
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_deterministic",
+          "money": 72,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 3,
+        "p2": 11,
+        "p3": 17
+      },
+      "game_index": 4,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 45,
+        "p2": 128,
+        "p3": 153
+      },
+      "powered_cities": {
+        "p1": 3,
+        "p2": 11,
+        "p3": 13
+      },
+      "seed": 4,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_heuristics",
+          "money": 153,
+          "place": 1,
+          "player_id": "p3",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_deterministic",
+          "money": 128,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 3,
+          "controller_name": "ai_deterministic",
+          "money": 45,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 3
+        }
+      ],
+      "winner_ids": [
+        "p3"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 5,
+        "p2": 17,
+        "p3": 7
+      },
+      "game_index": 5,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 70,
+        "p2": 157,
+        "p3": 86
+      },
+      "powered_cities": {
+        "p1": 5,
+        "p2": 15,
+        "p3": 7
+      },
+      "seed": 5,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 157,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 15
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 86,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_deterministic",
+          "money": 70,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 5
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 16,
+        "p3": 4
+      },
+      "game_index": 6,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 146,
+        "p2": 141,
+        "p3": 119
+      },
+      "powered_cities": {
+        "p1": 13,
+        "p2": 16,
+        "p3": 4
+      },
+      "seed": 6,
+      "standings": [
+        {
+          "connected_cities": 16,
+          "controller_name": "ai_deterministic",
+          "money": 141,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 146,
+          "place": 2,
+          "player_id": "p1",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 119,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 11,
+        "p2": 18,
+        "p3": 7
+      },
+      "game_index": 7,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 125,
+        "p2": 113,
+        "p3": 100
+      },
+      "powered_cities": {
+        "p1": 11,
+        "p2": 10,
+        "p3": 7
+      },
+      "seed": 7,
+      "standings": [
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_deterministic",
+          "money": 125,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 113,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 10
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 100,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 18,
+        "p2": 6,
+        "p3": 12
+      },
+      "game_index": 8,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 162,
+        "p2": 90,
+        "p3": 127
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 6,
+        "p3": 12
+      },
+      "seed": 8,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 162,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_heuristics",
+          "money": 127,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_deterministic",
+          "money": 90,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 6
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 3,
+        "p2": 18,
+        "p3": 5
+      },
+      "game_index": 9,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 46,
+        "p2": 170,
+        "p3": 106
+      },
+      "powered_cities": {
+        "p1": 3,
+        "p2": 18,
+        "p3": 5
+      },
+      "seed": 9,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 170,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 106,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 5
+        },
+        {
+          "connected_cities": 3,
+          "controller_name": "ai_deterministic",
+          "money": 46,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 3
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 12,
+        "p3": 8
+      },
+      "game_index": 10,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 163,
+        "p2": 137,
+        "p3": 98
+      },
+      "powered_cities": {
+        "p1": 16,
+        "p2": 12,
+        "p3": 8
+      },
+      "seed": 10,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 163,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_deterministic",
+          "money": 137,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 98,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 8
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 12,
+        "p3": 10
+      },
+      "game_index": 11,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 133,
+        "p2": 120,
+        "p3": 119
+      },
+      "powered_cities": {
+        "p1": 14,
+        "p2": 12,
+        "p3": 10
+      },
+      "seed": 11,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 133,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_deterministic",
+          "money": 120,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 10,
+          "controller_name": "ai_heuristics",
+          "money": 119,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 10
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 21,
+        "p2": 3,
+        "p3": 6
+      },
+      "game_index": 12,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 162,
+        "p2": 46,
+        "p3": 122
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 3,
+        "p3": 6
+      },
+      "seed": 12,
+      "standings": [
+        {
+          "connected_cities": 21,
+          "controller_name": "ai_deterministic",
+          "money": 162,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 122,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 6
+        },
+        {
+          "connected_cities": 3,
+          "controller_name": "ai_deterministic",
+          "money": 46,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 3
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 15,
+        "p3": 15
+      },
+      "game_index": 13,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 149,
+        "p2": 137,
+        "p3": 215
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 15,
+        "p3": 15
+      },
+      "seed": 13,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 149,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 15,
+          "controller_name": "ai_heuristics",
+          "money": 215,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 15
+        },
+        {
+          "connected_cities": 15,
+          "controller_name": "ai_deterministic",
+          "money": 137,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 15
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 20,
+        "p2": 20,
+        "p3": 8
+      },
+      "game_index": 14,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 164,
+        "p2": 18,
+        "p3": 193
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 0,
+        "p3": 8
+      },
+      "seed": 14,
+      "standings": [
+        {
+          "connected_cities": 20,
+          "controller_name": "ai_deterministic",
+          "money": 164,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 193,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 8
+        },
+        {
+          "connected_cities": 20,
+          "controller_name": "ai_deterministic",
+          "money": 18,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 0
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 18,
+        "p3": 14
+      },
+      "game_index": 15,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 155,
+        "p2": 160,
+        "p3": 198
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 16,
+        "p3": 14
+      },
+      "seed": 15,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 155,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 160,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 14,
+          "controller_name": "ai_heuristics",
+          "money": 198,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 14
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 7,
+        "p2": 17,
+        "p3": 13
+      },
+      "game_index": 16,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 86,
+        "p2": 142,
+        "p3": 106
+      },
+      "powered_cities": {
+        "p1": 7,
+        "p2": 17,
+        "p3": 10
+      },
+      "seed": 16,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 142,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 13,
+          "controller_name": "ai_heuristics",
+          "money": 106,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 10
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_deterministic",
+          "money": 86,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 4,
+        "p2": 17,
+        "p3": 5
+      },
+      "game_index": 17,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 57,
+        "p2": 143,
+        "p3": 67
+      },
+      "powered_cities": {
+        "p1": 4,
+        "p2": 13,
+        "p3": 5
+      },
+      "seed": 17,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 143,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 67,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 5
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_deterministic",
+          "money": 57,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 12,
+        "p2": 18,
+        "p3": 11
+      },
+      "game_index": 18,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 124,
+        "p2": 156,
+        "p3": 135
+      },
+      "powered_cities": {
+        "p1": 12,
+        "p2": 18,
+        "p3": 11
+      },
+      "seed": 18,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 156,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_deterministic",
+          "money": 124,
+          "place": 2,
+          "player_id": "p1",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_heuristics",
+          "money": 135,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 11
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 2,
+        "p2": 21,
+        "p3": 6
+      },
+      "game_index": 19,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 57,
+        "p2": 144,
+        "p3": 90
+      },
+      "powered_cities": {
+        "p1": 2,
+        "p2": 17,
+        "p3": 6
+      },
+      "seed": 19,
+      "standings": [
+        {
+          "connected_cities": 21,
+          "controller_name": "ai_deterministic",
+          "money": 144,
+          "place": 1,
+          "player_id": "p2",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 90,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 6
+        },
+        {
+          "connected_cities": 2,
+          "controller_name": "ai_deterministic",
+          "money": 57,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 2
+        }
+      ],
+      "winner_ids": [
+        "p2"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 7,
+        "p2": 15,
+        "p3": 18
+      },
+      "game_index": 20,
+      "lineup": [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 90,
+        "p2": 149,
+        "p3": 146
+      },
+      "powered_cities": {
+        "p1": 7,
+        "p2": 14,
+        "p3": 16
+      },
+      "seed": 20,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_heuristics",
+          "money": 146,
+          "place": 1,
+          "player_id": "p3",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 15,
+          "controller_name": "ai_deterministic",
+          "money": 149,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_deterministic",
+          "money": 90,
+          "place": 3,
+          "player_id": "p1",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p3"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 9,
+        "p3": 6
+      },
+      "game_index": 21,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 152,
+        "p2": 114,
+        "p3": 73
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 9,
+        "p3": 6
+      },
+      "seed": 1,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 152,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 9,
+          "controller_name": "ai_heuristics",
+          "money": 114,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 9
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 73,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 6
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 7,
+        "p3": 6
+      },
+      "game_index": 22,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 148,
+        "p2": 133,
+        "p3": 79
+      },
+      "powered_cities": {
+        "p1": 16,
+        "p2": 7,
+        "p3": 6
+      },
+      "seed": 2,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 148,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 133,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 79,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 6
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 20,
+        "p2": 5,
+        "p3": 4
+      },
+      "game_index": 23,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 161,
+        "p2": 80,
+        "p3": 73
+      },
+      "powered_cities": {
+        "p1": 16,
+        "p2": 5,
+        "p3": 4
+      },
+      "seed": 3,
+      "standings": [
+        {
+          "connected_cities": 20,
+          "controller_name": "ai_deterministic",
+          "money": 161,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 16
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 80,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 5
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 73,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 7,
+        "p3": 7
+      },
+      "game_index": 24,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 128,
+        "p2": 75,
+        "p3": 98
+      },
+      "powered_cities": {
+        "p1": 12,
+        "p2": 6,
+        "p3": 7
+      },
+      "seed": 4,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 128,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 98,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 75,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 6
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 20,
+        "p2": 12,
+        "p3": 7
+      },
+      "game_index": 25,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 132,
+        "p2": 129,
+        "p3": 132
+      },
+      "powered_cities": {
+        "p1": 14,
+        "p2": 12,
+        "p3": 7
+      },
+      "seed": 5,
+      "standings": [
+        {
+          "connected_cities": 20,
+          "controller_name": "ai_deterministic",
+          "money": 132,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 12,
+          "controller_name": "ai_heuristics",
+          "money": 129,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 132,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 14,
+        "p3": 8
+      },
+      "game_index": 26,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 162,
+        "p2": 352,
+        "p3": 88
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 14,
+        "p3": 7
+      },
+      "seed": 6,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 162,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 14,
+          "controller_name": "ai_heuristics",
+          "money": 352,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 88,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 18,
+        "p2": 15,
+        "p3": 11
+      },
+      "game_index": 27,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 164,
+        "p2": 166,
+        "p3": 172
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 15,
+        "p3": 11
+      },
+      "seed": 7,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 164,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 15,
+          "controller_name": "ai_heuristics",
+          "money": 166,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 15
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_heuristics",
+          "money": 172,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 11
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 8,
+        "p3": 7
+      },
+      "game_index": 28,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 145,
+        "p2": 105,
+        "p3": 107
+      },
+      "powered_cities": {
+        "p1": 14,
+        "p2": 8,
+        "p3": 7
+      },
+      "seed": 8,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 145,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 105,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 8
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 107,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 7
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 11,
+        "p3": 8
+      },
+      "game_index": 29,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 161,
+        "p2": 246,
+        "p3": 386
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 11,
+        "p3": 8
+      },
+      "seed": 9,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 161,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_heuristics",
+          "money": 246,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 386,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 8
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 7,
+        "p3": 5
+      },
+      "game_index": 30,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 124,
+        "p2": 102,
+        "p3": 74
+      },
+      "powered_cities": {
+        "p1": 11,
+        "p2": 7,
+        "p3": 5
+      },
+      "seed": 10,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 124,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 102,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 74,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 5
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 4,
+        "p3": 11
+      },
+      "game_index": 31,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 130,
+        "p2": 56,
+        "p3": 115
+      },
+      "powered_cities": {
+        "p1": 13,
+        "p2": 4,
+        "p3": 11
+      },
+      "seed": 11,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 130,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_heuristics",
+          "money": 115,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 56,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 18,
+        "p2": 4,
+        "p3": 7
+      },
+      "game_index": 32,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 103,
+        "p2": 97,
+        "p3": 103
+      },
+      "powered_cities": {
+        "p1": 9,
+        "p2": 4,
+        "p3": 7
+      },
+      "seed": 12,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 103,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 9
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 103,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 97,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 21,
+        "p2": 13,
+        "p3": 11
+      },
+      "game_index": 33,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 151,
+        "p2": 142,
+        "p3": 120
+      },
+      "powered_cities": {
+        "p1": 18,
+        "p2": 13,
+        "p3": 11
+      },
+      "seed": 13,
+      "standings": [
+        {
+          "connected_cities": 21,
+          "controller_name": "ai_deterministic",
+          "money": 151,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 18
+        },
+        {
+          "connected_cities": 13,
+          "controller_name": "ai_heuristics",
+          "money": 142,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 11,
+          "controller_name": "ai_heuristics",
+          "money": 120,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 11
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 18,
+        "p2": 6,
+        "p3": 5
+      },
+      "game_index": 34,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 146,
+        "p2": 129,
+        "p3": 76
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 6,
+        "p3": 5
+      },
+      "seed": 14,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 146,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 129,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 6
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 76,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 5
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 7,
+        "p3": 2
+      },
+      "game_index": 35,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 112,
+        "p2": 88,
+        "p3": 34
+      },
+      "powered_cities": {
+        "p1": 11,
+        "p2": 7,
+        "p3": 2
+      },
+      "seed": 15,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 112,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 11
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 88,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 2,
+          "controller_name": "ai_heuristics",
+          "money": 34,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 2
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 9,
+        "p3": 18
+      },
+      "game_index": 36,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 162,
+        "p2": 99,
+        "p3": 177
+      },
+      "powered_cities": {
+        "p1": 17,
+        "p2": 8,
+        "p3": 17
+      },
+      "seed": 16,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_heuristics",
+          "money": 177,
+          "place": 1,
+          "player_id": "p3",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 162,
+          "place": 2,
+          "player_id": "p1",
+          "powered_cities": 17
+        },
+        {
+          "connected_cities": 9,
+          "controller_name": "ai_heuristics",
+          "money": 99,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 8
+        }
+      ],
+      "winner_ids": [
+        "p3"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 17,
+        "p2": 5,
+        "p3": 4
+      },
+      "game_index": 37,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 131,
+        "p2": 92,
+        "p3": 94
+      },
+      "powered_cities": {
+        "p1": 12,
+        "p2": 5,
+        "p3": 4
+      },
+      "seed": 17,
+      "standings": [
+        {
+          "connected_cities": 17,
+          "controller_name": "ai_deterministic",
+          "money": 131,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 12
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 92,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 5
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 94,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 20,
+        "p2": 8,
+        "p3": 4
+      },
+      "game_index": 38,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 103,
+        "p2": 91,
+        "p3": 57
+      },
+      "powered_cities": {
+        "p1": 9,
+        "p2": 8,
+        "p3": 4
+      },
+      "seed": 18,
+      "standings": [
+        {
+          "connected_cities": 20,
+          "controller_name": "ai_deterministic",
+          "money": 103,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 9
+        },
+        {
+          "connected_cities": 8,
+          "controller_name": "ai_heuristics",
+          "money": 91,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 8
+        },
+        {
+          "connected_cities": 4,
+          "controller_name": "ai_heuristics",
+          "money": 57,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 4
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 18,
+        "p2": 6,
+        "p3": 7
+      },
+      "game_index": 39,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 134,
+        "p2": 88,
+        "p3": 91
+      },
+      "powered_cities": {
+        "p1": 14,
+        "p2": 6,
+        "p3": 7
+      },
+      "seed": 19,
+      "standings": [
+        {
+          "connected_cities": 18,
+          "controller_name": "ai_deterministic",
+          "money": 134,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 14
+        },
+        {
+          "connected_cities": 7,
+          "controller_name": "ai_heuristics",
+          "money": 91,
+          "place": 2,
+          "player_id": "p3",
+          "powered_cities": 7
+        },
+        {
+          "connected_cities": 6,
+          "controller_name": "ai_heuristics",
+          "money": 88,
+          "place": 3,
+          "player_id": "p2",
+          "powered_cities": 6
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    },
+    {
+      "connected_cities": {
+        "p1": 19,
+        "p2": 10,
+        "p3": 5
+      },
+      "game_index": 40,
+      "lineup": [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ],
+      "money": {
+        "p1": 128,
+        "p2": 113,
+        "p3": 105
+      },
+      "powered_cities": {
+        "p1": 13,
+        "p2": 10,
+        "p3": 5
+      },
+      "seed": 20,
+      "standings": [
+        {
+          "connected_cities": 19,
+          "controller_name": "ai_deterministic",
+          "money": 128,
+          "place": 1,
+          "player_id": "p1",
+          "powered_cities": 13
+        },
+        {
+          "connected_cities": 10,
+          "controller_name": "ai_heuristics",
+          "money": 113,
+          "place": 2,
+          "player_id": "p2",
+          "powered_cities": 10
+        },
+        {
+          "connected_cities": 5,
+          "controller_name": "ai_heuristics",
+          "money": 105,
+          "place": 3,
+          "player_id": "p3",
+          "powered_cities": 5
+        }
+      ],
+      "winner_ids": [
+        "p1"
+      ]
+    }
+  ],
+  "schedule": {
+    "games_per_lineup": 20,
+    "lineups": [
+      [
+        "ai_deterministic",
+        "ai_deterministic",
+        "ai_heuristics"
+      ],
+      [
+        "ai_deterministic",
+        "ai_heuristics",
+        "ai_heuristics"
+      ]
+    ],
+    "seed_start": 1,
+    "total_games": 40
+  }
+}

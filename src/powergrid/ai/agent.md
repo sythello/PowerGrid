@@ -53,6 +53,7 @@ This means the core contract is:
 - [base.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/base.py): abstract controller base
 - [deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/deterministic.py): simple baseline AI
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
+- [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py): registry and controller construction
 
 ## Current Controller Behavior
@@ -166,12 +167,84 @@ Also note:
 - Helper-generated AI seats from `make_default_seat_configs(..., ai_players=...)` currently use `ai_deterministic`
 - The GUI setup still exposes explicit AI versions and currently defaults its version picker to `ai_heuristics`
 
+## AI Evaluation
+
+The AI package now also contains an offline Elo evaluation subsystem for AI-vs-AI testing.
+
+Current evaluation scope:
+
+- V1 supports one rating bucket only:
+  - `map_id="germany"`
+  - `player_count=3`
+- Default evaluated controllers:
+  - `ai_deterministic`
+  - `ai_heuristics`
+- Ratings are recomputed fresh on each run from a baseline rating
+
+Core entrypoints:
+
+- `AiEvaluationBucketConfig`
+- `build_default_evaluation_lineups(...)`
+- `derive_final_standings(...)`
+- `evaluate_ai_bucket(...)`
+
+Current lineup schedule:
+
+- `("ai_deterministic", "ai_deterministic", "ai_heuristics")`
+- `("ai_deterministic", "ai_heuristics", "ai_heuristics")`
+
+Pure mirrors are intentionally excluded from the default schedule because they do not provide cross-AI rating signal.
+
+Current rating algorithm:
+
+- controller-level pairwise Elo derived from final multi-player placements
+- final standings use the same winner tuple logic as the rules engine:
+  - powered cities
+  - money
+  - connected cities
+  - `state.player_order` as deterministic fallback
+- equal `(powered, money, connected)` signatures are treated as pairwise draws
+- for each game, only distinct controller pairs are rated
+- for each unordered controller pair:
+  - compare all seat-vs-seat cross-pairings
+  - average the seat-pair outcomes into one controller-pair score
+  - compute Elo expectation with rating scale `400`
+  - use `pair_k = base_k / (distinct_controller_count - 1)`
+
+Reporting:
+
+- JSON report includes:
+  - bucket metadata
+  - resolved selected regions
+  - algorithm parameters
+  - schedule metadata
+  - per-controller summaries
+  - per-controller-pair diagnostics
+  - per-game summaries
+
+CLI workflow:
+
+- Tool: [../tools/evaluate_ai_ratings.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/evaluate_ai_ratings.py)
+- Example:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings \
+  --map germany \
+  --players 3 \
+  --controllers ai_deterministic ai_heuristics \
+  --games-per-lineup 20 \
+  --seed-start 1
+```
+
+- Default output path:
+  - `artifacts/ai_ratings/germany_3p.json`
+
 If you change naming or defaults, update all of:
 
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py)
 - [../model.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/model.py)
 - [../gui/app.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/gui/app.py)
-- tests in [../../../tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py), [../../../tests/test_session.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_session.py), and [../../../tests/test_gui.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_gui.py)
+- tests in [../../../tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py), [../../../tests/test_ai_evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai_evaluation.py), [../../../tests/test_session.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_session.py), and [../../../tests/test_gui.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_gui.py)
 
 ## Guidance For Further Development
 
@@ -262,6 +335,7 @@ Current AI tests already cover:
 - multi-city build behavior
 - final-round bureaucracy behavior
 - AI-vs-AI smoke completion
+- Elo evaluation helpers, reporting, and CLI output
 
 When changing behavior, extend [../../../tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py) first.
 
@@ -293,11 +367,11 @@ Reasonable next steps if we want a stronger AI without changing architecture:
 Useful commands after AI changes:
 
 ```bash
-PYTHONPATH=src python -m unittest tests.test_ai tests.test_model tests.test_session tests.test_gui -q
+PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation tests.test_model tests.test_session tests.test_gui -q
 ```
 
 If the change is isolated to AI logic, start with:
 
 ```bash
-PYTHONPATH=src python -m unittest tests.test_ai -q
+PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation -q
 ```
