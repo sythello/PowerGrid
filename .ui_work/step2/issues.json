@@ -1,0 +1,22 @@
+{
+  "state_name": "step2",
+  "window": {
+    "title": "PowerGrid GUI",
+    "geometry": "1400x900+5+30",
+    "width": 1400,
+    "height": 900,
+    "screenwidth": 1920,
+    "screenheight": 1080
+  },
+  "issue_count": 1,
+  "issues": [
+    {
+      "severity": "low",
+      "title": "Too many font sizes",
+      "detail": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+      "widgets": [],
+      "suggestion": "Define a small type scale (e.g. heading/body/caption) and reuse those sizes instead of ad-hoc values.",
+      "id": 1
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+TKINTER UI ANALYSIS
+============================================================
+Window: PowerGrid GUI   size: 1400x900
+State captured: auction_step3
+Widgets analyzed: 116
+
+Found 1 issue(s): 1 low
+
+[1] (LOW) Too many font sizes
+    What: 8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].
+    Fix:  Define a small type scale (e.g. heading/body/caption) and reuse those sizes instead of ad-hoc values.
+
+------------------------------------------------------------
+Next step: turn the fixes you agree with into a revisions.json, then run
+apply_revisions.py to apply them safely (dry-run first).

@@ -1,0 +1,12 @@
+{
+  "revisions": [
+    {
+      "id": 1,
+      "file": "src/powergrid/gui/components.py",
+      "find": "        columns = 4\n        size = 50\n        gap = 8",
+      "replace": "        columns = 3\n        size = 72\n        gap = 8",
+      "rationale": "Render player-rail plant cards at the same size (72) the market uses; draw_power_plant_card's text positions/fonts are tuned for 72, so size=50 collapsed the price onto the centered resource label.",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+TKINTER UI ANALYSIS — MULTI-STATE SUMMARY
+============================================================
+States analyzed: 7    total issues: 6
+
+  launcher              0 issues (0H/0M/0L)   -> launcher/issues.txt
+  opening               1 issues (0H/0M/1L)   -> opening/issues.txt
+  resource              1 issues (0H/0M/1L)   -> resource/issues.txt
+  build_test            1 issues (0H/0M/1L)   -> build_test/issues.txt
+  step2                 1 issues (0H/0M/1L)   -> step2/issues.txt
+  auction_step3         1 issues (0H/0M/1L)   -> auction_step3/issues.txt
+  endgame               1 issues (0H/0M/1L)   -> endgame/issues.txt
+
+Open each state's screenshot.png and issues.txt for detail.
+Then propose fixes and apply them with apply_revisions.py (dry-run first).

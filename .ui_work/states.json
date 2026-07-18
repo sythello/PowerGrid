@@ -1,0 +1,13 @@
+{
+  "pythonpath": "src",
+  "settle": 0.8,
+  "states": [
+    {"name": "launcher", "script": "src/powergrid/tools/play_tkinter_gui.py"},
+    {"name": "opening", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "opening"]},
+    {"name": "resource", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "resource"]},
+    {"name": "build_test", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "build_test"]},
+    {"name": "step2", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "step2"]},
+    {"name": "auction_step3", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "auction_step3"]},
+    {"name": "endgame", "script": "src/powergrid/tools/play_tkinter_gui.py", "args": ["--scenario", "endgame"]}
+  ]
+}

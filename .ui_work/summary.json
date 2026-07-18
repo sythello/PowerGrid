@@ -1,0 +1,89 @@
+{
+  "states": [
+    {
+      "name": "launcher",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 0,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/launcher/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/launcher/screenshot.png"
+    },
+    {
+      "name": "opening",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/opening/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/opening/screenshot.png"
+    },
+    {
+      "name": "resource",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/resource/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/resource/screenshot.png"
+    },
+    {
+      "name": "build_test",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/build_test/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/build_test/screenshot.png"
+    },
+    {
+      "name": "step2",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/step2/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/step2/screenshot.png"
+    },
+    {
+      "name": "auction_step3",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/auction_step3/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/auction_step3/screenshot.png"
+    },
+    {
+      "name": "endgame",
+      "script": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_tkinter_gui.py",
+      "issue_count": 1,
+      "severity": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      },
+      "issues_txt": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/endgame/issues.txt",
+      "screenshot": "/Users/mac/Desktop/syt/Projects/PowerGrid/.ui_work/endgame/screenshot.png"
+    }
+  ],
+  "total_issues": 6
+}

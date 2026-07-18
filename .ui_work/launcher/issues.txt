@@ -1,0 +1,9 @@
+TKINTER UI ANALYSIS
+============================================================
+Window: PowerGrid GUI   size: 1400x900
+State captured: launcher
+Widgets analyzed: 88
+
+No issues detected by the heuristic checks. 
+(This covers layout/contrast/consistency basics — a human pass on the 
+screenshot is still worthwhile for aesthetics and visual hierarchy.)

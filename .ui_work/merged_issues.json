@@ -1,0 +1,36 @@
+{
+  "common": [
+    {
+      "title": "Too many font sizes",
+      "severity": "low",
+      "widgets": [],
+      "suggestion": "Define a small type scale (e.g. heading/body/caption) and reuse those sizes instead of ad-hoc values.",
+      "details_by_state": {
+        "auction_step3": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+        "build_test": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+        "endgame": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+        "opening": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+        "resource": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].",
+        "step2": "8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18]."
+      },
+      "states": [
+        "auction_step3",
+        "build_test",
+        "endgame",
+        "opening",
+        "resource",
+        "step2"
+      ]
+    }
+  ],
+  "specific": [],
+  "state_names": [
+    "auction_step3",
+    "build_test",
+    "endgame",
+    "launcher",
+    "opening",
+    "resource",
+    "step2"
+  ]
+}

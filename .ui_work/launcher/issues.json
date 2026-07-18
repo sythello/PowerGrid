@@ -1,0 +1,13 @@
+{
+  "state_name": "launcher",
+  "window": {
+    "title": "PowerGrid GUI",
+    "geometry": "1400x900+34+59",
+    "width": 1400,
+    "height": 900,
+    "screenwidth": 1920,
+    "screenheight": 1080
+  },
+  "issue_count": 0,
+  "issues": []
+}

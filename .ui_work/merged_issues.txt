@@ -1,0 +1,12 @@
+TKINTER UI ANALYSIS — MERGED ACROSS STATES
+============================================================
+States: 7 (auction_step3, build_test, endgame, launcher, opening, resource, step2)
+Common issues: 1    State-specific issues: 0
+
+COMMON ISSUES (appear in multiple states — fix these first)
+------------------------------------------------------------
+[C1] (LOW) Too many font sizes
+     Seen in 6 states: auction_step3, build_test, endgame, opening, resource, step2
+     What: 8 distinct font sizes in use: [8, 9, 10, 11, 12, 13, 16, 18].
+     Fix:  Define a small type scale (e.g. heading/body/caption) and reuse those sizes instead of ad-hoc values.
+
