@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from powergrid.ai import derive_final_standings
@@ -32,6 +33,10 @@ def main(argv: list[str] | None = None) -> int:
         "--output",
         help="Optional JSON log output path. Defaults to artifacts/game_logs/{map}_{players}p_seed{seed}.json",
     )
+    parser.add_argument(
+        "--strategy-output",
+        help="Optional JSON output path containing only AI strategy/analysis log entries.",
+    )
     args = parser.parse_args(argv)
 
     controller_names = _resolve_controllers(args.controllers, args.players)
@@ -59,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     snapshot = session.advance_until_blocked()
     output_path = Path(args.output) if args.output else _default_output_path(config)
     session.dump_game_log(output_path)
+    strategy_output_path = Path(args.strategy_output) if args.strategy_output else None
+    if strategy_output_path is not None:
+        _dump_strategy_log(session.game_log_payload(), strategy_output_path, game_log_path=output_path)
 
     print("AI Game Completed")
     print(
@@ -87,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
             f"phase={snapshot.state.phase} step={snapshot.state.step}"
         )
     print(f"Wrote game log to {output_path}")
+    if strategy_output_path is not None:
+        print(f"Wrote strategy log to {strategy_output_path}")
     return 0
 
 
@@ -102,6 +112,28 @@ def _resolve_controllers(controller_names: list[str], player_count: int) -> tupl
 
 def _default_output_path(config: GameConfig) -> Path:
     return Path("artifacts") / "game_logs" / f"{config.map_id}_{len(config.players)}p_seed{config.seed}.json"
+
+
+def _dump_strategy_log(game_log_payload: dict[str, object], path: Path, *, game_log_path: Path) -> Path:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    game_log = game_log_payload.get("game_log", [])
+    strategy_entries = [
+        entry
+        for entry in game_log
+        if isinstance(entry, dict) and entry.get("source") == "ai"
+    ]
+    payload = {
+        "format_version": 1,
+        "source_game_log": str(game_log_path),
+        "config": game_log_payload.get("config"),
+        "winner_result": game_log_payload.get("winner_result"),
+        "strategy_log": strategy_entries,
+    }
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return output_path
 
 
 if __name__ == "__main__":

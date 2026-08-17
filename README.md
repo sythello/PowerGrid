@@ -95,14 +95,25 @@ Useful options:
 - `--players 3`
 - `--regions black,blue,magenta`
 - `--output artifacts/game_logs/germany_3p_seed7.json`
+- `--strategy-output artifacts/strategy_logs/germany_3p_seed7.json`
 
 Behavior:
 
 - runs the full game to completion through `GameSession`
 - prints winner and final standings
 - writes a structured JSON game log
+- optionally writes a strategy-only JSON log containing AI analysis entries
+  - heuristic auction entries include fallback-aware reserve samples and post-auction economy projections
 
 The default log output directory is `artifacts/game_logs/`, which is ignored by git.
+
+Analyze strategy logs:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.analyze_strategy_logs \
+  --strategy-dir artifacts/strategy_logs/heuristic_v005 \
+  --game-dir artifacts/game_logs/heuristic_v005
+```
 
 ### 4. Evaluate AI ratings
 

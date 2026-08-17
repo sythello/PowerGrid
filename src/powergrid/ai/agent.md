@@ -82,6 +82,10 @@ Current structured game-log behavior:
 - AI custom diagnostic entries can be appended during `choose_intent(...)`
 - full AI-vs-AI runs can be dumped from the CLI with:
   - `PYTHONPATH=src python -m powergrid.tools.run_ai_game --controllers ai_deterministic ai_heuristics ai_deterministic`
+- strategy-only logs can also be split out with:
+  - `PYTHONPATH=src python -m powergrid.tools.run_ai_game --strategy-output artifacts/strategy_logs/example.json`
+- strategy logs can be analyzed with:
+  - `PYTHONPATH=src python -m powergrid.tools.analyze_strategy_logs --strategy-dir artifacts/strategy_logs/example --game-dir artifacts/game_logs/example`
 
 AI-facing interface:
 
@@ -103,7 +107,14 @@ Recommended usage inside controllers:
 
 Current shipped AIs:
 
-- both deterministic and heuristic controllers emit one structured AI decision log entry per chosen intent
+- deterministic controllers emit one compact structured AI decision log entry per chosen intent
+- heuristic controllers emit one detailed structured AI reasoning log entry per chosen intent
+  - label: `heuristic_decision`
+  - includes current relative-state evaluation with weighted subterms
+  - includes a `scoreboard` with own score and each opponent score used in the relative formula
+  - includes ranked candidate actions with decision scores and projected relative scores
+  - includes the selected action, its decision score, and a detailed projected evaluation
+  - includes a search summary for the phase-specific search path
 
 ## Current Controller Behavior
 
@@ -147,11 +158,18 @@ Implemented behavior:
   - Simulates legal discard options
   - Keeps the portfolio/resource mix with the best evaluated future state
 - Auction
-  - Uses dynamic reserve prices via `_auction_reserve(...)`
-  - Incorporates plant quality, portfolio fit, resource pressure, cash floors, and game stage
+  - Uses fallback-aware reserve prices via `_auction_reserve_projection(...)`
+  - Values a plant by a fast post-auction economy projection:
+    - buy the plant at a candidate price
+    - choose a feasible refuel basket
+    - greedily build cities affordable with remaining cash
+    - simulate generation and income
+    - compare the resulting score against later-buy/pass fallback projections
+  - Keeps the older `_auction_reserve_level0(...)` as a cheap opponent interest estimate for contest pressure
   - Can pass on overpriced bids
   - In round 1, avoids passing when forced to buy
-  - Supports “bait” style starts when opponents value a plant more than the AI does
+  - Avoids bait starts in round 1 when the AI has no plant yet
+  - Supports “bait” style starts in later rounds when opponents value a plant more than the AI does
 - Resources
   - Uses bounded recursive search with `_search_resource_purchase(...)`
   - Evaluates stop-vs-buy tradeoffs rather than only immediate deficits
@@ -171,6 +189,9 @@ Implemented behavior:
 - Evaluation framework
   - Stage-aware weights in `STAGE_WEIGHTS`
   - Stage detection via `_stage_name(...)`
+  - Relative state evaluation uses opponent threat strength:
+    - `max(current_strength, best_affordable_partial_refuel_projected_strength)`
+    - the refuel projection is opponent-only and searches feasible partial resource baskets constrained by current market availability, cash, and storage legality
   - Player strength includes:
     - connected cities
     - powered cities
@@ -183,6 +204,15 @@ Implemented behavior:
     - resource exposure penalty
     - overbuild / unused-capacity penalties
     - trigger timing score
+- Strategy logging
+  - Records `schema_version=5` inside each `heuristic_decision` state payload
+  - Records current evaluation details before selecting
+  - Records `scoreboard` with own score, opponent scores, opponent adjustment, and relative score
+  - Records `opponent_threats` with current strength, best affordable partial-refuel projected strength, projected generation, and the selected refuel basket
+  - Records selected-action `projected_kind` / `projection_horizon` so analysis can separate immediate, fallback, and post-auction-economy projections
+  - Records auction reserve details including fallback score, target score, price samples, cash after purchase/resources/build/income, resource plan, build plan, generation, raw score, and viability adjustment
+  - Records candidate action scores from auction, resource, build, pending, and bureaucracy searches
+  - Records selected-action projected evaluation details for cross-turn strategy analysis
 
 ## Important Supporting Patterns
 

@@ -13,6 +13,7 @@ class RunAiGameToolTests(unittest.TestCase):
     def test_cli_tool_runs_game_and_writes_log(self) -> None:
         with TemporaryDirectory() as tempdir:
             output_path = f"{tempdir}/game_log.json"
+            strategy_output_path = f"{tempdir}/strategy_log.json"
             stdout = io.StringIO()
             with redirect_stdout(stdout):
                 result = run_ai_game_main(
@@ -25,20 +26,28 @@ class RunAiGameToolTests(unittest.TestCase):
                         "ai_deterministic",
                         "--output",
                         output_path,
+                        "--strategy-output",
+                        strategy_output_path,
                     ]
                 )
 
             self.assertEqual(result, 0)
             with open(output_path, "r", encoding="utf-8") as handle:
                 payload = json.load(handle)
+            with open(strategy_output_path, "r", encoding="utf-8") as handle:
+                strategy_payload = json.load(handle)
 
             self.assertEqual(payload["config"]["map_id"], "germany")
             self.assertEqual(len(payload["config"]["players"]), 3)
             self.assertEqual(payload["game_log"][0]["event_type"], "session_start")
             self.assertTrue(payload["game_log"])
+            self.assertEqual(strategy_payload["format_version"], 1)
+            self.assertTrue(strategy_payload["strategy_log"])
+            self.assertTrue(all(entry["source"] == "ai" for entry in strategy_payload["strategy_log"]))
             self.assertIn("AI Game Completed", stdout.getvalue())
             self.assertIn("Winner:", stdout.getvalue())
             self.assertIn("Wrote game log to", stdout.getvalue())
+            self.assertIn("Wrote strategy log to", stdout.getvalue())
 
     def test_single_controller_argument_repeats_for_all_seats(self) -> None:
         with TemporaryDirectory() as tempdir:

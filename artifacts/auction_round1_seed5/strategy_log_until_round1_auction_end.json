@@ -1,0 +1,1555 @@
+{
+  "config": {
+    "map_id": "germany",
+    "players": [
+      {
+        "controller": "ai_heuristics",
+        "name": "Player 1",
+        "player_id": "p1"
+      },
+      {
+        "controller": "ai_deterministic",
+        "name": "Player 2",
+        "player_id": "p2"
+      },
+      {
+        "controller": "ai_deterministic",
+        "name": "Player 3",
+        "player_id": "p3"
+      }
+    ],
+    "seed": 5,
+    "selected_regions": []
+  },
+  "format_version": 1,
+  "strategy_log": [
+    {
+      "event_type": "ai_state",
+      "index": 1,
+      "level": "debug",
+      "message": "Heuristic AI selected an intent.",
+      "payload": {
+        "controller": "ai_heuristics",
+        "label": "heuristic_decision",
+        "state": {
+          "candidate_action_count": 4,
+          "candidate_actions": [
+            {
+              "decision_score": 48.5832,
+              "intent_payload": {
+                "bid": 5,
+                "plant_price": 5
+              },
+              "intent_type": "auction_start",
+              "projected_kind": "hypothetical_purchase_at_price_guess",
+              "projected_relative_score": 64.6867,
+              "projected_score_delta": 47.4172,
+              "projection_horizon": "terminal_if_won",
+              "rank": 1,
+              "score_terms": {
+                "bait_score": 0.0,
+                "contest_pressure": 0,
+                "hard_cap": 40,
+                "market_bonus": 1.166,
+                "minimum_bid": 5,
+                "own_interest": 30,
+                "plant_purchase_gain": 18.95,
+                "price_guess": 35,
+                "projected_gain": 47.4172,
+                "projected_kind": "hypothetical_purchase_at_price_guess",
+                "reserve": 35,
+                "strongest_opponent_reserve": 35
+              }
+            },
+            {
+              "decision_score": 27.182,
+              "intent_payload": {
+                "bid": 9,
+                "plant_price": 9
+              },
+              "intent_type": "auction_start",
+              "projected_kind": "hypothetical_purchase_at_price_guess",
+              "projected_relative_score": 43.2855,
+              "projected_score_delta": 26.016,
+              "projection_horizon": "terminal_if_won",
+              "rank": 2,
+              "score_terms": {
+                "bait_score": 0.0,
+                "contest_pressure": 0,
+                "hard_cap": 40,
+                "market_bonus": 1.166,
+                "minimum_bid": 9,
+                "own_interest": 20,
+                "plant_purchase_gain": 12.7,
+                "price_guess": 29,
+                "projected_gain": 26.016,
+                "projected_kind": "hypothetical_purchase_at_price_guess",
+                "reserve": 29,
+                "strongest_opponent_reserve": 29
+              }
+            },
+            {
+              "decision_score": 26.8903,
+              "intent_payload": {
+                "bid": 1,
+                "plant_price": 4
+              },
+              "intent_type": "auction_start",
+              "projected_kind": "hypothetical_purchase_at_price_guess",
+              "projected_relative_score": 42.9938,
+              "projected_score_delta": 25.7243,
+              "projection_horizon": "terminal_if_won",
+              "rank": 3,
+              "score_terms": {
+                "bait_score": 0.0,
+                "contest_pressure": 0,
+                "hard_cap": 40,
+                "market_bonus": 1.166,
+                "minimum_bid": 1,
+                "own_interest": 18,
+                "plant_purchase_gain": 11.8,
+                "price_guess": 19,
+                "projected_gain": 25.7243,
+                "projected_kind": "hypothetical_purchase_at_price_guess",
+                "reserve": 19,
+                "strongest_opponent_reserve": 19
+              }
+            },
+            {
+              "decision_score": 16.158,
+              "intent_payload": {
+                "bid": 6,
+                "plant_price": 6
+              },
+              "intent_type": "auction_start",
+              "projected_kind": "hypothetical_purchase_at_price_guess",
+              "projected_relative_score": 32.2615,
+              "projected_score_delta": 14.992,
+              "projection_horizon": "terminal_if_won",
+              "rank": 4,
+              "score_terms": {
+                "bait_score": 0.0,
+                "contest_pressure": 0,
+                "hard_cap": 40,
+                "market_bonus": 1.166,
+                "minimum_bid": 6,
+                "own_interest": 14,
+                "plant_purchase_gain": 8.8,
+                "price_guess": 20,
+                "projected_gain": 14.992,
+                "projected_kind": "hypothetical_purchase_at_price_guess",
+                "reserve": 20,
+                "strongest_opponent_reserve": 20
+              }
+            }
+          ],
+          "candidate_actions_truncated": false,
+          "current_evaluation": {
+            "average_opponent_strength": 91.63,
+            "formula": {
+              "average_opponent_strength_weight": -0.2,
+              "max_opponent_strength_weight": -0.65,
+              "own_strength_weight": 1.0
+            },
+            "max_opponent_strength": 93.13,
+            "opponent_adjustment": -78.8605,
+            "opponent_strength_model": "max(current_strength, best_affordable_partial_refuel_projected_strength)",
+            "opponent_threats": [
+              {
+                "current_strength": 93.13,
+                "evaluated_refuel_baskets": 0,
+                "player_id": "p2",
+                "projected_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "refuel_basket": {},
+                "refuel_cost": 0,
+                "refuel_projected_strength": 93.13,
+                "refuel_projection_kind": "no_affordable_refuel_improvement",
+                "threat_applied": false,
+                "threat_strength": 93.13
+              },
+              {
+                "current_strength": 90.13,
+                "evaluated_refuel_baskets": 0,
+                "player_id": "p3",
+                "projected_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "refuel_basket": {},
+                "refuel_cost": 0,
+                "refuel_projected_strength": 90.13,
+                "refuel_projection_kind": "no_affordable_refuel_improvement",
+                "threat_applied": false,
+                "threat_strength": 90.13
+              }
+            ],
+            "opponents": [
+              {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 50,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 0.0,
+                  "power_plants": [],
+                  "resource_exposure": 0.0,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 0,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 1,
+                  "unused_capacity": 0
+                },
+                "penalty_terms_total": 0.0,
+                "player_id": "p2",
+                "positive_terms_total": 93.13,
+                "stage": "opening",
+                "total_score": 93.13,
+                "weighted_terms": {
+                  "cash": 22.5,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 3.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 0.0,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.0,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -0.0
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              },
+              {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 50,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 0.0,
+                  "power_plants": [],
+                  "resource_exposure": 0.0,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 0,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 0,
+                  "unused_capacity": 0
+                },
+                "penalty_terms_total": 0.0,
+                "player_id": "p3",
+                "positive_terms_total": 90.13,
+                "stage": "opening",
+                "total_score": 90.13,
+                "weighted_terms": {
+                  "cash": 22.5,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 0.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 0.0,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.0,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -0.0
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              }
+            ],
+            "own": {
+              "metrics": {
+                "best_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "cash": 50,
+                "connected_cities": 0,
+                "frontier_score": 21.65,
+                "overbuild": 0,
+                "plant_portfolio_score": 0.0,
+                "power_plants": [],
+                "resource_exposure": 0.0,
+                "resource_totals": {
+                  "coal": 0,
+                  "garbage": 0,
+                  "oil": 0,
+                  "uranium": 0
+                },
+                "stored_resource_value": 0.0,
+                "total_output": 0,
+                "trigger_timing_score": 0.0,
+                "turn_order_value": 2,
+                "unused_capacity": 0
+              },
+              "penalty_terms_total": 0.0,
+              "player_id": "p1",
+              "positive_terms_total": 96.13,
+              "stage": "opening",
+              "total_score": 96.13,
+              "weighted_terms": {
+                "cash": 22.5,
+                "connected": 0.0,
+                "frontier": 47.63,
+                "income": 20.0,
+                "order": 6.0,
+                "overbuild_penalty": -0.0,
+                "plants": 0.0,
+                "powered": 0.0,
+                "resource_exposure_penalty": -0.0,
+                "resources": 0.0,
+                "trigger_timing": 0.0,
+                "unused_capacity_penalty": -0.0
+              },
+              "weights": {
+                "cash": 0.45,
+                "connected": 5.0,
+                "exposure": 1.8,
+                "frontier": 2.2,
+                "income": 2.0,
+                "order": 3.0,
+                "overbuild": 4.0,
+                "plants": 3.8,
+                "powered": 6.0,
+                "resources": 1.0,
+                "unused_capacity": 1.2
+              }
+            },
+            "own_strength": 96.13,
+            "phase": "auction",
+            "player_id": "p1",
+            "relative_score": 17.2695,
+            "resource_pressure": {
+              "coal": 0.0,
+              "garbage": 0.0,
+              "oil": 0.0,
+              "uranium": 0.0
+            },
+            "round_number": 1,
+            "scoreboard": {
+              "average_opponent_score": 91.63,
+              "max_opponent_score": 93.13,
+              "opponent_adjustment": -78.8605,
+              "opponent_scores": [
+                {
+                  "current_score": 93.13,
+                  "player_id": "p2",
+                  "refuel_projected_score": 93.13,
+                  "score_for_relative": 93.13,
+                  "threat_applied": false
+                },
+                {
+                  "current_score": 90.13,
+                  "player_id": "p3",
+                  "refuel_projected_score": 90.13,
+                  "score_for_relative": 90.13,
+                  "threat_applied": false
+                }
+              ],
+              "own_score": 96.13,
+              "relative_score": 17.2695
+            },
+            "stage": "opening",
+            "step": 1
+          },
+          "decision_type": "auction_start",
+          "intent_payload": {
+            "bid": 5,
+            "plant_price": 5
+          },
+          "intent_type": "auction_start",
+          "schema_version": 4,
+          "search_summary": {
+            "best_start_delta": 48.5832,
+            "decision_family": "auction_start",
+            "legal_action_count": 4
+          },
+          "selected_action": {
+            "decision_score": 48.5832,
+            "intent_payload": {
+              "bid": 5,
+              "plant_price": 5
+            },
+            "intent_type": "auction_start",
+            "projected_evaluation": {
+              "average_opponent_strength": 91.63,
+              "formula": {
+                "average_opponent_strength_weight": -0.2,
+                "max_opponent_strength_weight": -0.65,
+                "own_strength_weight": 1.0
+              },
+              "max_opponent_strength": 93.13,
+              "opponent_adjustment": -78.8605,
+              "opponent_strength_model": "max(current_strength, best_affordable_partial_refuel_projected_strength)",
+              "opponent_threats": [
+                {
+                  "current_strength": 93.13,
+                  "evaluated_refuel_baskets": 0,
+                  "player_id": "p2",
+                  "projected_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "refuel_basket": {},
+                  "refuel_cost": 0,
+                  "refuel_projected_strength": 93.13,
+                  "refuel_projection_kind": "no_affordable_refuel_improvement",
+                  "threat_applied": false,
+                  "threat_strength": 93.13
+                },
+                {
+                  "current_strength": 90.13,
+                  "evaluated_refuel_baskets": 0,
+                  "player_id": "p3",
+                  "projected_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "refuel_basket": {},
+                  "refuel_cost": 0,
+                  "refuel_projected_strength": 90.13,
+                  "refuel_projection_kind": "no_affordable_refuel_improvement",
+                  "threat_applied": false,
+                  "threat_strength": 90.13
+                }
+              ],
+              "opponents": [
+                {
+                  "metrics": {
+                    "best_generation": {
+                      "income": 10,
+                      "plans": [],
+                      "powered": 0,
+                      "spent_units": 0,
+                      "spent_value": 0.0
+                    },
+                    "cash": 50,
+                    "connected_cities": 0,
+                    "frontier_score": 21.65,
+                    "overbuild": 0,
+                    "plant_portfolio_score": 0.0,
+                    "power_plants": [],
+                    "resource_exposure": 0.0,
+                    "resource_totals": {
+                      "coal": 0,
+                      "garbage": 0,
+                      "oil": 0,
+                      "uranium": 0
+                    },
+                    "stored_resource_value": 0.0,
+                    "total_output": 0,
+                    "trigger_timing_score": 0.0,
+                    "turn_order_value": 1,
+                    "unused_capacity": 0
+                  },
+                  "penalty_terms_total": 0.0,
+                  "player_id": "p2",
+                  "positive_terms_total": 93.13,
+                  "stage": "opening",
+                  "total_score": 93.13,
+                  "weighted_terms": {
+                    "cash": 22.5,
+                    "connected": 0.0,
+                    "frontier": 47.63,
+                    "income": 20.0,
+                    "order": 3.0,
+                    "overbuild_penalty": -0.0,
+                    "plants": 0.0,
+                    "powered": 0.0,
+                    "resource_exposure_penalty": -0.0,
+                    "resources": 0.0,
+                    "trigger_timing": 0.0,
+                    "unused_capacity_penalty": -0.0
+                  },
+                  "weights": {
+                    "cash": 0.45,
+                    "connected": 5.0,
+                    "exposure": 1.8,
+                    "frontier": 2.2,
+                    "income": 2.0,
+                    "order": 3.0,
+                    "overbuild": 4.0,
+                    "plants": 3.8,
+                    "powered": 6.0,
+                    "resources": 1.0,
+                    "unused_capacity": 1.2
+                  }
+                },
+                {
+                  "metrics": {
+                    "best_generation": {
+                      "income": 10,
+                      "plans": [],
+                      "powered": 0,
+                      "spent_units": 0,
+                      "spent_value": 0.0
+                    },
+                    "cash": 50,
+                    "connected_cities": 0,
+                    "frontier_score": 21.65,
+                    "overbuild": 0,
+                    "plant_portfolio_score": 0.0,
+                    "power_plants": [],
+                    "resource_exposure": 0.0,
+                    "resource_totals": {
+                      "coal": 0,
+                      "garbage": 0,
+                      "oil": 0,
+                      "uranium": 0
+                    },
+                    "stored_resource_value": 0.0,
+                    "total_output": 0,
+                    "trigger_timing_score": 0.0,
+                    "turn_order_value": 0,
+                    "unused_capacity": 0
+                  },
+                  "penalty_terms_total": 0.0,
+                  "player_id": "p3",
+                  "positive_terms_total": 90.13,
+                  "stage": "opening",
+                  "total_score": 90.13,
+                  "weighted_terms": {
+                    "cash": 22.5,
+                    "connected": 0.0,
+                    "frontier": 47.63,
+                    "income": 20.0,
+                    "order": 0.0,
+                    "overbuild_penalty": -0.0,
+                    "plants": 0.0,
+                    "powered": 0.0,
+                    "resource_exposure_penalty": -0.0,
+                    "resources": 0.0,
+                    "trigger_timing": 0.0,
+                    "unused_capacity_penalty": -0.0
+                  },
+                  "weights": {
+                    "cash": 0.45,
+                    "connected": 5.0,
+                    "exposure": 1.8,
+                    "frontier": 2.2,
+                    "income": 2.0,
+                    "order": 3.0,
+                    "overbuild": 4.0,
+                    "plants": 3.8,
+                    "powered": 6.0,
+                    "resources": 1.0,
+                    "unused_capacity": 1.2
+                  }
+                }
+              ],
+              "own": {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 15,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 17.078,
+                  "power_plants": [
+                    5
+                  ],
+                  "resource_exposure": 0.294,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 1,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 2,
+                  "unused_capacity": 1
+                },
+                "penalty_terms_total": -1.7292,
+                "player_id": "p1",
+                "positive_terms_total": 145.2764,
+                "stage": "opening",
+                "total_score": 143.5472,
+                "weighted_terms": {
+                  "cash": 6.75,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 6.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 64.8964,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.5292,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -1.2
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              },
+              "own_strength": 143.5472,
+              "phase": "auction",
+              "player_id": "p1",
+              "relative_score": 64.6867,
+              "resource_pressure": {
+                "coal": 0.05,
+                "garbage": 0.0,
+                "oil": 0.03,
+                "uranium": 0.0
+              },
+              "round_number": 1,
+              "scoreboard": {
+                "average_opponent_score": 91.63,
+                "max_opponent_score": 93.13,
+                "opponent_adjustment": -78.8605,
+                "opponent_scores": [
+                  {
+                    "current_score": 93.13,
+                    "player_id": "p2",
+                    "refuel_projected_score": 93.13,
+                    "score_for_relative": 93.13,
+                    "threat_applied": false
+                  },
+                  {
+                    "current_score": 90.13,
+                    "player_id": "p3",
+                    "refuel_projected_score": 90.13,
+                    "score_for_relative": 90.13,
+                    "threat_applied": false
+                  }
+                ],
+                "own_score": 143.5472,
+                "relative_score": 64.6867
+              },
+              "stage": "opening",
+              "step": 1
+            },
+            "projected_kind": "hypothetical_purchase_at_price_guess",
+            "projected_relative_score": 64.6867,
+            "projected_score_delta": 47.4172,
+            "projection_horizon": "terminal_if_won",
+            "score_terms": {
+              "projected_kind": "hypothetical_purchase_at_price_guess",
+              "selection_rule": "max_auction_start_delta"
+            }
+          }
+        }
+      },
+      "phase": "auction",
+      "player_id": "p1",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 3,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {
+            "bid": 6
+          },
+          "intent_type": "auction_bid"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p2",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 5,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {
+            "bid": 7
+          },
+          "intent_type": "auction_bid"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p3",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 7,
+      "level": "debug",
+      "message": "Heuristic AI selected an intent.",
+      "payload": {
+        "controller": "ai_heuristics",
+        "label": "heuristic_decision",
+        "state": {
+          "candidate_action_count": 2,
+          "candidate_actions": [
+            {
+              "decision_score": 27.0,
+              "intent_payload": {
+                "bid": 8
+              },
+              "intent_type": "auction_bid",
+              "projected_kind": "hypothetical_purchase_at_min_bid",
+              "projected_relative_score": 76.8367,
+              "projected_score_delta": 59.5672,
+              "projection_horizon": "terminal_if_won",
+              "rank": 1,
+              "score_terms": {
+                "hard_cap": 40,
+                "minimum_bid": 8,
+                "plant_price": 5,
+                "plant_purchase_gain": 18.95,
+                "projected_kind": "hypothetical_purchase_at_min_bid",
+                "reserve": 35
+              }
+            },
+            {
+              "decision_score": 0.0,
+              "intent_payload": {},
+              "intent_type": "auction_pass",
+              "projected_kind": "current_state_after_pass",
+              "projected_relative_score": 17.2695,
+              "projected_score_delta": 0.0,
+              "projection_horizon": "immediate_state",
+              "rank": 2,
+              "score_terms": {
+                "projected_kind": "current_state_after_pass"
+              }
+            }
+          ],
+          "candidate_actions_truncated": false,
+          "current_evaluation": {
+            "average_opponent_strength": 91.63,
+            "formula": {
+              "average_opponent_strength_weight": -0.2,
+              "max_opponent_strength_weight": -0.65,
+              "own_strength_weight": 1.0
+            },
+            "max_opponent_strength": 93.13,
+            "opponent_adjustment": -78.8605,
+            "opponent_strength_model": "max(current_strength, best_affordable_partial_refuel_projected_strength)",
+            "opponent_threats": [
+              {
+                "current_strength": 93.13,
+                "evaluated_refuel_baskets": 0,
+                "player_id": "p2",
+                "projected_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "refuel_basket": {},
+                "refuel_cost": 0,
+                "refuel_projected_strength": 93.13,
+                "refuel_projection_kind": "no_affordable_refuel_improvement",
+                "threat_applied": false,
+                "threat_strength": 93.13
+              },
+              {
+                "current_strength": 90.13,
+                "evaluated_refuel_baskets": 0,
+                "player_id": "p3",
+                "projected_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "refuel_basket": {},
+                "refuel_cost": 0,
+                "refuel_projected_strength": 90.13,
+                "refuel_projection_kind": "no_affordable_refuel_improvement",
+                "threat_applied": false,
+                "threat_strength": 90.13
+              }
+            ],
+            "opponents": [
+              {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 50,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 0.0,
+                  "power_plants": [],
+                  "resource_exposure": 0.0,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 0,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 1,
+                  "unused_capacity": 0
+                },
+                "penalty_terms_total": 0.0,
+                "player_id": "p2",
+                "positive_terms_total": 93.13,
+                "stage": "opening",
+                "total_score": 93.13,
+                "weighted_terms": {
+                  "cash": 22.5,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 3.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 0.0,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.0,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -0.0
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              },
+              {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 50,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 0.0,
+                  "power_plants": [],
+                  "resource_exposure": 0.0,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 0,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 0,
+                  "unused_capacity": 0
+                },
+                "penalty_terms_total": 0.0,
+                "player_id": "p3",
+                "positive_terms_total": 90.13,
+                "stage": "opening",
+                "total_score": 90.13,
+                "weighted_terms": {
+                  "cash": 22.5,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 0.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 0.0,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.0,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -0.0
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              }
+            ],
+            "own": {
+              "metrics": {
+                "best_generation": {
+                  "income": 10,
+                  "plans": [],
+                  "powered": 0,
+                  "spent_units": 0,
+                  "spent_value": 0.0
+                },
+                "cash": 50,
+                "connected_cities": 0,
+                "frontier_score": 21.65,
+                "overbuild": 0,
+                "plant_portfolio_score": 0.0,
+                "power_plants": [],
+                "resource_exposure": 0.0,
+                "resource_totals": {
+                  "coal": 0,
+                  "garbage": 0,
+                  "oil": 0,
+                  "uranium": 0
+                },
+                "stored_resource_value": 0.0,
+                "total_output": 0,
+                "trigger_timing_score": 0.0,
+                "turn_order_value": 2,
+                "unused_capacity": 0
+              },
+              "penalty_terms_total": 0.0,
+              "player_id": "p1",
+              "positive_terms_total": 96.13,
+              "stage": "opening",
+              "total_score": 96.13,
+              "weighted_terms": {
+                "cash": 22.5,
+                "connected": 0.0,
+                "frontier": 47.63,
+                "income": 20.0,
+                "order": 6.0,
+                "overbuild_penalty": -0.0,
+                "plants": 0.0,
+                "powered": 0.0,
+                "resource_exposure_penalty": -0.0,
+                "resources": 0.0,
+                "trigger_timing": 0.0,
+                "unused_capacity_penalty": -0.0
+              },
+              "weights": {
+                "cash": 0.45,
+                "connected": 5.0,
+                "exposure": 1.8,
+                "frontier": 2.2,
+                "income": 2.0,
+                "order": 3.0,
+                "overbuild": 4.0,
+                "plants": 3.8,
+                "powered": 6.0,
+                "resources": 1.0,
+                "unused_capacity": 1.2
+              }
+            },
+            "own_strength": 96.13,
+            "phase": "auction",
+            "player_id": "p1",
+            "relative_score": 17.2695,
+            "resource_pressure": {
+              "coal": 0.0,
+              "garbage": 0.0,
+              "oil": 0.0,
+              "uranium": 0.0
+            },
+            "round_number": 1,
+            "scoreboard": {
+              "average_opponent_score": 91.63,
+              "max_opponent_score": 93.13,
+              "opponent_adjustment": -78.8605,
+              "opponent_scores": [
+                {
+                  "current_score": 93.13,
+                  "player_id": "p2",
+                  "refuel_projected_score": 93.13,
+                  "score_for_relative": 93.13,
+                  "threat_applied": false
+                },
+                {
+                  "current_score": 90.13,
+                  "player_id": "p3",
+                  "refuel_projected_score": 90.13,
+                  "score_for_relative": 90.13,
+                  "threat_applied": false
+                }
+              ],
+              "own_score": 96.13,
+              "relative_score": 17.2695
+            },
+            "stage": "opening",
+            "step": 1
+          },
+          "decision_type": "auction_bid",
+          "intent_payload": {
+            "bid": 8
+          },
+          "intent_type": "auction_bid",
+          "schema_version": 4,
+          "search_summary": {
+            "decision_family": "auction_bid",
+            "legal_action_count": 2
+          },
+          "selected_action": {
+            "decision_score": 27.0,
+            "intent_payload": {
+              "bid": 8
+            },
+            "intent_type": "auction_bid",
+            "projected_evaluation": {
+              "average_opponent_strength": 91.63,
+              "formula": {
+                "average_opponent_strength_weight": -0.2,
+                "max_opponent_strength_weight": -0.65,
+                "own_strength_weight": 1.0
+              },
+              "max_opponent_strength": 93.13,
+              "opponent_adjustment": -78.8605,
+              "opponent_strength_model": "max(current_strength, best_affordable_partial_refuel_projected_strength)",
+              "opponent_threats": [
+                {
+                  "current_strength": 93.13,
+                  "evaluated_refuel_baskets": 0,
+                  "player_id": "p2",
+                  "projected_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "refuel_basket": {},
+                  "refuel_cost": 0,
+                  "refuel_projected_strength": 93.13,
+                  "refuel_projection_kind": "no_affordable_refuel_improvement",
+                  "threat_applied": false,
+                  "threat_strength": 93.13
+                },
+                {
+                  "current_strength": 90.13,
+                  "evaluated_refuel_baskets": 0,
+                  "player_id": "p3",
+                  "projected_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "refuel_basket": {},
+                  "refuel_cost": 0,
+                  "refuel_projected_strength": 90.13,
+                  "refuel_projection_kind": "no_affordable_refuel_improvement",
+                  "threat_applied": false,
+                  "threat_strength": 90.13
+                }
+              ],
+              "opponents": [
+                {
+                  "metrics": {
+                    "best_generation": {
+                      "income": 10,
+                      "plans": [],
+                      "powered": 0,
+                      "spent_units": 0,
+                      "spent_value": 0.0
+                    },
+                    "cash": 50,
+                    "connected_cities": 0,
+                    "frontier_score": 21.65,
+                    "overbuild": 0,
+                    "plant_portfolio_score": 0.0,
+                    "power_plants": [],
+                    "resource_exposure": 0.0,
+                    "resource_totals": {
+                      "coal": 0,
+                      "garbage": 0,
+                      "oil": 0,
+                      "uranium": 0
+                    },
+                    "stored_resource_value": 0.0,
+                    "total_output": 0,
+                    "trigger_timing_score": 0.0,
+                    "turn_order_value": 1,
+                    "unused_capacity": 0
+                  },
+                  "penalty_terms_total": 0.0,
+                  "player_id": "p2",
+                  "positive_terms_total": 93.13,
+                  "stage": "opening",
+                  "total_score": 93.13,
+                  "weighted_terms": {
+                    "cash": 22.5,
+                    "connected": 0.0,
+                    "frontier": 47.63,
+                    "income": 20.0,
+                    "order": 3.0,
+                    "overbuild_penalty": -0.0,
+                    "plants": 0.0,
+                    "powered": 0.0,
+                    "resource_exposure_penalty": -0.0,
+                    "resources": 0.0,
+                    "trigger_timing": 0.0,
+                    "unused_capacity_penalty": -0.0
+                  },
+                  "weights": {
+                    "cash": 0.45,
+                    "connected": 5.0,
+                    "exposure": 1.8,
+                    "frontier": 2.2,
+                    "income": 2.0,
+                    "order": 3.0,
+                    "overbuild": 4.0,
+                    "plants": 3.8,
+                    "powered": 6.0,
+                    "resources": 1.0,
+                    "unused_capacity": 1.2
+                  }
+                },
+                {
+                  "metrics": {
+                    "best_generation": {
+                      "income": 10,
+                      "plans": [],
+                      "powered": 0,
+                      "spent_units": 0,
+                      "spent_value": 0.0
+                    },
+                    "cash": 50,
+                    "connected_cities": 0,
+                    "frontier_score": 21.65,
+                    "overbuild": 0,
+                    "plant_portfolio_score": 0.0,
+                    "power_plants": [],
+                    "resource_exposure": 0.0,
+                    "resource_totals": {
+                      "coal": 0,
+                      "garbage": 0,
+                      "oil": 0,
+                      "uranium": 0
+                    },
+                    "stored_resource_value": 0.0,
+                    "total_output": 0,
+                    "trigger_timing_score": 0.0,
+                    "turn_order_value": 0,
+                    "unused_capacity": 0
+                  },
+                  "penalty_terms_total": 0.0,
+                  "player_id": "p3",
+                  "positive_terms_total": 90.13,
+                  "stage": "opening",
+                  "total_score": 90.13,
+                  "weighted_terms": {
+                    "cash": 22.5,
+                    "connected": 0.0,
+                    "frontier": 47.63,
+                    "income": 20.0,
+                    "order": 0.0,
+                    "overbuild_penalty": -0.0,
+                    "plants": 0.0,
+                    "powered": 0.0,
+                    "resource_exposure_penalty": -0.0,
+                    "resources": 0.0,
+                    "trigger_timing": 0.0,
+                    "unused_capacity_penalty": -0.0
+                  },
+                  "weights": {
+                    "cash": 0.45,
+                    "connected": 5.0,
+                    "exposure": 1.8,
+                    "frontier": 2.2,
+                    "income": 2.0,
+                    "order": 3.0,
+                    "overbuild": 4.0,
+                    "plants": 3.8,
+                    "powered": 6.0,
+                    "resources": 1.0,
+                    "unused_capacity": 1.2
+                  }
+                }
+              ],
+              "own": {
+                "metrics": {
+                  "best_generation": {
+                    "income": 10,
+                    "plans": [],
+                    "powered": 0,
+                    "spent_units": 0,
+                    "spent_value": 0.0
+                  },
+                  "cash": 42,
+                  "connected_cities": 0,
+                  "frontier_score": 21.65,
+                  "overbuild": 0,
+                  "plant_portfolio_score": 17.078,
+                  "power_plants": [
+                    5
+                  ],
+                  "resource_exposure": 0.294,
+                  "resource_totals": {
+                    "coal": 0,
+                    "garbage": 0,
+                    "oil": 0,
+                    "uranium": 0
+                  },
+                  "stored_resource_value": 0.0,
+                  "total_output": 1,
+                  "trigger_timing_score": 0.0,
+                  "turn_order_value": 2,
+                  "unused_capacity": 1
+                },
+                "penalty_terms_total": -1.7292,
+                "player_id": "p1",
+                "positive_terms_total": 157.4264,
+                "stage": "opening",
+                "total_score": 155.6972,
+                "weighted_terms": {
+                  "cash": 18.9,
+                  "connected": 0.0,
+                  "frontier": 47.63,
+                  "income": 20.0,
+                  "order": 6.0,
+                  "overbuild_penalty": -0.0,
+                  "plants": 64.8964,
+                  "powered": 0.0,
+                  "resource_exposure_penalty": -0.5292,
+                  "resources": 0.0,
+                  "trigger_timing": 0.0,
+                  "unused_capacity_penalty": -1.2
+                },
+                "weights": {
+                  "cash": 0.45,
+                  "connected": 5.0,
+                  "exposure": 1.8,
+                  "frontier": 2.2,
+                  "income": 2.0,
+                  "order": 3.0,
+                  "overbuild": 4.0,
+                  "plants": 3.8,
+                  "powered": 6.0,
+                  "resources": 1.0,
+                  "unused_capacity": 1.2
+                }
+              },
+              "own_strength": 155.6972,
+              "phase": "auction",
+              "player_id": "p1",
+              "relative_score": 76.8367,
+              "resource_pressure": {
+                "coal": 0.05,
+                "garbage": 0.0,
+                "oil": 0.03,
+                "uranium": 0.0
+              },
+              "round_number": 1,
+              "scoreboard": {
+                "average_opponent_score": 91.63,
+                "max_opponent_score": 93.13,
+                "opponent_adjustment": -78.8605,
+                "opponent_scores": [
+                  {
+                    "current_score": 93.13,
+                    "player_id": "p2",
+                    "refuel_projected_score": 93.13,
+                    "score_for_relative": 93.13,
+                    "threat_applied": false
+                  },
+                  {
+                    "current_score": 90.13,
+                    "player_id": "p3",
+                    "refuel_projected_score": 90.13,
+                    "score_for_relative": 90.13,
+                    "threat_applied": false
+                  }
+                ],
+                "own_score": 155.6972,
+                "relative_score": 76.8367
+              },
+              "stage": "opening",
+              "step": 1
+            },
+            "projected_kind": "hypothetical_purchase_at_min_bid",
+            "projected_relative_score": 76.8367,
+            "projected_score_delta": 59.5672,
+            "projection_horizon": "terminal_if_won",
+            "score_terms": {
+              "hard_cap": 40,
+              "minimum_bid": 8,
+              "projected_kind": "hypothetical_purchase_at_min_bid",
+              "reserve": 35,
+              "selection_rule": "bid_minimum_while_within_reserve_and_hard_cap"
+            }
+          }
+        }
+      },
+      "phase": "auction",
+      "player_id": "p1",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 9,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {},
+          "intent_type": "auction_pass"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p2",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 11,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {},
+          "intent_type": "auction_pass"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p3",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 13,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_start",
+          "intent_payload": {
+            "bid": 4,
+            "plant_price": 4
+          },
+          "intent_type": "auction_start"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p2",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 15,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {
+            "bid": 5
+          },
+          "intent_type": "auction_bid"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p3",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 17,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {
+            "bid": 6
+          },
+          "intent_type": "auction_bid"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p2",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 19,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_bid",
+          "intent_payload": {},
+          "intent_type": "auction_pass"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p3",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    },
+    {
+      "event_type": "ai_state",
+      "index": 21,
+      "level": "debug",
+      "message": "Deterministic AI selected an intent.",
+      "payload": {
+        "controller": "ai_deterministic",
+        "label": "deterministic_decision",
+        "state": {
+          "decision_type": "auction_start",
+          "intent_payload": {
+            "bid": 6,
+            "plant_price": 6
+          },
+          "intent_type": "auction_start"
+        }
+      },
+      "phase": "auction",
+      "player_id": "p3",
+      "round_number": 1,
+      "source": "ai",
+      "state_snapshot": null,
+      "step": 1
+    }
+  ]
+}
