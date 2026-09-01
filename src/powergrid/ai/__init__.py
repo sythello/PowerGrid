@@ -13,6 +13,14 @@ from .evaluation import (
     build_default_evaluation_lineups,
     derive_final_standings,
     evaluate_ai_bucket,
+    select_evaluation_regions,
+)
+from .nn_rank_value.controller import NnRankValueAiController
+from .nn_rl_based.controller import NnRlBasedAiController
+from .profiled_deterministic import (
+    EfficiencyDeterministicAiController,
+    ExpansionDeterministicAiController,
+    ReserveDeterministicAiController,
 )
 from .strategic import StrategicAiController
 
@@ -20,7 +28,12 @@ from .strategic import StrategicAiController
 DeterministicAiSeat = DeterministicAiController
 
 AI_CONTROLLER_REGISTRY: dict[str, type[BaseAiController]] = {
+    "ai_nn_rl_based_v1": NnRlBasedAiController,
+    "ai_nn_rank_value_v1": NnRankValueAiController,
     "ai_heuristics": StrategicAiController,
+    "ai_deterministic_efficiency": EfficiencyDeterministicAiController,
+    "ai_deterministic_expansion": ExpansionDeterministicAiController,
+    "ai_deterministic_reserve": ReserveDeterministicAiController,
     "ai_deterministic": DeterministicAiController,
     "ai": DeterministicAiController,
 }
@@ -53,8 +66,14 @@ __all__ = [
     "build_default_evaluation_lineups",
     "DeterministicAiController",
     "DeterministicAiSeat",
+    "EfficiencyDeterministicAiController",
+    "ExpansionDeterministicAiController",
+    "NnRankValueAiController",
+    "NnRlBasedAiController",
+    "ReserveDeterministicAiController",
     "derive_final_standings",
     "evaluate_ai_bucket",
+    "select_evaluation_regions",
     "StrategicAiController",
     "build_ai_controller",
     "register_ai_controller",

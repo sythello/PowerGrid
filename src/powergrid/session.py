@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -122,6 +123,34 @@ class GameSession:
             winner_result=self._winner_result,
             analysis_log=self._make_analysis_log_writer(),
         )
+
+    def fork(
+        self,
+        *,
+        seat_agents: dict[str, SeatAgent] | None = None,
+        include_logs: bool = False,
+    ) -> "GameSession":
+        """Create an isolated in-memory copy for AI rollouts.
+
+        The phase cursor and pending bureaucracy choices live in the session rather
+        than ``GameState`` and therefore must be copied together with the rules
+        state. Logs are omitted by default to keep counterfactual rollouts cheap.
+        """
+
+        cloned = GameSession(
+            GameState.from_dict(self._state.to_dict()),
+            seat_agents or dict(self._seat_agents),
+        )
+        cloned._event_log = deepcopy(self._event_log) if include_logs else []
+        cloned._game_log = deepcopy(self._game_log) if include_logs else []
+        cloned._static_log_data = deepcopy(self._static_log_data)
+        cloned._last_round_summary = deepcopy(self._last_round_summary)
+        cloned._round_summaries = deepcopy(self._round_summaries)
+        cloned._winner_result = deepcopy(self._winner_result)
+        cloned._phase_marker = self._phase_marker
+        cloned._active_index = self._active_index
+        cloned._bureaucracy_choices = deepcopy(self._bureaucracy_choices)
+        return cloned
 
     def current_request(self) -> TurnRequest | None:
         self._sync_phase_cursor()

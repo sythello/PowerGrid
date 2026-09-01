@@ -13,13 +13,21 @@ from powergrid.ai import (
     build_default_evaluation_lineups,
     derive_final_standings,
     evaluate_ai_bucket,
+    select_evaluation_regions,
 )
 from powergrid.ai.evaluation import (
     _compute_pairwise_game_updates,
     _controller_pair_actual_score,
     _pair_k_factor,
 )
-from powergrid.model import GameConfig, advance_phase, create_initial_state, make_default_seat_configs, resolve_winner
+from powergrid.model import (
+    GameConfig,
+    advance_phase,
+    create_initial_state,
+    legal_region_sets,
+    make_default_seat_configs,
+    resolve_winner,
+)
 from powergrid.tools.evaluate_ai_ratings import main as evaluate_ai_ratings_main
 
 
@@ -90,6 +98,31 @@ class AiEvaluationTests(unittest.TestCase):
         self.assertEqual(_pair_k_factor(24.0, 2), 24.0)
         self.assertEqual(_pair_k_factor(24.0, 3), 12.0)
 
+    def test_random_region_selection_is_legal_reproducible_and_varies(self) -> None:
+        config = AiEvaluationBucketConfig(region_sampling_seed=17)
+        legal_sets = set(legal_region_sets("germany", 3))
+        first_schedule = tuple(select_evaluation_regions(config, seed) for seed in range(100))
+        repeated_schedule = tuple(select_evaluation_regions(config, seed) for seed in range(100))
+
+        self.assertEqual(first_schedule, repeated_schedule)
+        self.assertTrue(set(first_schedule).issubset(legal_sets))
+        self.assertGreater(len(set(first_schedule)), 1)
+
+    def test_explicit_regions_disable_random_sampling(self) -> None:
+        selected_regions = ("black", "blue", "magenta")
+        config = AiEvaluationBucketConfig(
+            selected_regions=selected_regions,
+            region_sampling_seed=99,
+        )
+
+        self.assertEqual(config.region_selection_mode, "fixed_explicit")
+        self.assertTrue(
+            all(
+                select_evaluation_regions(config, seed) == selected_regions
+                for seed in range(20)
+            )
+        )
+
     def test_derive_final_standings_matches_winner_tiebreak_rules(self) -> None:
         base_state = advance_phase(
             create_initial_state(
@@ -144,9 +177,16 @@ class AiEvaluationTests(unittest.TestCase):
 
         self.assertEqual(report.config.map_id, "germany")
         self.assertEqual(report.config.player_count, 3)
-        self.assertEqual(report.resolved_selected_regions, ("black", "blue", "magenta"))
+        self.assertEqual(report.config.region_selection_mode, "random_all_legal")
+        self.assertEqual(report.resolved_selected_regions, ())
+        self.assertEqual(len(report.sampled_region_sets), 1)
         self.assertEqual(len(report.scheduled_lineups), 2)
         self.assertEqual(len(report.game_summaries), 2)
+        self.assertEqual(
+            report.game_summaries[0].selected_regions,
+            report.game_summaries[1].selected_regions,
+        )
+        self.assertIn(report.game_summaries[0].selected_regions, report.legal_region_sets)
         self.assertEqual(
             {summary.controller_name for summary in report.controller_summaries},
             {"ai_deterministic", "ai_heuristics"},
@@ -175,6 +215,9 @@ class AiEvaluationTests(unittest.TestCase):
                 payload = json.load(handle)
             self.assertEqual(payload["bucket"]["map_id"], "germany")
             self.assertEqual(payload["bucket"]["player_count"], 3)
+            self.assertEqual(payload["bucket"]["region_selection_mode"], "random_all_legal")
+            self.assertEqual(len(payload["bucket"]["region_game_counts"]), 1)
+            self.assertTrue(all(game["selected_regions"] for game in payload["games"]))
             self.assertEqual(len(payload["schedule"]["lineups"]), 2)
             self.assertIn("Leaderboard:", stdout.getvalue())
             self.assertIn("Wrote report to", stdout.getvalue())

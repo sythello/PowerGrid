@@ -42,6 +42,7 @@ This repo implements Power Grid across several layers:
    - terminal CLI
 5. AI
    - rule-based controllers
+   - feature-engineered NumPy rank/value controller and offline training pipeline
    - Elo evaluation tooling
 6. Tests and manual scripts
 
@@ -102,8 +103,17 @@ The most important architectural boundary is:
   - abstract AI controller and analysis-log helpers
 - [deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/deterministic.py)
   - simple baseline AI
+- [profiled_deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/profiled_deterministic.py)
+  - three fast, no-lookahead behavior policies for diverse dataset generation
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py)
   - stronger heuristic AI
+- [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value)
+  - public observation and candidate encoding
+  - terminal-label dataset/counterfactual rollout generation
+  - NumPy MLP training/checkpoints and `ai_nn_rank_value_v1` controller
+- [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based)
+  - listwise Policy and multi-player vector-Q model
+  - full-action semantic search, decision-grouped Parquet data, training, and `ai_nn_rl_based_v1`
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py)
   - offline Elo evaluation system
 - [agent.md](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/agent.md)
@@ -117,6 +127,11 @@ User-facing entrypoints:
 - [play_cli_game.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/play_cli_game.py)
 - [run_ai_game.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/run_ai_game.py)
 - [evaluate_ai_ratings.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/evaluate_ai_ratings.py)
+- [generate_nn_rank_value_dataset.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/generate_nn_rank_value_dataset.py)
+- [train_nn_rank_value.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/train_nn_rank_value.py)
+- `generate_nn_rl_based_dataset.py`, `train_nn_rl_based.py`, `validate_nn_rl_based.py`
+- [validate_profiled_deterministic_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/validate_profiled_deterministic_ai.py)
+- `validate_nn_observation.py`, `validate_nn_candidates.py`, `validate_nn_dataset.py`, `validate_nn_model.py`, `validate_nn_training.py`, `validate_nn_controller.py`
 - [show_initial_state.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/show_initial_state.py)
 - [run_auction_scenario.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/run_auction_scenario.py)
 - [validate_static_data.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/validate_static_data.py)
@@ -186,6 +201,11 @@ Current controller names:
 - `human`
 - `ai_deterministic`
 - `ai_heuristics`
+- `ai_deterministic_efficiency`
+- `ai_deterministic_expansion`
+- `ai_deterministic_reserve`
+- `ai_nn_rank_value_v1`
+- `ai_nn_rl_based_v1`
 - `ai`
 
 Current meanings:
@@ -230,6 +250,9 @@ Use these when validating user-facing behavior:
   - `PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings --games-per-lineup 20 --seed-start 1`
 - Static data validation:
   - `PYTHONPATH=src python -m powergrid.tools.validate_static_data`
+- Neural AI design/training/validation:
+  - see [docs/ai_nn_rank_value_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rank_value_v1.md)
+  - see [docs/ai_nn_rl_based_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rl_based_v1.md)
 - Manual scripts:
   - see [tests/manual_test/README.md](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/manual_test/README.md)
 
@@ -279,11 +302,13 @@ Start with:
 - [src/powergrid/ai/base.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/base.py)
 - [src/powergrid/ai/deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/deterministic.py)
 - [src/powergrid/ai/strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py)
+- [src/powergrid/ai/nn_rank_value](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value)
 - [src/powergrid/ai/evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py)
 
 Validate with:
 
 - [tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py)
+- [tests/test_nn_rank_value.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_nn_rank_value.py)
 - [tests/test_ai_evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai_evaluation.py)
 - [tests/test_session.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_session.py) if logging or session coupling changes
 

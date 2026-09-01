@@ -208,6 +208,11 @@ __marimo__/
 
 *.DS_Store*
 
-# Generated analysis logs
+# Generated analysis logs and local neural datasets/checkpoints
 artifacts/game_logs/
 artifacts/strategy_logs/
+artifacts/nn_rank_value/
+artifacts/datasets/nn_rl_*/
+artifacts/models/ai_nn_rl_based*.npz
+artifacts/validation/ai_nn_rl_based*.json
+artifacts/ai_ratings/ai_nn_rl_based*.json

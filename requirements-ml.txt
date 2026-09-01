@@ -1,0 +1,3 @@
+# Runtime/training dependencies for ai_nn_rank_value_v1.
+numpy>=1.23,<3
+pyarrow>=12,<22

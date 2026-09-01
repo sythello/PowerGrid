@@ -35,7 +35,12 @@ The AI layer is intentionally small at the public seam:
   - Abstract seat agent interface.
   - Every AI must implement `choose_intent(request, snapshot) -> GuiIntent`.
 - Registry in [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py)
+  - `ai_nn_rl_based_v1` -> `NnRlBasedAiController`
+  - `ai_nn_rank_value_v1` -> `NnRankValueAiController`
   - `ai_heuristics` -> `StrategicAiController`
+  - `ai_deterministic_efficiency` -> `EfficiencyDeterministicAiController`
+  - `ai_deterministic_expansion` -> `ExpansionDeterministicAiController`
+  - `ai_deterministic_reserve` -> `ReserveDeterministicAiController`
   - `ai_deterministic` -> `DeterministicAiController`
   - `ai` -> `DeterministicAiController` as the generic/default alias
 - Session integration in [../session.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/session.py)
@@ -43,6 +48,7 @@ The AI layer is intentionally small at the public seam:
   - `advance_one_ai_action()` and `advance_until_blocked()` call `choose_intent(...)`
   - The AI layer does not mutate session state directly; it only returns intents
   - `GameSnapshot.analysis_log` exposes an AI-safe structured logging hook for diagnostics
+  - `GameSession.fork()` copies state plus session-owned cursors for isolated rollout labels
 
 This means the core contract is:
 
@@ -54,9 +60,21 @@ This means the core contract is:
 
 - [base.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/base.py): abstract controller base
 - [deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/deterministic.py): simple baseline AI
+- [profiled_deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/profiled_deterministic.py): three no-lookahead, strength-calibrated data-generation policies
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
+- [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value): public observation, candidates, dataset generation, NumPy MLP/training, and neural controller
+- [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based): listwise Policy/vector-Q model, full-action semantic search, decision-grouped dataset/training, and Policy-only controller
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py): registry and controller construction
+
+The neural controller's full feature/label/model/command specification is in
+[../../../docs/ai_nn_rank_value_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rank_value_v1.md).
+The offline-RL Policy/vector-Q controller is specified in
+[../../../docs/ai_nn_rl_based_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rl_based_v1.md).
+Its exhaustive 513-state/42-action feature dictionary is in
+[../../../docs/ai_nn_rank_value_v1_feature_dictionary.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rank_value_v1_feature_dictionary.md).
+The profiled deterministic design, calibration, heuristic speed levers, and generation
+benchmarks are in [../../../docs/profiled_deterministic_ai.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/profiled_deterministic_ai.md).
 
 ## AI Logging And Game Logs
 
@@ -108,6 +126,8 @@ Recommended usage inside controllers:
 Current shipped AIs:
 
 - deterministic controllers emit one compact structured AI decision log entry per chosen intent
+- profiled deterministic controllers emit `profiled_deterministic_decision` entries
+  with controller/profile angle and the chosen intent
 - heuristic controllers emit one detailed structured AI reasoning log entry per chosen intent
   - label: `heuristic_decision`
   - includes current relative-state evaluation with weighted subterms
@@ -115,6 +135,12 @@ Current shipped AIs:
   - includes ranked candidate actions with decision scores and projected relative scores
   - includes the selected action, its decision score, and a detailed projected evaluation
   - includes a search summary for the phase-specific search path
+- neural rank-value controllers emit one batched candidate-ranking entry per intent
+  - label: `nn_rank_value_decision`
+  - includes checkpoint metadata, all candidate intents, win/rank predictions, combined scores, and selection
+- neural RL controllers emit one Policy-ranked candidate entry per intent
+  - label: `nn_rl_based_decision`
+  - includes checkpoint/player-slot metadata, Policy probabilities, actor Q, all-player Q vectors, and selection
 
 ## Current Controller Behavior
 
@@ -214,6 +240,114 @@ Implemented behavior:
   - Records candidate action scores from auction, resource, build, pending, and bureaucracy searches
   - Records selected-action projected evaluation details for cross-turn strategy analysis
 
+### Profiled deterministic controllers
+
+Purpose:
+
+- Fast and reproducible behavior diversity for NN dataset generation
+- No state cloning, recursive resource search, auction economy rollout, or build beam search
+- Held-out strength calibrated against `ai_deterministic`
+
+Profiles:
+
+- `ai_deterministic_efficiency`
+  - plant/output/run-cost value, cheap-fuel buffer, total-build-cost priority
+- `ai_deterministic_expansion`
+  - output and network growth, largest resource deficit, connection-cost priority
+- `ai_deterministic_reserve`
+  - purchase/run-cost and ecological preference, one-unit resource buying, cash reserve
+
+All three reuse the original deterministic pending-decision and bureaucracy legality
+logic. Dataset generation rotates the original plus these three profiles by default;
+`ai_heuristics` must be requested explicitly when its slower search behavior is wanted.
+
+### `NnRankValueAiController`
+
+Purpose:
+
+- First trainable AI baseline, exposed as `ai_nn_rank_value_v1`
+- Scores dynamic legal `(public state, candidate action)` rows with a NumPy MLP
+- Keeps the same `choose_intent(...)` and session legality boundary as rule-based AIs
+
+Implemented behavior:
+
+- Constructs a 513-dimensional actor-relative public observation
+  - excludes seed and hidden deck identities/order
+  - zero-pads to six players and fixed market/plant slots
+- Constructs a 42-dimensional candidate-action vector
+- Generates deterministic phase-specific candidates
+  - all explicit discard and generation plans
+  - minimum bid/pass auction decisions
+  - all affordable resource quantities
+  - single-city/finish build decisions
+- Runs a `555 -> 128 -> 64 -> 2` two-head MLP
+  - sigmoid win-probability head
+  - tanh normalized-rank head
+- Uses `0.7 * P(win) + 0.3 * normalized_rank` at inference
+- Loads `data/ai_models/ai_nn_rank_value_v1.npz` by default
+  - override with `POWERGRID_NN_RANK_VALUE_CHECKPOINT`
+  - verifies feature names embedded in the checkpoint
+- Is deterministic for a fixed checkpoint and state
+
+Training support:
+
+- behavior-policy self-play produces selected state/action rows with terminal labels
+- optional `GameSession.fork()` rollouts label counterfactual candidates
+- final labels are `is_winner` and normalized `rank_value`
+- generation streams one completed game at a time into Zstandard-compressed Parquet
+  shards; parallel workers are bounded, so memory does not scale with dataset size
+- each game is one Parquet row group, and shards target 512 MiB by default
+- a checksummed manifest records Parquet/feature schemas and per-shard rows/games/bytes
+- only the first three complete games are retained as human-readable JSONL examples
+- train/validation/test assignment is a deterministic SHA-256 hash of complete game id
+- training normalization, optimizer batches, and split evaluation all stream from Parquet
+- loss is binary cross entropy plus rank-value mean squared error
+- bundled checkpoint is a functional bootstrap artifact, not a strength-qualified replacement for `ai_heuristics`
+
+### `NnRlBasedAiController`
+
+Purpose:
+
+- Offline approximate-policy-iteration baseline exposed as `ai_nn_rl_based_v1`
+- Removes a separate V head and computes `V_i(s) = E_{a~policy}[Q_i(s,a)]`
+- Uses one listwise Policy head and one six-slot, multi-player vector-Q head
+
+Implemented behavior:
+
+- Reuses the 513-state/42-action public feature and runtime candidate schemas
+- Scores every legal runtime candidate in one NumPy batch
+- Chooses only by maximum Policy logit online, with candidate order as stable tie-break
+- Logs Policy probability, current-actor Q, and Q mapped to every player id
+- Supports only Germany with three players in v1
+- Loads `data/ai_models/ai_nn_rl_based_v1.npz` by default
+  - override with `POWERGRID_NN_RL_BASED_CHECKPOINT`
+
+Training/search support:
+
+- Behavior cloning uses canonical `ai_deterministic` actions
+- Chosen actions receive all-player terminal-rank Monte Carlo Q labels
+- Deterministically sampled roots receive labels for every candidate from a frozen target Q
+- Every edge applies one candidate, then continues to an auction/resource/build/bureaucracy/pending semantic boundary
+- Depth 1 is complete; adaptive depth 2 is accepted only when every action fits the node budget
+- Player values are remapped by player id whenever the current actor changes
+- Sibling forks share one hidden-deck determinization while observations continue to exclude hidden order
+- Data uses one decision per Parquet row, one complete game per row group, checksummed shards, game-exclusive splits, and three JSONL examples
+- Stage-1 conservative improvement can retain every searched row plus an equal deterministic
+  non-search anchor sample with `--training-sampling balanced_search`
+- `advantage_gate` keeps the deterministic one-hot target unless a representable searched action
+  clears the configured actor-Q margin; accepted targets assign 0.75 to that action and 0.25 to
+  the deterministic action
+- Germany/3-player generation cycles by seed over all 13 legal contiguous region sets unless an explicit set/list is supplied
+- Parallel generation keeps at most `2 * workers` complete games in flight and falls back to a bounded thread pool where process semaphores are unavailable
+- Online controller inference never forks or searches
+- `powergrid.tools.evaluate_nn_rl_paired_rollouts` audits every Policy deviation on
+  held-out deterministic trajectories by pairing the RL/baseline first action from the
+  same session state and continuing both branches with `ai_deterministic` to terminal
+- `powergrid.tools.evaluate_nn_rl_deterministic_suite` runs the selected checkpoint
+  against the canonical, efficiency, expansion, and reserve deterministic controllers
+  with balanced seats and all-region cycling; the current bundled v1 checkpoint is the
+  `delta=0.10` model selected by paired-rollout plus end-to-end point-score gates
+
 ## Important Supporting Patterns
 
 The stronger AI relies heavily on these internal patterns:
@@ -240,6 +374,13 @@ There are two different “default” concepts in the codebase:
   - `ai` currently resolves to `ai_deterministic`
 - Explicit advanced controller
   - `ai_heuristics` resolves to `StrategicAiController`
+- Explicit trainable controller
+  - `ai_nn_rank_value_v1` resolves to `NnRankValueAiController`
+  - `ai_nn_rl_based_v1` resolves to `NnRlBasedAiController`
+- Explicit fast data-generation controllers
+  - `ai_deterministic_efficiency`
+  - `ai_deterministic_expansion`
+  - `ai_deterministic_reserve`
 
 Also note:
 
@@ -436,6 +577,11 @@ If you add a new AI:
 
 Reasonable next steps if we want a stronger AI without changing architecture:
 
+- collect candidate-level counterfactual labels or add a behavior-cloning policy head;
+  the 1 GiB behavior-only rank/value run generalized on labels but failed held-out Elo
+- extend the current multi-seed, multi-policy Germany data to more player counts/maps
+- benchmark new NN checkpoints by held-out-seed Elo before changing any default
+- add dataset merge/balancing and calibration diagnostics for the win head
 - add memoization inside strategic evaluation for repeated summaries
 - improve opponent modeling during auctions and endgame trigger decisions
 - improve build planning with better frontier/network centrality features
@@ -448,6 +594,42 @@ Useful commands after AI changes:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.test_ai tests.test_ai_evaluation tests.test_model tests.test_session tests.test_gui -q
+```
+
+Neural rank-value component checks:
+
+```bash
+PYTHONPATH=src python -m unittest tests.test_nn_rank_value -v
+PYTHONPATH=src python -m powergrid.tools.validate_nn_observation
+PYTHONPATH=src python -m powergrid.tools.validate_nn_candidates
+PYTHONPATH=src python -m powergrid.tools.validate_nn_dataset
+PYTHONPATH=src python -m powergrid.tools.validate_nn_model
+PYTHONPATH=src python -m powergrid.tools.validate_nn_training
+PYTHONPATH=src python -m powergrid.tools.validate_nn_controller
+```
+
+Neural RL Policy/vector-Q checks:
+
+```bash
+PYTHONPATH=src python -m unittest tests.test_nn_rl_based -v
+PYTHONPATH=src python -m powergrid.tools.validate_nn_rl_based \
+  --section all --output artifacts/validation/ai_nn_rl_based_v1.json
+
+# Formal model thresholds, including 50 full-rollout calibration roots:
+PYTHONPATH=src python -m powergrid.tools.validate_nn_rl_based \
+  --section training --dataset artifacts/datasets/nn_rl_bootstrap \
+  --search-dataset artifacts/datasets/nn_rl_search_1 \
+  --bootstrap-checkpoint artifacts/models/ai_nn_rl_based_bootstrap.npz \
+  --checkpoint src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz \
+  --calibration-roots 50 --enforce-acceptance
+```
+
+Profile behavior and held-out strength calibration:
+
+```bash
+PYTHONPATH=src python -m unittest tests.test_profiled_deterministic_ai -v
+PYTHONPATH=src python -m powergrid.tools.validate_profiled_deterministic_ai \
+  --games-per-lineup 30 --seed-start 9001
 ```
 
 If the change is isolated to AI logic, start with:

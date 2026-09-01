@@ -7,6 +7,13 @@ from pathlib import Path
 from powergrid.ai import AiEvaluationBucketConfig, evaluate_ai_bucket
 
 
+def _parse_regions(value: str) -> tuple[str, ...]:
+    regions = tuple(part.strip() for part in value.split(",") if part.strip())
+    if not regions:
+        raise argparse.ArgumentTypeError("regions must be a comma-separated non-empty list")
+    return regions
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate Power Grid AI controllers with Elo ratings.")
     parser.add_argument("--map", dest="map_id", default="germany")
@@ -19,6 +26,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--games-per-lineup", type=int, default=20)
     parser.add_argument("--seed-start", type=int, default=1)
+    parser.add_argument(
+        "--regions",
+        "--selected-regions",
+        dest="selected_regions",
+        type=_parse_regions,
+        default=(),
+        help=(
+            "Fix every game to one comma-separated legal region set. "
+            "If omitted, each game seed samples reproducibly from all legal sets."
+        ),
+    )
+    parser.add_argument(
+        "--region-sampling-seed",
+        type=int,
+        default=0,
+        help="Salt for reproducible random region sampling when --regions is omitted.",
+    )
     parser.add_argument("--initial-rating", type=float, default=1500.0)
     parser.add_argument("--k-factor", type=float, default=24.0)
     parser.add_argument(
@@ -31,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
         map_id=args.map_id,
         player_count=args.player_count,
         controller_names=tuple(args.controllers),
+        selected_regions=tuple(args.selected_regions),
+        region_sampling_seed=args.region_sampling_seed,
         games_per_lineup=args.games_per_lineup,
         seed_start=args.seed_start,
         initial_rating=args.initial_rating,
@@ -44,9 +70,16 @@ def main(argv: list[str] | None = None) -> int:
         handle.write("\n")
 
     print("AI Elo Evaluation")
+    if report.config.selected_regions:
+        region_description = f"fixed:{','.join(report.config.selected_regions)}"
+    else:
+        region_description = (
+            f"random_all_legal(seed={report.config.region_sampling_seed},"
+            f" covered={len(report.sampled_region_sets)}/{len(report.legal_region_sets)})"
+        )
     print(
         f"Bucket: map={report.config.map_id} players={report.config.player_count} "
-        f"regions={','.join(report.resolved_selected_regions)}"
+        f"regions={region_description}"
     )
     print(
         f"Games: {len(report.game_summaries)} "

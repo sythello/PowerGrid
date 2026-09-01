@@ -1047,6 +1047,31 @@ def select_play_areas(
     raise ModelValidationError("no contiguous playing zone could be selected for this map")
 
 
+def legal_region_sets(
+    map_id: str,
+    player_count: int,
+    data_root: str | None = None,
+) -> tuple[tuple[str, ...], ...]:
+    """Return every legal contiguous play-area set in stable lexical order."""
+
+    if not 3 <= player_count <= 6:
+        raise ModelValidationError("legal_region_sets supports 3-6 players")
+    game_map = load_map(map_id, data_root=data_root)
+    rules = load_rule_tables(data_root=data_root)
+    required_count = rules.player_count_rules[player_count]["areas"]
+    available_regions = tuple(sorted(region.id for region in game_map.regions))
+    region_sets = tuple(
+        candidate
+        for candidate in combinations(available_regions, required_count)
+        if _are_regions_contiguous(game_map, candidate)
+    )
+    if not region_sets:
+        raise ModelValidationError(
+            f"no legal region sets exist for map_id={map_id!r}, player_count={player_count}"
+        )
+    return region_sets
+
+
 def initialize_game(
     config: GameConfig,
     controllers: dict[str, Any] | None,

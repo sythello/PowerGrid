@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 from itertools import combinations
 
-from ..model import GameConfig, GameState, ModelValidationError, SeatConfig, WinnerResult
+from ..model import (
+    GameConfig,
+    GameState,
+    ModelValidationError,
+    SeatConfig,
+    WinnerResult,
+    legal_region_sets,
+)
 
 
 DEFAULT_EVALUATION_CONTROLLERS = ("ai_deterministic", "ai_heuristics")
@@ -22,10 +30,11 @@ class AiEvaluationBucketConfig:
     seed_start: int = 1
     initial_rating: float = DEFAULT_INITIAL_RATING
     k_factor: float = DEFAULT_K_FACTOR
+    region_sampling_seed: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "controller_names", tuple(self.controller_names))
-        object.__setattr__(self, "selected_regions", tuple(self.selected_regions))
+        object.__setattr__(self, "selected_regions", tuple(sorted(self.selected_regions)))
         if self.map_id != "germany" or self.player_count != 3:
             raise ModelValidationError("AI evaluation v1 only supports map_id='germany' with player_count=3")
         if len(self.controller_names) != len(set(self.controller_names)):
@@ -38,10 +47,23 @@ class AiEvaluationBucketConfig:
             raise ModelValidationError("games_per_lineup must be positive")
         if self.seed_start < 0:
             raise ModelValidationError("seed_start may not be negative")
+        if self.region_sampling_seed < 0:
+            raise ModelValidationError("region_sampling_seed may not be negative")
         if self.initial_rating <= 0:
             raise ModelValidationError("initial_rating must be positive")
         if self.k_factor <= 0:
             raise ModelValidationError("k_factor must be positive")
+        if self.selected_regions and self.selected_regions not in legal_region_sets(
+            self.map_id,
+            self.player_count,
+        ):
+            raise ModelValidationError(
+                "selected_regions must be a legal contiguous region set for the evaluation bucket"
+            )
+
+    @property
+    def region_selection_mode(self) -> str:
+        return "fixed_explicit" if self.selected_regions else "random_all_legal"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -49,6 +71,8 @@ class AiEvaluationBucketConfig:
             "player_count": self.player_count,
             "controller_names": list(self.controller_names),
             "selected_regions": list(self.selected_regions),
+            "region_selection_mode": self.region_selection_mode,
+            "region_sampling_seed": self.region_sampling_seed,
             "games_per_lineup": self.games_per_lineup,
             "seed_start": self.seed_start,
             "initial_rating": self.initial_rating,
@@ -134,6 +158,7 @@ class AiEvaluationGameSummary:
     game_index: int
     seed: int
     lineup: tuple[str, ...]
+    selected_regions: tuple[str, ...]
     winner_ids: tuple[str, ...]
     standings: tuple[AiEvaluationStanding, ...]
     powered_cities: dict[str, int]
@@ -145,6 +170,7 @@ class AiEvaluationGameSummary:
             "game_index": self.game_index,
             "seed": self.seed,
             "lineup": list(self.lineup),
+            "selected_regions": list(self.selected_regions),
             "winner_ids": list(self.winner_ids),
             "standings": [standing.to_dict() for standing in self.standings],
             "powered_cities": dict(self.powered_cities),
@@ -157,6 +183,8 @@ class AiEvaluationGameSummary:
 class AiEvaluationReport:
     config: AiEvaluationBucketConfig
     resolved_selected_regions: tuple[str, ...]
+    legal_region_sets: tuple[tuple[str, ...], ...]
+    sampled_region_sets: tuple[tuple[str, ...], ...]
     scheduled_lineups: tuple[tuple[str, ...], ...]
     controller_summaries: tuple[AiControllerRatingSummary, ...]
     controller_pair_summaries: tuple[AiControllerPairSummary, ...]
@@ -164,10 +192,24 @@ class AiEvaluationReport:
     rating_scale: float = RATING_SCALE
 
     def to_dict(self) -> dict[str, object]:
+        region_game_counts: dict[tuple[str, ...], int] = {}
+        for game in self.game_summaries:
+            region_game_counts[game.selected_regions] = (
+                region_game_counts.get(game.selected_regions, 0) + 1
+            )
         return {
             "bucket": {
                 **self.config.to_dict(),
                 "resolved_selected_regions": list(self.resolved_selected_regions),
+                "legal_region_sets": [list(values) for values in self.legal_region_sets],
+                "sampled_region_sets": [list(values) for values in self.sampled_region_sets],
+                "region_game_counts": [
+                    {
+                        "selected_regions": list(values),
+                        "games": count,
+                    }
+                    for values, count in sorted(region_game_counts.items())
+                ],
             },
             "algorithm": {
                 "name": "pairwise_elo",
@@ -218,6 +260,24 @@ def build_default_evaluation_lineups(
         (first, first, second),
         (first, second, second),
     )
+
+
+def select_evaluation_regions(
+    config: AiEvaluationBucketConfig,
+    game_seed: int,
+) -> tuple[str, ...]:
+    """Select a legal region set reproducibly and independently of game RNG."""
+
+    if config.selected_regions:
+        return config.selected_regions
+    candidates = legal_region_sets(config.map_id, config.player_count)
+    digest = hashlib.sha256(
+        (
+            f"{config.map_id}|{config.player_count}|"
+            f"{config.region_sampling_seed}|{game_seed}"
+        ).encode("utf-8")
+    ).digest()
+    return candidates[int.from_bytes(digest[:8], "big") % len(candidates)]
 
 
 def derive_final_standings(
@@ -285,21 +345,25 @@ def evaluate_ai_bucket(config: AiEvaluationBucketConfig) -> AiEvaluationReport:
     }
     controller_pair_stats: dict[tuple[str, str], dict[str, float | int]] = {}
     game_summaries: list[AiEvaluationGameSummary] = []
-    resolved_selected_regions: tuple[str, ...] = ()
+    all_legal_region_sets = legal_region_sets(config.map_id, config.player_count)
+    region_schedule = tuple(
+        select_evaluation_regions(config, config.seed_start + offset)
+        for offset in range(config.games_per_lineup)
+    )
     game_index = 0
 
     for lineup in scheduled_lineups:
         for offset in range(config.games_per_lineup):
             seed = config.seed_start + offset
+            selected_regions = region_schedule[offset]
             game_index += 1
-            game_summary, selected_regions = _run_evaluation_game(
+            game_summary = _run_evaluation_game(
                 config,
                 lineup,
                 seed=seed,
                 game_index=game_index,
+                selected_regions=selected_regions,
             )
-            if not resolved_selected_regions:
-                resolved_selected_regions = selected_regions
             game_summaries.append(game_summary)
             _accumulate_controller_stats(controller_stats, game_summary)
 
@@ -375,7 +439,9 @@ def evaluate_ai_bucket(config: AiEvaluationBucketConfig) -> AiEvaluationReport:
     )
     return AiEvaluationReport(
         config=config,
-        resolved_selected_regions=resolved_selected_regions,
+        resolved_selected_regions=config.selected_regions,
+        legal_region_sets=all_legal_region_sets,
+        sampled_region_sets=tuple(sorted(set(region_schedule))),
         scheduled_lineups=scheduled_lineups,
         controller_summaries=controller_summaries,
         controller_pair_summaries=controller_pair_summaries,
@@ -399,7 +465,8 @@ def _run_evaluation_game(
     *,
     seed: int,
     game_index: int,
-) -> tuple[AiEvaluationGameSummary, tuple[str, ...]]:
+    selected_regions: tuple[str, ...],
+) -> AiEvaluationGameSummary:
     from ..session import GameSession
 
     seat_configs = tuple(
@@ -414,7 +481,7 @@ def _run_evaluation_game(
         map_id=config.map_id,
         players=seat_configs,
         seed=seed,
-        selected_regions=config.selected_regions,
+        selected_regions=selected_regions,
     )
     session = GameSession.new_game(game_config)
     snapshot = session.advance_until_blocked()
@@ -424,18 +491,16 @@ def _run_evaluation_game(
             f"AI evaluation game failed for lineup={lineup!r} seed={seed}: {message}"
         )
     standings = derive_final_standings(snapshot.state, snapshot.winner_result)
-    return (
-        AiEvaluationGameSummary(
-            game_index=game_index,
-            seed=seed,
-            lineup=tuple(lineup),
-            winner_ids=snapshot.winner_result.winner_ids,
-            standings=standings,
-            powered_cities=dict(snapshot.winner_result.powered_cities),
-            money=dict(snapshot.winner_result.money),
-            connected_cities=dict(snapshot.winner_result.connected_cities),
-        ),
-        tuple(snapshot.state.selected_regions),
+    return AiEvaluationGameSummary(
+        game_index=game_index,
+        seed=seed,
+        lineup=tuple(lineup),
+        selected_regions=tuple(snapshot.state.selected_regions),
+        winner_ids=snapshot.winner_result.winner_ids,
+        standings=standings,
+        powered_cities=dict(snapshot.winner_result.powered_cities),
+        money=dict(snapshot.winner_result.money),
+        connected_cities=dict(snapshot.winner_result.connected_cities),
     )
 
 
@@ -557,4 +622,5 @@ __all__ = [
     "build_default_evaluation_lineups",
     "derive_final_standings",
     "evaluate_ai_bucket",
+    "select_evaluation_regions",
 ]

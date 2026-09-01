@@ -6,14 +6,14 @@ PowerGrid is a Python implementation of the Power Grid board game with:
 - a frontend-neutral session layer
 - a Tkinter GUI
 - a terminal CLI
-- multiple rule-based AI controllers
+- deterministic, heuristic-search, and trainable neural AI controllers
 - AI-vs-AI evaluation and structured game-log dumping
 
 The repository is organized for both gameplay and engine development. Most commands assume you are in the repo root and run them with `PYTHONPATH=src`.
 
 ## Quick Start
 
-This repo currently runs as plain Python modules rather than an installed package. The runtime is mostly standard-library only; the GUI uses `tkinter`.
+This repo currently runs as plain Python modules rather than an installed package. The runtime is mostly standard-library only; the GUI uses `tkinter`. The optional trainable AI/data pipeline requires NumPy and PyArrow, listed in `requirements-ml.txt`.
 
 Validate the bundled maps/rules data:
 
@@ -63,8 +63,13 @@ GUI launcher behavior:
 - choose `Seed`
 - choose each seat as `human` or `ai`
 - when a seat is `ai`, choose an AI version:
-  - `ai_heuristics`: stronger rule-based AI
-  - `ai_deterministic`: simpler, more predictable baseline AI
+    - `ai_heuristics`: stronger rule-based AI
+    - `ai_deterministic`: simpler, more predictable baseline AI
+    - `ai_deterministic_efficiency`: no-search plant/fuel-efficiency data policy
+    - `ai_deterministic_expansion`: no-search output/network-growth data policy
+    - `ai_deterministic_reserve`: no-search cash-preservation data policy
+    - `ai_nn_rank_value_v1`: feature-engineered NumPy MLP baseline using the bundled bootstrap checkpoint
+    - `ai_nn_rl_based_v1`: Germany/3-player Policy + multi-player vector-Q controller (requires a trained checkpoint)
 
 During AI turns, the GUI advances AI actions with a pause between actions and exposes a `Pause AI` / `Resume AI` control.
 
@@ -121,10 +126,23 @@ PYTHONPATH=src python -m powergrid.tools.analyze_strategy_logs \
 PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings --games-per-lineup 20 --seed-start 1
 ```
 
+默认情况下，每个 game seed 会从当前地图/人数的全部合法连续区域组合中可复现地随机
+采样；两种换座 lineup 在相同 seed 下使用同一区域组合。需要复现固定区域实验时可传：
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings \
+  --games-per-lineup 20 --seed-start 1 \
+  --regions black,blue,magenta
+```
+
+`--region-sampling-seed` 可改变随机区域调度而不改变游戏 seed。
+
 Current scope:
 
 - Elo evaluation is currently implemented for `germany` with `3` players
 - the default evaluated controllers are `ai_deterministic` and `ai_heuristics`
+- `ai_nn_rank_value_v1` can be supplied explicitly with `--controllers`, two controller types at a time
+- JSON output records every game's selected regions and aggregate region coverage/counts
 
 Output:
 
@@ -157,6 +175,15 @@ Seat controller names:
 - `human`
 - `ai_deterministic`
 - `ai_heuristics`
+- `ai_deterministic_efficiency`
+- `ai_deterministic_expansion`
+- `ai_deterministic_reserve`
+- `ai_nn_rank_value_v1`
+  - trainable state/action rank-value baseline
+  - loads the bundled checkpoint unless `POWERGRID_NN_RANK_VALUE_CHECKPOINT` is set
+- `ai_nn_rl_based_v1`
+  - offline-RL/search-distilled Policy + vector-Q AI for Germany/3-player games
+  - loads `src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz` unless `POWERGRID_NN_RL_BASED_CHECKPOINT` is set
 - `ai`
   - generic alias
   - currently resolves to the deterministic AI
@@ -203,6 +230,72 @@ PYTHONPATH=src python -m powergrid.tools.show_initial_state --players 3 --seed 7
 PYTHONPATH=src python -m powergrid.tools.run_auction_scenario --scenario first-round
 ```
 
+### Train and validate the neural rank-value AI
+
+Install its optional NumPy/Parquet dependencies:
+
+```bash
+python -m pip install -r requirements-ml.txt
+```
+
+Generate terminal-rank data and train a checkpoint:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.generate_nn_rank_value_dataset \
+  --output artifacts/nn_rank_value/train \
+  --games 100 \
+  --controllers ai_deterministic \
+    ai_deterministic_efficiency \
+    ai_deterministic_expansion \
+    ai_deterministic_reserve \
+  --region-set blue,magenta,black \
+  --region-set black,yellow,green \
+  --target-shard-size-mib 512 \
+  --workers 4
+
+PYTHONPATH=src python -m powergrid.tools.train_nn_rank_value \
+  --dataset artifacts/nn_rank_value/train \
+  --output artifacts/nn_rank_value/model.npz
+```
+
+The generated directory contains Zstandard-compressed Parquet shards, a checksummed
+`manifest.json`, deterministic game-level train/validation/test splits, and exactly
+three whole-game JSONL examples. Generated neural artifacts remain ignored by Git.
+
+Run the component validations:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.validate_nn_observation
+PYTHONPATH=src python -m powergrid.tools.validate_nn_candidates
+PYTHONPATH=src python -m powergrid.tools.validate_nn_dataset
+PYTHONPATH=src python -m powergrid.tools.validate_nn_model
+PYTHONPATH=src python -m powergrid.tools.validate_nn_training
+PYTHONPATH=src python -m powergrid.tools.validate_nn_controller
+```
+
+The complete feature, label, architecture, checkpoint, training, and validation
+specification is in [docs/ai_nn_rank_value_v1.md](docs/ai_nn_rank_value_v1.md). The
+bundled checkpoint is a functional bootstrap artifact; it is not yet a claim of
+strength over `ai_heuristics`.
+
+The three fast behavior policies, held-out strength calibration, heuristic search
+speed controls, and generation benchmarks are documented in
+[docs/profiled_deterministic_ai.md](docs/profiled_deterministic_ai.md).
+
+### Train and validate the neural RL Policy/Q AI
+
+`ai_nn_rl_based_v1` behavior-clones `ai_deterministic`, anchors vector Q with terminal
+rank, then distills full-action finite-depth semantic search into a Policy-only online
+controller. Bootstrap, search-iteration, validation, and evaluation commands are in
+[docs/ai_nn_rl_based_v1.md](docs/ai_nn_rl_based_v1.md).
+Dataset generation defaults to a deterministic seed-based cycle over all 13 legal
+Germany/3-player region sets.
+
+```bash
+PYTHONPATH=src python -m unittest tests.test_nn_rl_based -v
+PYTHONPATH=src python -m powergrid.tools.validate_nn_rl_based --section all
+```
+
 ### Explore manual interactive scripts
 
 See [tests/manual_test/README.md](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/manual_test/README.md).
@@ -224,7 +317,7 @@ Main code lives under [src/powergrid](/Users/mac/Desktop/syt/Projects/PowerGrid/
 - `session_types.py`: requests, intents, snapshots, log entry types
 - `cli.py`: terminal game loop and rendering helpers
 - `gui/`: Tkinter application shell and panels
-- `ai/`: AI registry, controllers, logging hooks, Elo evaluation
+- `ai/`: AI registry, rule-based and neural controllers, training data/model code, logging hooks, Elo evaluation
 - `rules_data.py`: JSON loading and static-data validation
 - `scenarios.py`: deterministic scenario builders for testing and manual flows
 - `tools/`: user-facing entrypoints
