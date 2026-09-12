@@ -212,6 +212,12 @@ def train_rl_model(
         metadata={
             "supported_map": "germany",
             "supported_player_count": 3,
+            "observation_schema_version": int(
+                metadata["observation_schema_version"]
+            ),
+            "action_feature_schema_version": int(
+                metadata["action_feature_schema_version"]
+            ),
             "training_dataset": str(root),
             "training_dataset_manifest_sha256": sha256_file(root / "manifest.json"),
             "target_checkpoint_sha256": metadata["generation"].get(

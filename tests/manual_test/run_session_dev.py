@@ -68,6 +68,7 @@ def main() -> None:
             intent = parse_intent(
                 snapshot.active_request.player_id,
                 snapshot.active_request.phase,
+                snapshot.active_request.metadata,
                 raw,
             )
         except (ModelValidationError, ValueError) as exc:
@@ -112,7 +113,7 @@ def print_help(phase: str, decision_type: str) -> None:
         print("Commands: start <plant_price> <bid>, bid <amount>, pass, status, events, help, quit")
         return
     if phase == "buy_resources":
-        print("Commands: buy <resource> <amount>, done, status, events, help, quit")
+        print("Commands: buy <amount>, skip, status, events, help, quit")
         return
     if phase == "build_houses":
         print("Commands: quote <city_id> [city_id ...], build <city_id> [city_id ...], done, status, events, help, quit")
@@ -122,7 +123,12 @@ def print_help(phase: str, decision_type: str) -> None:
         return
 
 
-def parse_intent(player_id: str, phase: str, command: str) -> GuiIntent:
+def parse_intent(
+    player_id: str,
+    phase: str,
+    metadata: dict[str, object],
+    command: str,
+) -> GuiIntent:
     tokens = command.split()
     lowered = tokens[0].lower()
     if lowered == "start" and len(tokens) == 3:
@@ -131,10 +137,14 @@ def parse_intent(player_id: str, phase: str, command: str) -> GuiIntent:
         return GuiIntent.auction_bid(player_id, int(tokens[1]))
     if lowered == "pass" and len(tokens) == 1:
         return GuiIntent.auction_pass(player_id)
-    if lowered == "buy" and len(tokens) == 3:
-        return GuiIntent.buy_resource(player_id, tokens[1].lower(), int(tokens[2]))
-    if lowered == "done" and len(tokens) == 1 and phase == "buy_resources":
-        return GuiIntent.finish_buying(player_id)
+    if lowered == "buy" and phase == "buy_resources" and len(tokens) in {2, 3}:
+        resource = str(metadata["resource"])
+        if len(tokens) == 3 and tokens[1].lower() != resource:
+            raise ValueError(f"current resource is {resource!r}")
+        amount = int(tokens[-1])
+        return GuiIntent.buy_resource(player_id, resource, amount)
+    if lowered in {"skip", "done"} and len(tokens) == 1 and phase == "buy_resources":
+        return GuiIntent.buy_resource(player_id, str(metadata["resource"]), 0)
     if lowered == "done" and len(tokens) == 1 and phase == "build_houses":
         return GuiIntent.finish_building(player_id)
     if lowered == "quote" and len(tokens) >= 2:

@@ -211,11 +211,18 @@ class GameSessionTests(unittest.TestCase):
             ResourceStorage(coal=4, hybrid_coal=1, hybrid_oil=3),
         )
 
-    def test_resource_phase_buy_and_done_advance_turn_order(self) -> None:
+    def test_resource_phase_uses_fixed_resource_order_and_advances_after_last_choice(self) -> None:
         session = GameSession.from_scenario("resource", seed=7)
         first_snapshot = session.snapshot()
         assert first_snapshot.active_request is not None
         active_player_id = first_snapshot.active_request.player_id
+        self.assertEqual(first_snapshot.active_request.metadata["resource"], "oil")
+        rejected = session.submit_intent(
+            GuiIntent.buy_resource(active_player_id, resource="coal", amount=0)
+        )
+        assert rejected.active_request is not None
+        self.assertEqual(rejected.active_request.metadata["resource"], "oil")
+        self.assertEqual(rejected.event_log[-1].level, "error")
         buy_action = next(
             action
             for action in first_snapshot.active_request.legal_actions
@@ -231,7 +238,12 @@ class GameSessionTests(unittest.TestCase):
             )
         )
         mid_money = _player(snapshot.state, active_player_id).elektro
-        snapshot = session.submit_intent(GuiIntent.finish_buying(active_player_id))
+        assert snapshot.active_request is not None
+        self.assertEqual(snapshot.active_request.player_id, active_player_id)
+        self.assertEqual(snapshot.active_request.metadata["resource"], "uranium")
+        snapshot = session.submit_intent(
+            GuiIntent.buy_resource(active_player_id, resource="uranium", amount=0)
+        )
 
         self.assertLess(mid_money, before_money)
         self.assertIsNotNone(snapshot.active_request)

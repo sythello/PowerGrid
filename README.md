@@ -275,8 +275,10 @@ PYTHONPATH=src python -m powergrid.tools.validate_nn_controller
 
 The complete feature, label, architecture, checkpoint, training, and validation
 specification is in [docs/ai_nn_rank_value_v1.md](docs/ai_nn_rank_value_v1.md). The
-bundled checkpoint is a functional bootstrap artifact; it is not yet a claim of
-strength over `ai_heuristics`.
+resource-schema-v2 migration is documented in
+[docs/ai_nn_resource_schema_v2.md](docs/ai_nn_resource_schema_v2.md). The bundled
+`ai_nn_rl_based_v1` checkpoint uses the current 520/52 schema; the legacy
+`ai_nn_rank_value_v1` checkpoint still requires retraining before use.
 
 The three fast behavior policies, held-out strength calibration, heuristic search
 speed controls, and generation benchmarks are documented in

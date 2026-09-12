@@ -12,6 +12,7 @@ from .model import (
     ModelValidationError,
     PlantRunPlan,
     PowerPlantCard,
+    RESOURCE_TYPES,
     remove_power_plant_from_player,
     advance_phase,
     apply_builds,
@@ -373,75 +374,86 @@ def _run_resource_phase(
     allow_debug_commands: bool,
 ) -> tuple[GameState, bool]:
     buy_order = tuple(reversed(state.player_order))
-    active_index = 0
-    while active_index < len(buy_order):
-        if state.pending_decision is not None:
-            state, quit_requested = _run_pending_decision(
-                state,
-                controllers,
-                output_fn=output_fn,
-                render_state=render_state,
-                allow_debug_commands=allow_debug_commands,
-            )
-            if quit_requested:
-                return state, True
-            continue
-        player_id = buy_order[active_index]
-        request = DecisionRequest(
-            player_id=player_id,
-            decision_type="buy_resources",
-            prompt=(
-                f"Resource buying for {player_id}. "
-                "Use: options, buy <resource> <amount>, done, status, help, quit"
-            ),
-            metadata={"phase": state.phase},
-        )
-        controller = controllers[player_id]
-        command = controller.choose_command(request).strip()
-        if not command:
-            if getattr(controller, "interactive", False):
-                continue
-            raise ModelValidationError(f"{player_id} returned an empty resource-buying command")
-        lowered = command.lower()
-        if lowered == "quit":
-            return state, True
-        if lowered == "status":
-            output_fn(render_game_state(state, active_player_id=player_id))
-            continue
-        if lowered == "help":
-            output_fn(_resource_help_text())
-            continue
-        if lowered == "options":
-            output_fn(_resource_options_text(state, player_id))
-            continue
-        if allow_debug_commands:
-            state, handled = _apply_debug_command(
-                state,
-                acting_player_id=player_id,
-                command=command,
-                output_fn=output_fn,
-            )
-            if handled:
+    for player_id in buy_order:
+        for resource_index, resource in enumerate(RESOURCE_TYPES):
+            while True:
+                legal_action = next(
+                    (
+                        action
+                        for action in legal_resource_purchases(state, player_id)
+                        if str(action.payload["resource"]) == resource
+                    ),
+                    None,
+                )
+                if legal_action is None:
+                    output_fn(f"{player_id} cannot buy {resource}; skipped automatically.")
+                    break
+                request = DecisionRequest(
+                    player_id=player_id,
+                    decision_type="buy_resources",
+                    prompt=(
+                        f"Choose how much {resource} {player_id} will buy. "
+                        "Use: buy <amount>, skip, options, status, help, quit"
+                    ),
+                    legal_actions=(legal_action,),
+                    metadata={
+                        "phase": state.phase,
+                        "resource": resource,
+                        "resource_index": resource_index,
+                    },
+                )
+                controller = controllers[player_id]
+                command = controller.choose_command(request).strip()
+                if not command:
+                    if getattr(controller, "interactive", False):
+                        continue
+                    raise ModelValidationError(
+                        f"{player_id} returned an empty resource-buying command"
+                    )
+                lowered = command.lower()
+                if lowered == "quit":
+                    return state, True
+                if lowered == "status":
+                    output_fn(render_game_state(state, active_player_id=player_id))
+                    continue
+                if lowered == "help":
+                    output_fn(_resource_help_text(resource))
+                    continue
+                if lowered == "options":
+                    output_fn(_resource_options_text(state, player_id, resource))
+                    continue
+                if allow_debug_commands:
+                    state, handled = _apply_debug_command(
+                        state,
+                        acting_player_id=player_id,
+                        command=command,
+                        output_fn=output_fn,
+                    )
+                    if handled:
+                        if render_state:
+                            output_fn(render_game_state(state, active_player_id=player_id))
+                        continue
+                try:
+                    amount = _parse_resource_quantity_command(command, resource)
+                    if amount > 0:
+                        state = purchase_resources(state, player_id, {resource: amount})
+                except (ModelValidationError, ValueError) as exc:
+                    if getattr(controller, "interactive", False):
+                        output_fn(f"Rejected: {exc}")
+                        continue
+                    raise ModelValidationError(
+                        f"{player_id} resource command {command!r} rejected: {exc}"
+                    ) from exc
+                output_fn(
+                    f"{player_id} bought {amount} {resource}."
+                    if amount > 0
+                    else f"{player_id} skipped {resource}."
+                )
                 if render_state:
                     output_fn(render_game_state(state, active_player_id=player_id))
-                continue
-        if lowered == "done":
-            active_index += 1
-            output_fn(f"{player_id} finished resource buying.")
-            output_fn("")
-            continue
-        try:
-            state = _apply_resource_command(state, player_id, command)
-        except (ModelValidationError, ValueError) as exc:
-            if getattr(controller, "interactive", False):
-                output_fn(f"Rejected: {exc}")
-                continue
-            raise ModelValidationError(
-                f"{player_id} resource command {command!r} rejected: {exc}"
-            ) from exc
-        output_fn("Accepted.")
-        if render_state:
-            output_fn(render_game_state(state, active_player_id=player_id))
+                break
+        output_fn(f"{player_id} finished resource buying.")
+        output_fn("")
     return state, False
 
 
@@ -706,11 +718,21 @@ def _apply_auction_command(state: GameState, player_id: str, command: str) -> Ga
     raise ValueError("expected: start <plant_price> <bid> or pass")
 
 
-def _apply_resource_command(state: GameState, player_id: str, command: str) -> GameState:
+def _parse_resource_quantity_command(command: str, resource: str) -> int:
     tokens = command.split()
-    if len(tokens) != 3 or tokens[0].lower() != "buy":
-        raise ValueError("expected: buy <resource> <amount>")
-    return purchase_resources(state, player_id, {tokens[1].lower(): int(tokens[2])})
+    if len(tokens) == 1 and tokens[0].lower() in {"skip", "done"}:
+        return 0
+    if len(tokens) == 2 and tokens[0].lower() == "buy":
+        amount = int(tokens[1])
+    elif len(tokens) == 3 and tokens[0].lower() == "buy":
+        if tokens[1].lower() != resource:
+            raise ValueError(f"expected a {resource} quantity choice")
+        amount = int(tokens[2])
+    else:
+        raise ValueError("expected: buy <amount> or skip")
+    if amount < 0:
+        raise ValueError("resource purchase amount cannot be negative")
+    return amount
 
 
 def _apply_build_command(state: GameState, player_id: str, command: str) -> GameState:
@@ -863,20 +885,22 @@ def _pending_options_text(state: GameState) -> str:
     return "Legal discard choices: " + prices
 
 
-def _resource_options_text(state: GameState, player_id: str) -> str:
-    actions = legal_resource_purchases(state, player_id)
-    if not actions:
-        return f"No legal resource purchases for {player_id}."
-    lines = [f"Legal resource purchases for {player_id}:"]
-    for action in actions:
-        payload = action.payload
-        lines.append(
-            f"  {payload['resource']}: "
-            f"max_units={payload['max_units']} "
-            f"max_affordable={payload['max_affordable_units']} "
-            f"unit_prices={payload['unit_prices']}"
-        )
-    return "\n".join(lines)
+def _resource_options_text(state: GameState, player_id: str, resource: str) -> str:
+    action = next(
+        (
+            action
+            for action in legal_resource_purchases(state, player_id)
+            if str(action.payload["resource"]) == resource
+        ),
+        None,
+    )
+    if action is None:
+        return f"No legal {resource} purchase for {player_id}."
+    payload = action.payload
+    return (
+        f"Legal {resource} quantity for {player_id}: 0..{payload['max_affordable_units']}; "
+        f"unit_prices={payload['unit_prices']}"
+    )
 
 
 def _build_options_text(state: GameState, player_id: str) -> str:
@@ -947,8 +971,11 @@ def _auction_help_text(state: GameState) -> str:
     return "Commands: options, start <plant_price> <bid>, pass, status, help, quit, debug-help"
 
 
-def _resource_help_text() -> str:
-    return "Commands: options, buy <resource> <amount>, done, status, help, quit, debug-help"
+def _resource_help_text(resource: str) -> str:
+    return (
+        f"Current resource: {resource}. Commands: options, buy <amount>, skip, "
+        "status, help, quit, debug-help"
+    )
 
 
 def _build_help_text() -> str:

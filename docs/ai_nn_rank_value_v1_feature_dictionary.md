@@ -1,5 +1,9 @@
 # `ai_nn_rank_value_v1` feature dictionary
 
+> This is a historical schema-v1 dictionary. The current resource-related runtime
+> schema is v2 (520 state / 52 action); see
+> [`ai_nn_resource_schema_v2.md`](ai_nn_resource_schema_v2.md).
+
 ## Scope
 
 This document is the exhaustive data dictionary for observation schema v1 and

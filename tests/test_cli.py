@@ -23,15 +23,15 @@ class CLIGameLoopTests(unittest.TestCase):
         controllers = {
             "p1": ScriptedController(
                 player_id="p1",
-                commands=["pass", "start 7 7", "buy oil 3", "done", "done", "run 7"],
+                commands=["pass", "start 7 7", "buy oil 3", "done", "run 7"],
             ),
             "p2": ScriptedController(
                 player_id="p2",
-                commands=["pass", "pass", "start 10 10", "buy coal 2", "done", "done", "run 10"],
+                commands=["pass", "pass", "start 10 10", "buy coal 2", "done", "run 10"],
             ),
             "p3": ScriptedController(
                 player_id="p3",
-                commands=["start 6 1", "buy garbage 1", "done", "done", "run 6"],
+                commands=["start 6 1", "buy garbage 1", "done", "run 6"],
             ),
         }
 
@@ -97,11 +97,11 @@ class CLIGameLoopTests(unittest.TestCase):
         controllers = {
             "p1": ScriptedController(
                 player_id="p1",
-                commands=["pass", "pass", "done", "done", "skip"],
+                commands=["pass", "pass", "done", "skip"],
             ),
             "p2": ScriptedController(
                 player_id="p2",
-                commands=["pass", "pass", "done", "done", "skip"],
+                commands=["pass", "pass", "done", "skip"],
             ),
             "p3": ScriptedController(
                 player_id="p3",

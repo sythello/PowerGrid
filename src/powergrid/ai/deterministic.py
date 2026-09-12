@@ -7,7 +7,6 @@ from ..model import (
     choose_plants_to_run,
     compute_powered_cities,
     legal_build_targets,
-    legal_resource_purchases,
 )
 from ..session_types import GameSnapshot, GuiIntent, TurnRequest
 from .base import BaseAiController
@@ -27,7 +26,7 @@ class DeterministicAiController(BaseAiController):
             self._log_decision(snapshot, request, intent)
             return intent
         if request.phase == "buy_resources":
-            intent = _choose_resource_intent(state, request.player_id)
+            intent = _choose_resource_intent(state, request)
             self._log_decision(snapshot, request, intent)
             return intent
         if request.phase == "build_houses":
@@ -132,29 +131,19 @@ def _resource_need_by_type(state: GameState, player_id: str) -> dict[str, int]:
     return deficits
 
 
-def _choose_resource_intent(state: GameState, player_id: str) -> GuiIntent:
-    actions = legal_resource_purchases(state, player_id)
-    if not actions:
-        return GuiIntent.finish_buying(player_id)
-    deficits = _resource_need_by_type(state, player_id)
-    candidate_actions = [
+def _choose_resource_intent(state: GameState, request: TurnRequest) -> GuiIntent:
+    player_id = request.player_id
+    resource = str(request.metadata["resource"])
+    chosen = next(
         action
-        for action in actions
-        if deficits.get(str(action.payload["resource"]), 0) > 0
-    ]
-    if not candidate_actions:
-        return GuiIntent.finish_buying(player_id)
-    chosen = min(
-        candidate_actions,
-        key=lambda action: (
-            int(action.payload["unit_prices"][0]),
-            str(action.payload["resource"]),
-        ),
+        for action in request.legal_actions
+        if action.action_type == "buy_resource"
+        and str(action.payload["resource"]) == resource
     )
-    resource = str(chosen.payload["resource"])
+    deficits = _resource_need_by_type(state, player_id)
     amount = min(
         int(chosen.payload["max_affordable_units"]),
-        max(1, deficits[resource]),
+        deficits[resource],
     )
     return GuiIntent.buy_resource(player_id, resource=resource, amount=amount)
 

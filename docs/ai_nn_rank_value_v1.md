@@ -1,5 +1,11 @@
 # `ai_nn_rank_value_v1`
 
+> **Runtime schema update:** the resource system now uses observation/action
+> feature schema v2 (520/52), documented in
+> [`ai_nn_resource_schema_v2.md`](ai_nn_resource_schema_v2.md). The bundled 513/42
+> checkpoint and the historical measurements below describe schema v1 and require
+> retraining before use with the current runtime.
+
 ## Status and intended use
 
 `ai_nn_rank_value_v1` is the repository's first trainable AI controller. It is a

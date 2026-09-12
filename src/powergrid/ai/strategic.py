@@ -236,7 +236,7 @@ class StrategicAiController(BaseAiController):
             self._log_decision(snapshot, request, intent, trace)
             return intent
         if request.phase == "buy_resources":
-            intent, trace = _choose_resource_intent(state, request.player_id)
+            intent, trace = _choose_resource_intent(state, request)
             self._log_decision(snapshot, request, intent, trace)
             return intent
         if request.phase == "build_houses":
@@ -717,16 +717,19 @@ def _choose_auction_bid_intent(state: GameState, player_id: str) -> tuple[GuiInt
     )
 
 
-def _choose_resource_intent(state: GameState, player_id: str) -> tuple[GuiIntent, _DecisionTrace]:
+def _choose_resource_intent(state: GameState, request: TurnRequest) -> tuple[GuiIntent, _DecisionTrace]:
+    player_id = request.player_id
+    resource = str(request.metadata["resource"])
     current_evaluation = _evaluate_relative_state_detail(state, player_id)
     current_score = _evaluate_relative_state(state, player_id)
-    depth = 3
-    actions = legal_resource_purchases(state, player_id)
-    if len(actions) > 8:
-        depth = 2
-    score, move, candidate_actions = _search_resource_purchase_decision(state, player_id, depth=depth)
-    if move is None:
-        intent = GuiIntent.finish_buying(player_id)
+    remaining_resources = RESOURCE_TYPES[RESOURCE_TYPES.index(resource) :]
+    score, amount, candidate_actions = _search_resource_purchase_decision(
+        state,
+        player_id,
+        resources=remaining_resources,
+    )
+    if amount == 0:
+        intent = GuiIntent.buy_resource(player_id, resource, 0)
         return intent, _DecisionTrace(
             current_evaluation=current_evaluation,
             candidate_actions=tuple(candidate_actions),
@@ -735,19 +738,19 @@ def _choose_resource_intent(state: GameState, player_id: str) -> tuple[GuiIntent
                 decision_score=score,
                 projected_evaluation=current_evaluation,
                 current_score=current_score,
-                score_terms={"selection_rule": "finish_when_no_purchase_improves_stop_score"},
+                score_terms={"selection_rule": "buy_zero_for_current_resource"},
             ),
             search_summary={
                 "decision_family": "resource_purchase",
-                "search_depth": depth,
-                "legal_action_count": len(actions),
+                "resource": resource,
+                "remaining_resource_steps": len(remaining_resources),
                 "first_level_candidate_count": len(candidate_actions),
                 "stop_score": _score(_resource_finish_score(state, player_id)),
                 "best_score": _score(score),
             },
         )
-    next_state = purchase_resources(_clone_state(state), player_id, {move[0]: move[1]})
-    intent = GuiIntent.buy_resource(player_id, resource=move[0], amount=move[1])
+    next_state = purchase_resources(_clone_state(state), player_id, {resource: amount})
+    intent = GuiIntent.buy_resource(player_id, resource=resource, amount=amount)
     return intent, _DecisionTrace(
         current_evaluation=current_evaluation,
         candidate_actions=tuple(candidate_actions),
@@ -763,8 +766,8 @@ def _choose_resource_intent(state: GameState, player_id: str) -> tuple[GuiIntent
         ),
         search_summary={
             "decision_family": "resource_purchase",
-            "search_depth": depth,
-            "legal_action_count": len(actions),
+            "resource": resource,
+            "remaining_resource_steps": len(remaining_resources),
             "first_level_candidate_count": len(candidate_actions),
             "stop_score": _score(_resource_finish_score(state, player_id)),
             "best_score": _score(score),
@@ -973,90 +976,104 @@ def _search_resource_purchase_decision(
     state: GameState,
     player_id: str,
     *,
-    depth: int,
-) -> tuple[float, tuple[str, int] | None, list[dict[str, object]]]:
+    resources: tuple[str, ...],
+) -> tuple[float, int, list[dict[str, object]]]:
+    if not resources:
+        return _resource_finish_score(state, player_id), 0, []
+    resource = resources[0]
     current_score = _evaluate_relative_state(state, player_id)
-    best_score = _resource_finish_score(state, player_id)
-    best_move = None
-    candidate_actions = [
-        _candidate_action_trace(
-            intent_type="finish_buying",
-            payload={},
-            decision_score=best_score,
-            projected_relative_score=current_score,
-            current_score=current_score,
-            score_terms=_resource_finish_score_terms(state, player_id),
+    action = next(
+        (
+            action
+            for action in legal_resource_purchases(state, player_id)
+            if str(action.payload["resource"]) == resource
+        ),
+        None,
+    )
+    positive_amounts = (
+        _candidate_resource_amounts(state, player_id, action)
+        if action is not None
+        else ()
+    )
+    best_score = float("-inf")
+    best_amount = 0
+    candidate_actions: list[dict[str, object]] = []
+    zero_score = float("-inf")
+    for amount in (0, *positive_amounts):
+        next_state = (
+            purchase_resources(_clone_state(state), player_id, {resource: amount})
+            if amount > 0
+            else state
         )
-    ]
-    if depth <= 0:
-        return best_score, None, candidate_actions
-
-    for action in legal_resource_purchases(state, player_id):
-        resource = str(action.payload["resource"])
-        for amount in _candidate_resource_amounts(state, player_id, action):
-            try:
-                next_state = purchase_resources(
-                    _clone_state(state),
-                    player_id,
-                    {resource: amount},
-                )
-            except ModelValidationError:
-                continue
-            next_score, _ = _search_resource_purchase(next_state, player_id, depth=depth - 1)
-            immediate_projected_score = _evaluate_relative_state(next_state, player_id)
-            candidate_actions.append(
-                _candidate_action_trace(
-                    intent_type="buy_resource",
-                    payload={"resource": resource, "amount": amount},
-                    decision_score=next_score,
-                    projected_relative_score=immediate_projected_score,
-                    current_score=current_score,
-                    score_terms={
-                        "recursive_depth_remaining": depth - 1,
-                        "resource": resource,
-                        "amount": amount,
-                        "recursive_score": next_score,
-                        "immediate_projected_relative_score": immediate_projected_score,
-                    },
-                )
+        next_score = _search_resource_purchase_sequence(
+            next_state,
+            player_id,
+            resources=resources[1:],
+        )
+        if amount == 0:
+            zero_score = next_score
+        immediate_projected_score = _evaluate_relative_state(next_state, player_id)
+        candidate_actions.append(
+            _candidate_action_trace(
+                intent_type="buy_resource",
+                payload={"resource": resource, "amount": amount},
+                decision_score=next_score,
+                projected_relative_score=immediate_projected_score,
+                current_score=current_score,
+                score_terms={
+                    "remaining_resource_steps": len(resources) - 1,
+                    "resource": resource,
+                    "amount": amount,
+                    "recursive_score": next_score,
+                    "immediate_projected_relative_score": immediate_projected_score,
+                },
             )
-            signature = (next_score, amount, -RESOURCE_TYPES.index(resource))
-            if best_move is None or signature > (best_score, best_move[1], -RESOURCE_TYPES.index(best_move[0])):
-                if next_score > best_score + 0.15:
-                    best_score = next_score
-                    best_move = (resource, amount)
-    return best_score, best_move, candidate_actions
+        )
+        if (next_score, amount) > (best_score, best_amount):
+            best_score = next_score
+            best_amount = amount
+    if best_amount > 0 and best_score <= zero_score + 0.15:
+        return zero_score, 0, candidate_actions
+    return best_score, best_amount, candidate_actions
 
 
-def _search_resource_purchase(
+def _search_resource_purchase_sequence(
     state: GameState,
     player_id: str,
     *,
-    depth: int,
-) -> tuple[float, tuple[str, int] | None]:
-    best_score = _resource_finish_score(state, player_id)
-    best_move = None
-    if depth <= 0:
-        return best_score, None
-
-    for action in legal_resource_purchases(state, player_id):
-        resource = str(action.payload["resource"])
-        for amount in _candidate_resource_amounts(state, player_id, action):
-            try:
-                next_state = purchase_resources(
-                    _clone_state(state),
-                    player_id,
-                    {resource: amount},
-                )
-            except ModelValidationError:
-                continue
-            next_score, _ = _search_resource_purchase(next_state, player_id, depth=depth - 1)
-            signature = (next_score, amount, -RESOURCE_TYPES.index(resource))
-            if best_move is None or signature > (best_score, best_move[1], -RESOURCE_TYPES.index(best_move[0])):
-                if next_score > best_score + 0.15:
-                    best_score = next_score
-                    best_move = (resource, amount)
-    return best_score, best_move
+    resources: tuple[str, ...],
+) -> float:
+    if not resources:
+        return _resource_finish_score(state, player_id)
+    resource = resources[0]
+    action = next(
+        (
+            action
+            for action in legal_resource_purchases(state, player_id)
+            if str(action.payload["resource"]) == resource
+        ),
+        None,
+    )
+    positive_amounts = (
+        _candidate_resource_amounts(state, player_id, action)
+        if action is not None
+        else ()
+    )
+    scores = []
+    for amount in (0, *positive_amounts):
+        next_state = (
+            purchase_resources(_clone_state(state), player_id, {resource: amount})
+            if amount > 0
+            else state
+        )
+        scores.append(
+            _search_resource_purchase_sequence(
+                next_state,
+                player_id,
+                resources=resources[1:],
+            )
+        )
+    return max(scores)
 
 
 def _candidate_resource_amounts(state: GameState, player_id: str, action) -> tuple[int, ...]:

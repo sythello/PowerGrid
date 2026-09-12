@@ -9,6 +9,8 @@ from ...session_types import GameSnapshot, GuiIntent, TurnRequest
 from ..base import BaseAiController
 from .candidates import generate_candidate_actions
 from .observation import (
+    ACTION_FEATURE_SCHEMA_VERSION,
+    OBSERVATION_SCHEMA_VERSION,
     build_public_observation,
     encode_action_features,
     encode_state_features,
@@ -73,6 +75,16 @@ class NnRankValueAiController(BaseAiController):
             action_names = action_names or current_names
             if current_names != action_names:
                 raise ModelValidationError("NN candidate action schema changed during scoring")
+        if model.state_dim != len(state_features) or model.action_dim != len(
+            action_rows[0]
+        ):
+            raise ModelValidationError(
+                "NN checkpoint dimensions "
+                f"{model.state_dim}/{model.action_dim} do not match runtime feature "
+                f"schema v{OBSERVATION_SCHEMA_VERSION}/v{ACTION_FEATURE_SCHEMA_VERSION} "
+                f"({len(state_features)}/{len(action_rows[0])}); regenerate the dataset "
+                "and retrain the checkpoint"
+            )
         if model.state_feature_names and tuple(state_names) != model.state_feature_names:
             raise ModelValidationError("NN checkpoint state feature schema does not match runtime")
         if model.action_feature_names and tuple(action_names or ()) != model.action_feature_names:
@@ -112,12 +124,15 @@ class NnRankValueAiController(BaseAiController):
             request,
             label="nn_rank_value_decision",
             state={
-                "schema_version": 1,
+                "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
+                "action_feature_schema_version": ACTION_FEATURE_SCHEMA_VERSION,
                 "checkpoint": str(self._checkpoint_path),
                 "model_metadata": {
                     key: model.metadata[key]
                     for key in (
                         "model_name",
+                        "observation_schema_version",
+                        "action_feature_schema_version",
                         "training_dataset",
                         "training_epochs",
                         "train_samples",

@@ -325,7 +325,16 @@ def _semantic_boundary_reached(
         if auction_resolving:
             return not active
         return request.player_id != root_request.player_id
-    if root_request.phase in {"buy_resources", "build_houses"}:
+    if root_request.phase == "buy_resources":
+        if state.pending_decision is not None:
+            return False
+        if (
+            state.phase != root_request.phase
+            or request.player_id != root_request.player_id
+        ):
+            return True
+        return request.metadata.get("resource") != root_request.metadata.get("resource")
+    if root_request.phase == "build_houses":
         if state.pending_decision is not None:
             return False
         return state.phase != root_request.phase or request.player_id != root_request.player_id

@@ -13,6 +13,7 @@ from .model import (
     ModelValidationError,
     PowerPlantCard,
     PlantRunPlan,
+    RESOURCE_TYPES,
     ResourceMarket,
     ResourceStorage,
     AuctionState,
@@ -76,6 +77,7 @@ class GameSession:
         self._winner_result: WinnerResult | None = None
         self._phase_marker: tuple[int, str, int] | None = None
         self._active_index = 0
+        self._resource_index = 0
         self._bureaucracy_choices: dict[str, tuple[PlantRunPlan, ...]] = {}
         self._sync_phase_cursor()
         self._append_game_log(
@@ -132,9 +134,10 @@ class GameSession:
     ) -> "GameSession":
         """Create an isolated in-memory copy for AI rollouts.
 
-        The phase cursor and pending bureaucracy choices live in the session rather
-        than ``GameState`` and therefore must be copied together with the rules
-        state. Logs are omitted by default to keep counterfactual rollouts cheap.
+        The phase/resource cursors and pending bureaucracy choices live in the
+        session rather than ``GameState`` and therefore must be copied together
+        with the rules state. Logs are omitted by default to keep counterfactual
+        rollouts cheap.
         """
 
         cloned = GameSession(
@@ -149,6 +152,7 @@ class GameSession:
         cloned._winner_result = deepcopy(self._winner_result)
         cloned._phase_marker = self._phase_marker
         cloned._active_index = self._active_index
+        cloned._resource_index = self._resource_index
         cloned._bureaucracy_choices = deepcopy(self._bureaucracy_choices)
         return cloned
 
@@ -161,18 +165,7 @@ class GameSession:
         if self._state.phase == "auction":
             return _build_auction_request(self._state)
         if self._state.phase == "buy_resources":
-            player_id = self._current_ordered_player(reverse=True)
-            return TurnRequest(
-                player_id=player_id,
-                phase=self._state.phase,
-                decision_type="buy_resources",
-                prompt=f"Resource buying for {player_id}.",
-                legal_actions=(
-                    *legal_resource_purchases(self._state, player_id),
-                    Action("finish_buying", player_id, {}),
-                ),
-                metadata={"phase": self._state.phase},
-            )
+            return self._build_resource_request()
         if self._state.phase == "build_houses":
             player_id = self._current_ordered_player(reverse=True)
             return TurnRequest(
@@ -267,6 +260,7 @@ class GameSession:
     def _apply_and_log(self, intent: GuiIntent, *, auto_generated: bool) -> bool:
         before_state = self._state
         before_index = self._active_index
+        before_resource_index = self._resource_index
         before_summary = self._last_round_summary
         before_winner = self._winner_result
         before_choices = dict(self._bureaucracy_choices)
@@ -275,6 +269,7 @@ class GameSession:
         except (ModelValidationError, ValueError) as exc:
             self._state = before_state
             self._active_index = before_index
+            self._resource_index = before_resource_index
             self._last_round_summary = before_summary
             self._winner_result = before_winner
             self._bureaucracy_choices = before_choices
@@ -377,19 +372,24 @@ class GameSession:
         raise ModelValidationError("unsupported auction intent")
 
     def _apply_resource_intent(self, intent: GuiIntent) -> None:
-        if intent.intent_type == "buy_resource":
+        if intent.intent_type != "buy_resource":
+            raise ModelValidationError("expected a resource quantity choice")
+        expected_resource = RESOURCE_TYPES[self._resource_index]
+        resource = str(intent.payload["resource"])
+        amount = int(intent.payload["amount"])
+        if resource != expected_resource:
+            raise ModelValidationError(
+                f"expected a {expected_resource} purchase choice, got {resource}"
+            )
+        if amount < 0:
+            raise ModelValidationError("resource purchase amount cannot be negative")
+        if amount > 0:
             self._state = purchase_resources(
                 self._state,
                 intent.player_id,
-                {str(intent.payload["resource"]): int(intent.payload["amount"])},
+                {resource: amount},
             )
-            return
-        if intent.intent_type != "finish_buying":
-            raise ModelValidationError("unsupported resource-phase intent")
-        self._active_index += 1
-        if self._active_index >= len(self._state.player_order):
-            self._state = advance_phase(self._state)
-            self._sync_phase_cursor(force_reset=True)
+        self._advance_resource_cursor()
 
     def _apply_build_intent(self, intent: GuiIntent) -> None:
         city_ids = tuple(str(city_id) for city_id in intent.payload.get("city_ids", []))
@@ -485,7 +485,47 @@ class GameSession:
         if force_reset or marker != self._phase_marker:
             self._phase_marker = marker
             self._active_index = 0
+            self._resource_index = 0
             self._bureaucracy_choices = {}
+
+    def _build_resource_request(self) -> TurnRequest | None:
+        while self._state.phase == "buy_resources":
+            player_id = self._current_ordered_player(reverse=True)
+            resource = RESOURCE_TYPES[self._resource_index]
+            legal_action = next(
+                (
+                    action
+                    for action in legal_resource_purchases(self._state, player_id)
+                    if str(action.payload["resource"]) == resource
+                ),
+                None,
+            )
+            if legal_action is None:
+                self._advance_resource_cursor()
+                continue
+            return TurnRequest(
+                player_id=player_id,
+                phase=self._state.phase,
+                decision_type="buy_resources",
+                prompt=f"Choose how much {resource} {player_id} will buy.",
+                legal_actions=(legal_action,),
+                metadata={
+                    "phase": self._state.phase,
+                    "resource": resource,
+                    "resource_index": self._resource_index,
+                },
+            )
+        return self.current_request()
+
+    def _advance_resource_cursor(self) -> None:
+        self._resource_index += 1
+        if self._resource_index < len(RESOURCE_TYPES):
+            return
+        self._resource_index = 0
+        self._active_index += 1
+        if self._active_index >= len(self._state.player_order):
+            self._state = advance_phase(self._state)
+            self._sync_phase_cursor(force_reset=True)
 
     def _current_ordered_player(self, *, reverse: bool) -> str:
         ordered = tuple(reversed(self._state.player_order)) if reverse else tuple(self._state.player_order)
@@ -761,6 +801,8 @@ def _describe_intent(
     if intent.intent_type == "buy_resource":
         resource = str(intent.payload["resource"])
         amount = int(intent.payload["amount"])
+        if amount == 0:
+            return actor_message(f"skipped {resource} purchasing.")
         total_cost = before_state.resource_market.quote_purchase_cost(resource, amount)
         return actor_message(f"bought {amount} {resource} for {total_cost} Elektro.")
     if intent.intent_type == "finish_buying":

@@ -8,7 +8,16 @@ from powergrid.ai.nn_rank_value.dataset import (
     generate_rank_value_dataset,
 )
 from powergrid.ai.nn_rank_value.model import NumpyRankValueNetwork
+from powergrid.ai.nn_rank_value.observation import (
+    ACTION_FEATURE_SCHEMA_VERSION,
+    OBSERVATION_SCHEMA_VERSION,
+    build_public_observation,
+    encode_action_features,
+    encode_state_features,
+)
+from powergrid.ai.nn_rank_value.candidates import generate_candidate_actions
 from powergrid.ai.nn_rank_value.training import train_rank_value_model
+from powergrid.session import GameSession
 
 
 def main() -> None:
@@ -39,7 +48,24 @@ def main() -> None:
     assert summary.train_samples > 0
     assert summary.validation_samples > 0
     assert summary.test_samples > 0
-    assert restored.state_dim == 513 and restored.action_dim == 42
+    snapshot = GameSession.from_scenario("opening", seed=29).snapshot()
+    assert snapshot.active_request is not None
+    observation = build_public_observation(snapshot.state, snapshot.active_request)
+    state_features, state_names = encode_state_features(observation)
+    candidate = generate_candidate_actions(snapshot.active_request, snapshot)[0]
+    action_features, action_names = encode_action_features(observation, candidate)
+    assert restored.state_dim == len(state_features)
+    assert restored.action_dim == len(action_features)
+    assert restored.state_feature_names == state_names
+    assert restored.action_feature_names == action_names
+    assert (
+        restored.metadata["observation_schema_version"]
+        == OBSERVATION_SCHEMA_VERSION
+    )
+    assert (
+        restored.metadata["action_feature_schema_version"]
+        == ACTION_FEATURE_SCHEMA_VERSION
+    )
     assert restored.metadata["training_epochs"] == 4
     assert all(math.isfinite(value) for value in summary.final_train_metrics.values())
     assert all(math.isfinite(value) for value in summary.final_validation_metrics.values())

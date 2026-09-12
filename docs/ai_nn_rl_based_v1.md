@@ -1,13 +1,19 @@
 # `ai_nn_rl_based_v1`
 
-`ai_nn_rl_based_v1` 是 Power Grid 的第一版离线 RL / 搜索蒸馏 AI。它保留
-`ai_nn_rank_value_v1` 的公开 513 维状态特征、42 维动作特征和候选动作生成器，
-但用一个 listwise Policy head 和一个多玩家 vector-Q head 替代 behavior-only
-rank-value 打分。
+> **Runtime schema update:** the resource system now uses observation/action
+> feature schema v2 (520/52), documented in
+> [`ai_nn_resource_schema_v2.md`](ai_nn_resource_schema_v2.md). The bundled
+> `ai_nn_rl_based_v1` checkpoint uses schema v2. Measurements explicitly marked as
+> schema v1 below are retained as historical records.
+
+`ai_nn_rl_based_v1` 是 Power Grid 的第一版离线 RL / 搜索蒸馏 AI。当前默认模型使用
+schema-v2 的公开 520 维状态特征、52 维动作特征和候选动作生成器，并用一个
+listwise Policy head 和一个多玩家 vector-Q head 替代 behavior-only rank-value 打分。
 
 每个原始特征的类型与中文含义见
 [`ai_nn_rank_value_v1_feature_dictionary.md`](ai_nn_rank_value_v1_feature_dictionary.md)；
-本版本不改变这些特征或归一化，只隔离验证 Policy/Q/搜索目标的收益。
+schema-v1 的完整历史字典仍保留在该文档中；资源相关的 schema-v2 增量见上面的
+schema-v2 文档。
 
 ## 支持范围
 
@@ -21,8 +27,8 @@ rank-value 打分。
 ## 模型
 
 ```text
-state[513] -> ReLU(128) -> ReLU(64)
-                                 + action[42]
+state[520] -> ReLU(128) -> ReLU(64)
+                                 + action[52]
                                       |
                                  ReLU(64)
                                   /      \
@@ -98,9 +104,9 @@ determinization；模型 observation 仍不包含牌序或 seed。它是一个�
 game_id / seed / decision_index / phase / decision_type
 behavior_controller / continuation_controller / selected_regions
 player_ids_in_slot_order / player_mask[6]
-state_features[513]
+state_features[520]
 candidate_jsons[]
-candidate_action_features[][42]
+candidate_action_features[][52]
 teacher_action_index
 terminal_rank_values[6]
 has_search_targets
@@ -180,7 +186,7 @@ PYTHONPATH=src .venv/bin/python -m powergrid.tools.train_nn_rl_based \
   --training-sampling balanced_search
 ```
 
-在 `advantage_gate` 下，搜索 label 的 actor slot 0 决定候选优势。与 teacher 的 42 维
+在 `advantage_gate` 下，搜索 label 的 actor slot 0 决定候选优势。与 teacher 的动作
 action feature 完全相同的候选不可由当前网络区分，不允许触发 target 切换。相同最高
 Q 按候选顺序稳定选择。checkpoint 记录 target/sampling 配置、源 searched/non-search
 行数，以及每个 epoch 实际训练和 accepted improvement 数量。
@@ -466,7 +472,7 @@ PYTHONPATH=src .venv/bin/python -m powergrid.tools.evaluate_nn_rl_deterministic_
 `[0.5120, 0.5407]`，因此满足预先固定的“保留为当前最优”标准。reserve 的 CI 仍
 跨过 0.50，所以准确表述是“通过点估计门槛”，而不是“已统计显著战胜 reserve”。
 
-δ=0.10 已发布为当前默认 checkpoint：
+schema-v1 的 δ=0.10 模型曾于 2026-09-01 发布为默认 checkpoint：
 
 ```text
 src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz
@@ -478,6 +484,33 @@ SHA-256 db45c1976e7da5762e19a4710e03ab51e29457a46578c1fd41fadf775e1f079e
 `selected_delta=0.10`、`release_status=current_best`、来源与两份验证报告的
 SHA-256，以及 reserve CI 限制。注册名仍为 `ai_nn_rl_based_v1`，未修改 `ai`
 默认 alias。
+
+#### 2026-09-06 schema-v2 资源模型发布
+
+资源市场改为 16 维表示、购买阶段改为煤/石油/垃圾/铀四次定序决策，并加入库存、
+发电缺口和剩余容量等派生特征后，重新生成了两组各 5000 局的数据并训练：
+
+- bootstrap：2,487,586 decisions，20 epoch；
+- search：2,489,806 decisions，其中 248,276 个搜索根、6,110,889 个搜索节点；
+- final：`advantage_gate`、`delta=0.10`、`balanced_search`，20 epoch；
+- schema：520 state / 52 action，observation/action schema version 均为 2。
+
+固定发布种子的 paired rollout score 为 0.5512，95% CI `[0.5378, 0.5661]`。对
+`ai_deterministic`、`efficiency`、`expansion`、`reserve` 的 end-to-end pairwise
+score 分别为 0.7044、0.7900、0.5913、0.8625，四个 95% CI 下界均严格大于
+0.50。独立新种子复核的 paired score 为 0.5481，四个 end-to-end score 为
+0.7150、0.8137、0.5975、0.8850。
+
+当前默认 checkpoint：
+
+```text
+src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz
+SHA-256 466d8d507c406215014f222de8d5720ebd96bcbb8465b3b7e1d8061284a5bc0c
+```
+
+发布 metadata 记录了来源模型、固定种子与新种子报告、离线 acceptance 报告及其
+SHA-256。端到端发布标准全部通过；离线诊断的 `all_checks_pass` 仍为 false，主要
+保留为后续训练优化依据，不作为本次端到端发布门槛。
 
 ### 2026-08-28 smoke/组件验证
 

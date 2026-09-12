@@ -220,74 +220,94 @@ class ResourcePanel(BasePhasePanel):
         super().__init__(master, on_intent, on_local_change)
         self.player_id = ""
         self.help_var = tk.StringVar()
-        self._buy_actions_by_resource: dict[str, object] = {}
+        self.resource_var = tk.StringVar(value="No resource selected")
+        self.range_var = tk.StringVar(value="")
+        self.amount_var = tk.IntVar(value=0)
+        self._current_resource = ""
+        self._maximum_amount = 0
         self.grid_columnconfigure(0, weight=1)
         ttk.Label(self, text="Buy Resources", font=("Helvetica", 12, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(self, textvariable=self.help_var, wraplength=420, justify="left").grid(
-            row=1, column=0, sticky="w", pady=(6, 10)
+            row=1, column=0, columnspan=3, sticky="w", pady=(6, 10)
         )
-        self.button_row = ttk.Frame(self)
-        self.button_row.grid(row=2, column=0, sticky="ew")
-        self.resource_buttons: dict[str, ttk.Button] = {}
-        for index, resource in enumerate(RESOURCE_TYPES):
-            self.button_row.grid_columnconfigure(index, weight=1, uniform="resource")
-            button = ttk.Button(
-                self.button_row,
-                text=resource.title(),
-                command=lambda resource=resource: self.handle_resource_click(resource),
-                width=14,
-            )
-            button.grid(row=0, column=index, sticky="ew", padx=(0, 8 if index < len(RESOURCE_TYPES) - 1 else 0))
-            self.resource_buttons[resource] = button
-        ttk.Button(self, text="Done", command=self._submit_done).grid(row=3, column=0, pady=(10, 0), sticky="w")
+        ttk.Label(self, text="Resource").grid(row=2, column=0, sticky="w")
+        ttk.Label(self, textvariable=self.resource_var).grid(row=2, column=1, sticky="w")
+        ttk.Label(self, text="Amount").grid(row=3, column=0, sticky="w")
+        self.amount_spin = ttk.Spinbox(
+            self,
+            from_=0,
+            to=0,
+            textvariable=self.amount_var,
+            width=10,
+            state="disabled",
+        )
+        self.amount_spin.grid(row=3, column=1, sticky="w")
+        ttk.Label(self, textvariable=self.range_var).grid(row=3, column=2, sticky="w", padx=(8, 0))
+        self.submit_button = ttk.Button(self, text="Submit", command=self._submit_amount)
+        self.submit_button.grid(row=4, column=0, pady=(10, 0), sticky="w")
 
     def render(self, snapshot: GameSnapshot) -> None:
         super().render(snapshot)
         request = snapshot.active_request
         self.player_id = request.player_id if request is not None else ""
-        self._buy_actions_by_resource = {}
+        previous_resource = self._current_resource
+        self._current_resource = ""
+        self._maximum_amount = 0
+        self.submit_button.configure(state="disabled")
         if request is None:
             self.help_var.set("No resource action is pending.")
-            for button in self.resource_buttons.values():
-                button.configure(state="disabled")
+            self.resource_var.set("No resource selected")
+            self.amount_spin.configure(state="disabled", from_=0, to=0)
+            self.amount_var.set(0)
+            self.range_var.set("")
             return
-        for action in request.legal_actions:
-            if action.action_type == "buy_resource":
-                self._buy_actions_by_resource[str(action.payload["resource"])] = action
-        self.help_var.set(request.prompt + " Click a resource token in the market or a resource button below.")
-        for resource in RESOURCE_TYPES:
-            button = self.resource_buttons[resource]
-            action = self._buy_actions_by_resource.get(resource)
-            if action is None:
-                button.configure(
-                    text=f"{resource.title()}\nUnavailable",
-                    state="disabled",
-                )
-                continue
-            unit_prices = list(action.payload["unit_prices"])
-            first_price = unit_prices[0] if unit_prices else "-"
-            button.configure(
-                text=(
-                    f"{resource.title()}\n"
-                    f"${first_price} | max {action.payload['max_affordable_units']}"
-                ),
-                state="normal",
-            )
+        action = next(
+            (action for action in request.legal_actions if action.action_type == "buy_resource"),
+            None,
+        )
+        if action is None:
+            self.help_var.set("This resource step has no legal quantity choice.")
+            return
+        self._current_resource = str(action.payload["resource"])
+        self._maximum_amount = int(action.payload["max_affordable_units"])
+        self.help_var.set(
+            request.prompt + " Choose 0 to skip, or select a quantity and submit."
+        )
+        self.resource_var.set(self._current_resource.title())
+        self.amount_spin.configure(
+            state="readonly",
+            from_=0,
+            to=self._maximum_amount,
+        )
+        current = int(self.amount_var.get())
+        if self._current_resource != previous_resource or current < 0 or current > self._maximum_amount:
+            self.amount_var.set(0)
+        self.range_var.set(f"Legal range: 0 - {self._maximum_amount}")
+        self.submit_button.configure(state="normal", text=f"Submit {self._current_resource.title()}")
 
     def board_interaction_state(self) -> dict[str, object]:
         return {
             "resource_phase_active": self._snapshot is not None and self._snapshot.active_request is not None,
-            "buyable_resources": tuple(sorted(self._buy_actions_by_resource)),
+            "buyable_resources": ((self._current_resource,) if self._current_resource else ()),
         }
 
     def handle_resource_click(self, resource: str) -> bool:
-        if resource not in self._buy_actions_by_resource:
+        if resource != self._current_resource:
             return False
-        self._on_intent(GuiIntent.buy_resource(self.player_id, resource=resource, amount=1))
+        self.amount_var.set(min(self._maximum_amount, int(self.amount_var.get()) + 1))
+        self._notify_local_change()
         return True
 
-    def _submit_done(self) -> None:
-        self._on_intent(GuiIntent.finish_buying(self.player_id))
+    def _submit_amount(self) -> None:
+        if not self._current_resource:
+            return
+        self._on_intent(
+            GuiIntent.buy_resource(
+                self.player_id,
+                resource=self._current_resource,
+                amount=int(self.amount_var.get()),
+            )
+        )
 
 
 class BuildPanel(BasePhasePanel):

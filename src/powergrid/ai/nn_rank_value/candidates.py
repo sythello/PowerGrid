@@ -9,9 +9,12 @@ from ...model import (
     PlantRunPlan,
     choose_plants_to_run,
     compute_powered_cities,
+    discard_resources_to_fit_storage,
     pay_income,
+    purchase_resources,
 )
 from ...session_types import GameSnapshot, GuiIntent, TurnRequest
+from .resource_metrics import resource_planning_metrics
 
 
 @dataclass(frozen=True)
@@ -43,17 +46,18 @@ def generate_candidate_actions(
     """Generate the legal policy-candidate set used by NN rank-value v1.
 
     The v1 policy deliberately uses minimum-only raises and single-city builds.
-    Resource quantities are expanded explicitly. Build and resource phases remain
-    sequential because the session lets the same player act repeatedly before finishing.
+    Resource quantities are expanded explicitly for the current fixed resource step;
+    the next resource becomes a new request. Build actions remain sequential because
+    the session lets the same player build repeatedly before finishing.
     """
 
     state = snapshot.state
     if state.pending_decision is not None:
-        candidates = _pending_candidates(request)
+        candidates = _pending_candidates(request, state)
     elif request.phase == "auction":
         candidates = _auction_candidates(request, state)
     elif request.phase == "buy_resources":
-        candidates = _resource_candidates(request)
+        candidates = _resource_candidates(request, state)
     elif request.phase == "build_houses":
         candidates = _build_candidates(request)
     elif request.phase == "bureaucracy":
@@ -82,7 +86,10 @@ def candidate_from_intent(intent: GuiIntent) -> CandidateAction:
     return CandidateAction(intent=intent, metadata={"teacher_only_candidate": True})
 
 
-def _pending_candidates(request: TurnRequest) -> list[CandidateAction]:
+def _pending_candidates(
+    request: TurnRequest,
+    state: GameState,
+) -> list[CandidateAction]:
     candidates: list[CandidateAction] = []
     for action in request.legal_actions:
         if action.action_type == "discard_power_plant":
@@ -96,10 +103,31 @@ def _pending_candidates(request: TurnRequest) -> list[CandidateAction]:
         elif action.action_type == "discard_hybrid_resources":
             coal = int(action.payload.get("coal", 0))
             oil = int(action.payload.get("oil", 0))
+            next_state = discard_resources_to_fit_storage(
+                state,
+                request.player_id,
+                {"coal": coal, "oil": oil},
+            )
+            current_metrics = resource_planning_metrics(state, request.player_id)
+            post_metrics = resource_planning_metrics(next_state, request.player_id)
+            post_metrics["delta_max_powered"] = int(
+                post_metrics["max_powered_cities"]
+            ) - int(current_metrics["max_powered_cities"])
+            post_metrics["delta_max_runnable_output"] = int(
+                post_metrics["max_runnable_output"]
+            ) - int(current_metrics["max_runnable_output"])
             candidates.append(
                 CandidateAction(
-                    GuiIntent.discard_hybrid_resources(request.player_id, coal=coal, oil=oil),
-                    {"coal": coal, "oil": oil},
+                    GuiIntent.discard_hybrid_resources(
+                        request.player_id,
+                        coal=coal,
+                        oil=oil,
+                    ),
+                    {
+                        "coal": coal,
+                        "oil": oil,
+                        "post_resource_metrics": post_metrics,
+                    },
                 )
             )
     return candidates
@@ -158,14 +186,27 @@ def _auction_candidates(request: TurnRequest, state: GameState) -> list[Candidat
     return candidates
 
 
-def _resource_candidates(request: TurnRequest) -> list[CandidateAction]:
+def _resource_candidates(request: TurnRequest, state: GameState) -> list[CandidateAction]:
     candidates: list[CandidateAction] = []
+    current_metrics = resource_planning_metrics(state, request.player_id)
     for action in request.legal_actions:
         if action.action_type == "buy_resource":
             resource = str(action.payload["resource"])
             unit_prices = tuple(int(price) for price in action.payload["unit_prices"])
             maximum = int(action.payload["max_affordable_units"])
-            for amount in range(1, maximum + 1):
+            for amount in range(0, maximum + 1):
+                next_state = (
+                    purchase_resources(state, request.player_id, {resource: amount})
+                    if amount > 0
+                    else state
+                )
+                post_metrics = resource_planning_metrics(next_state, request.player_id)
+                post_metrics["delta_max_powered"] = int(
+                    post_metrics["max_powered_cities"]
+                ) - int(current_metrics["max_powered_cities"])
+                post_metrics["delta_max_runnable_output"] = int(
+                    post_metrics["max_runnable_output"]
+                ) - int(current_metrics["max_runnable_output"])
                 candidates.append(
                     CandidateAction(
                         GuiIntent.buy_resource(request.player_id, resource, amount),
@@ -174,11 +215,10 @@ def _resource_candidates(request: TurnRequest) -> list[CandidateAction]:
                             "amount": amount,
                             "cost": sum(unit_prices[:amount]),
                             "unit_prices": list(unit_prices[:amount]),
+                            "post_resource_metrics": post_metrics,
                         },
                     )
                 )
-        elif action.action_type == "finish_buying":
-            candidates.append(CandidateAction(GuiIntent.finish_buying(request.player_id)))
     return candidates
 
 

@@ -7,7 +7,6 @@ from ..model import (
     ModelValidationError,
     PowerPlantCard,
     legal_build_targets,
-    legal_resource_purchases,
 )
 from ..session_types import GameSnapshot, GuiIntent, TurnRequest
 from .base import BaseAiController
@@ -103,7 +102,7 @@ class ProfiledDeterministicAiController(BaseAiController):
         elif request.phase == "auction":
             intent = _choose_profiled_auction_intent(state, request, self.profile)
         elif request.phase == "buy_resources":
-            intent = _choose_profiled_resource_intent(state, request.player_id, self.profile)
+            intent = _choose_profiled_resource_intent(state, request, self.profile)
         elif request.phase == "build_houses":
             intent = _choose_profiled_build_intent(state, request.player_id, self.profile)
         elif request.phase == "bureaucracy":
@@ -238,37 +237,22 @@ def _market_plant(state: GameState, price: int) -> PowerPlantCard:
 
 def _choose_profiled_resource_intent(
     state: GameState,
-    player_id: str,
+    request: TurnRequest,
     profile: DeterministicStrategyProfile,
 ) -> GuiIntent:
-    actions = legal_resource_purchases(state, player_id)
-    if not actions:
-        return GuiIntent.finish_buying(player_id)
-    deficits = _profile_resource_deficits(state, player_id, profile)
-    candidates = [
+    player_id = request.player_id
+    resource = str(request.metadata["resource"])
+    action = next(
         action
-        for action in actions
-        if deficits.get(str(action.payload["resource"]), 0) > 0
-    ]
-    if not candidates:
-        return GuiIntent.finish_buying(player_id)
-
-    def priority(action) -> tuple[float, ...]:
-        resource = str(action.payload["resource"])
-        first_price = int(action.payload["unit_prices"][0])
-        deficit = deficits[resource]
-        if profile.resource_priority == "largest_deficit":
-            return (-deficit, first_price, RESOURCE_TYPES.index(resource))
-        if profile.resource_priority == "cash_preserving":
-            return (first_price * max(1, deficit), first_price, RESOURCE_TYPES.index(resource))
-        return (first_price, -deficit, RESOURCE_TYPES.index(resource))
-
-    chosen = min(candidates, key=priority)
-    resource = str(chosen.payload["resource"])
-    amount = min(int(chosen.payload["max_affordable_units"]), deficits[resource])
-    if profile.resource_priority == "cash_preserving":
+        for action in request.legal_actions
+        if action.action_type == "buy_resource"
+        and str(action.payload["resource"]) == resource
+    )
+    deficits = _profile_resource_deficits(state, player_id, profile)
+    amount = min(int(action.payload["max_affordable_units"]), deficits[resource])
+    if profile.resource_priority == "cash_preserving" and amount > 0:
         amount = 1
-    return GuiIntent.buy_resource(player_id, resource, max(1, amount))
+    return GuiIntent.buy_resource(player_id, resource, amount)
 
 
 def _profile_resource_deficits(

@@ -71,7 +71,9 @@ The neural controller's full feature/label/model/command specification is in
 [../../../docs/ai_nn_rank_value_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rank_value_v1.md).
 The offline-RL Policy/vector-Q controller is specified in
 [../../../docs/ai_nn_rl_based_v1.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rl_based_v1.md).
-Its exhaustive 513-state/42-action feature dictionary is in
+The active resource-schema-v2 changes are documented in
+[../../../docs/ai_nn_resource_schema_v2.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_resource_schema_v2.md).
+The historical schema-v1 513-state/42-action feature dictionary is in
 [../../../docs/ai_nn_rank_value_v1_feature_dictionary.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/ai_nn_rank_value_v1_feature_dictionary.md).
 The profiled deterministic design, calibration, heuristic speed levers, and generation
 benchmarks are in [../../../docs/profiled_deterministic_ai.md](/Users/mac/Desktop/syt/Projects/PowerGrid/docs/profiled_deterministic_ai.md).
@@ -271,16 +273,16 @@ Purpose:
 
 Implemented behavior:
 
-- Constructs a 513-dimensional actor-relative public observation
+- Constructs a 520-dimensional actor-relative public observation (feature schema v2)
   - excludes seed and hidden deck identities/order
   - zero-pads to six players and fixed market/plant slots
-- Constructs a 42-dimensional candidate-action vector
+- Constructs a 52-dimensional candidate-action vector (feature schema v2)
 - Generates deterministic phase-specific candidates
   - all explicit discard and generation plans
   - minimum bid/pass auction decisions
-  - all affordable resource quantities
+  - zero through the maximum affordable quantity for the current fixed resource step
   - single-city/finish build decisions
-- Runs a `555 -> 128 -> 64 -> 2` two-head MLP
+- Runs a `572 -> 128 -> 64 -> 2` two-head MLP
   - sigmoid win-probability head
   - tanh normalized-rank head
 - Uses `0.7 * P(win) + 0.3 * normalized_rank` at inference
@@ -302,7 +304,7 @@ Training support:
 - train/validation/test assignment is a deterministic SHA-256 hash of complete game id
 - training normalization, optimizer batches, and split evaluation all stream from Parquet
 - loss is binary cross entropy plus rank-value mean squared error
-- bundled checkpoint is a functional bootstrap artifact, not a strength-qualified replacement for `ai_heuristics`
+- bundled schema-v1 checkpoint is historical and must be retrained for schema v2
 
 ### `NnRlBasedAiController`
 
@@ -314,7 +316,7 @@ Purpose:
 
 Implemented behavior:
 
-- Reuses the 513-state/42-action public feature and runtime candidate schemas
+- Reuses the 520-state/52-action schema-v2 public feature and runtime candidate schemas
 - Scores every legal runtime candidate in one NumPy batch
 - Chooses only by maximum Policy logit online, with candidate order as stable tie-break
 - Logs Policy probability, current-actor Q, and Q mapped to every player id

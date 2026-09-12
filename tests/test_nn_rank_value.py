@@ -24,7 +24,14 @@ from powergrid.ai.nn_rank_value.observation import (
     encode_action_features,
     encode_state_features,
 )
-from powergrid.session import GameSession, GuiIntent
+from powergrid.model import (
+    ModelValidationError,
+    ResourceMarket,
+    ResourceStorage,
+    add_power_plant_to_player,
+    replace_plant_if_needed,
+)
+from powergrid.session import GameSession, GuiIntent, default_seat_agents
 
 
 class NnObservationAndCandidateTests(unittest.TestCase):
@@ -59,6 +66,168 @@ class NnObservationAndCandidateTests(unittest.TestCase):
                         auto_advance=False,
                     )
                     self.assertNotEqual(result.event_log[-1].level, "error")
+
+    def test_resource_schema_uses_frontiers_and_post_purchase_metrics(self) -> None:
+        session = GameSession.from_scenario("resource", seed=7)
+        snapshot = session.snapshot()
+        assert snapshot.active_request is not None
+        self.assertEqual(snapshot.active_request.metadata["resource"], "oil")
+        observation = build_public_observation(snapshot.state, snapshot.active_request)
+        state_features, state_names = encode_state_features(observation)
+
+        self.assertTrue(
+            all(
+                set(market) == {
+                    "empty",
+                    "cheapest_price",
+                    "units_at_cheapest",
+                    "supply",
+                }
+                for market in observation.payload["resource_market"].values()
+            )
+        )
+        market_names = [name for name in state_names if name.startswith("market.")]
+        self.assertEqual(len(market_names), 16)
+        self.assertNotIn("market.oil.unit_price_0", state_names)
+        self.assertFalse(any("total_available" in name for name in state_names))
+        self.assertEqual(
+            state_features[state_names.index("global.resource_purchase.oil")],
+            1.0,
+        )
+        self.assertEqual(
+            state_features[state_names.index("actor_resource.max_runnable_output")],
+            0.0,
+        )
+
+        candidates = generate_candidate_actions(snapshot.active_request, snapshot)
+        self.assertEqual(
+            [int(candidate.intent.payload["amount"]) for candidate in candidates],
+            list(range(7)),
+        )
+        buy_three = next(
+            candidate
+            for candidate in candidates
+            if int(candidate.intent.payload["amount"]) == 3
+        )
+        action_features, action_names = encode_action_features(observation, buy_three)
+        self.assertEqual(
+            action_features[
+                action_names.index("action.post_resource.delta_max_runnable_output")
+            ],
+            2 / 22,
+        )
+        self.assertEqual(len(state_features), 520)
+        self.assertEqual(len(action_features), 52)
+
+        after_buy = session.fork().submit_intent(
+            GuiIntent.buy_resource(snapshot.active_request.player_id, "oil", 4),
+            auto_advance=False,
+        )
+        assert after_buy.active_request is not None
+        after_observation = build_public_observation(
+            after_buy.state,
+            after_buy.active_request,
+        )
+        oil_market = after_observation.payload["resource_market"]["oil"]
+        self.assertEqual(oil_market["cheapest_price"], 4)
+        self.assertEqual(oil_market["units_at_cheapest"], 2)
+        self.assertEqual(
+            2
+            + sum(
+                int(capacity)
+                for price, capacity in after_buy.state.rules.resource_market_tracks[
+                    "oil"
+                ]["capacity_by_price"].items()
+                if int(price) > 4
+            ),
+            after_buy.state.resource_market.total_in_market("oil"),
+        )
+
+    def test_pending_hybrid_discard_encodes_post_discard_resource_context(self) -> None:
+        state = GameSession.from_scenario("resource", seed=7).snapshot().state
+        state = add_power_plant_to_player(state, "p1", 7)
+        state = add_power_plant_to_player(state, "p1", 11)
+        player = next(player for player in state.players if player.player_id == "p1")
+        player = replace(
+            player,
+            resource_storage=ResourceStorage(
+                coal=4,
+                oil=4,
+                hybrid_coal=2,
+            ),
+        )
+        state = replace(
+            state,
+            players=tuple(
+                player if existing.player_id == "p1" else existing
+                for existing in state.players
+            ),
+        )
+        state = replace_plant_if_needed(state, "p1", 7)
+        session = GameSession(state, default_seat_agents(state.config))
+        snapshot = session.snapshot()
+        assert snapshot.active_request is not None
+        self.assertEqual(
+            snapshot.active_request.decision_type,
+            "discard_hybrid_resources",
+        )
+
+        observation = build_public_observation(state, snapshot.active_request)
+        state_features, state_names = encode_state_features(observation)
+        self.assertEqual(
+            state_features[
+                state_names.index(
+                    "pending_resource_discard.discarded_plant_price"
+                )
+            ],
+            7 / 50,
+        )
+        self.assertEqual(
+            state_features[
+                state_names.index("pending_resource_discard.capacity.hybrid")
+            ],
+            4 / 24,
+        )
+        self.assertEqual(
+            state_features[
+                state_names.index("pending_resource_discard.target.oil")
+            ],
+            4 / 24,
+        )
+        candidates = generate_candidate_actions(snapshot.active_request, snapshot)
+        self.assertEqual(len(candidates), 3)
+        for candidate in candidates:
+            action_features, action_names = encode_action_features(
+                observation,
+                candidate,
+            )
+            self.assertGreaterEqual(
+                action_features[
+                    action_names.index(
+                        "action.post_resource.max_runnable_output"
+                    )
+                ],
+                0.0,
+            )
+
+    def test_resource_frontier_rejects_noncanonical_market(self) -> None:
+        snapshot = GameSession.from_scenario("resource", seed=7).snapshot()
+        assert snapshot.active_request is not None
+        market = {
+            resource: dict(bands)
+            for resource, bands in snapshot.state.resource_market.market.items()
+        }
+        market["oil"][4] = 2
+        malformed = replace(
+            snapshot.state,
+            resource_market=ResourceMarket(
+                market=market,
+                supply=dict(snapshot.state.resource_market.supply),
+            ),
+        )
+
+        with self.assertRaisesRegex(ModelValidationError, "non-full price band"):
+            build_public_observation(malformed, snapshot.active_request)
 
     def test_unaffordable_minimum_raise_is_not_a_candidate(self) -> None:
         session = GameSession.from_scenario("opening", seed=7)
@@ -95,7 +264,11 @@ class NnObservationAndCandidateTests(unittest.TestCase):
         session = GameSession.from_scenario("resource", seed=7)
         before = session.snapshot()
         assert before.active_request is not None
-        candidate = generate_candidate_actions(before.active_request, before)[0]
+        candidate = next(
+            candidate
+            for candidate in generate_candidate_actions(before.active_request, before)
+            if int(candidate.intent.payload.get("amount", 0)) > 0
+        )
         fork = session.fork()
 
         fork.submit_intent(candidate.intent, auto_advance=False)
@@ -152,6 +325,8 @@ class NnModelDatasetAndControllerTests(unittest.TestCase):
         self.assertEqual(len(summary.example_jsonl_paths), 3)
         self.assertEqual(verification, {"shards": summary.shards, "examples": 3})
         self.assertEqual(manifest["storage"]["row_group_unit"], "complete_game")
+        self.assertEqual(manifest["observation_schema_version"], 2)
+        self.assertEqual(manifest["action_feature_schema_version"], 2)
 
     def test_dataset_split_is_stable_and_game_exclusive(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

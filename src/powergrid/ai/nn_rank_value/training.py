@@ -171,6 +171,12 @@ def train_rank_value_model(
         checkpoint_path,
         metadata={
             "model_name": "ai_nn_rank_value_v1",
+            "observation_schema_version": int(
+                metadata["observation_schema_version"]
+            ),
+            "action_feature_schema_version": int(
+                metadata["action_feature_schema_version"]
+            ),
             "training_dataset": str(dataset_root),
             "training_dataset_manifest_sha256": _sha256_file(manifest_path),
             "training_epochs": epochs,

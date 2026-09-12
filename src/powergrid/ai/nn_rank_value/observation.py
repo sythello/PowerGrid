@@ -5,18 +5,24 @@ from dataclasses import dataclass
 from statistics import mean
 from typing import Any
 
-from ...model import GameState, RESOURCE_TYPES, PowerPlantCard, legal_build_targets
+from ...model import (
+    GameState,
+    ModelValidationError,
+    PowerPlantCard,
+    RESOURCE_TYPES,
+    legal_build_targets,
+)
 from ...session_types import TurnRequest
 from .candidates import CandidateAction
+from .resource_metrics import STORAGE_BUCKETS, resource_planning_metrics
 
 
-OBSERVATION_SCHEMA_VERSION = 1
-ACTION_FEATURE_SCHEMA_VERSION = 1
+OBSERVATION_SCHEMA_VERSION = 2
+ACTION_FEATURE_SCHEMA_VERSION = 2
 MAX_PLAYERS = 6
 MAX_PLAYER_PLANTS = 4
 MAX_CURRENT_MARKET = 6
 MAX_FUTURE_MARKET = 4
-MAX_RESOURCE_PRICE_SLOTS = 8
 MAX_BUILD_COST_SLOTS = 8
 
 PHASES = ("auction", "buy_resources", "build_houses", "bureaucracy")
@@ -34,7 +40,6 @@ ACTION_TYPES = (
     "auction_bid",
     "auction_pass",
     "buy_resource",
-    "finish_buying",
     "commit_build",
     "finish_building",
     "run_plants",
@@ -69,6 +74,64 @@ class _FeatureBuilder:
     def add(self, name: str, value: int | float | bool) -> None:
         self.names.append(name)
         self.values.append(float(value))
+
+
+def _resource_market_frontier(state: GameState, resource: str) -> dict[str, Any]:
+    capacities = {
+        int(price): int(amount)
+        for price, amount in state.rules.resource_market_tracks[resource][
+            "capacity_by_price"
+        ].items()
+    }
+    amounts = {
+        int(price): int(amount)
+        for price, amount in state.resource_market.market[resource].items()
+    }
+    if set(amounts) != set(capacities):
+        raise ModelValidationError(
+            f"{resource} market price bands do not match the rule table"
+        )
+    if any(
+        not 0 <= amounts[price] <= capacity
+        for price, capacity in capacities.items()
+    ):
+        raise ModelValidationError(
+            f"{resource} market contains a quantity outside its band capacity"
+        )
+    ordered_prices = sorted(capacities)
+    occupied = [price for price in ordered_prices if amounts.get(price, 0) > 0]
+    if not occupied:
+        cheapest_price = 0
+        units_at_cheapest = 0
+    else:
+        cheapest_price = occupied[0]
+        units_at_cheapest = amounts[cheapest_price]
+        if any(
+            amounts.get(price, 0) != 0
+            for price in ordered_prices
+            if price < cheapest_price
+        ):
+            raise ModelValidationError(
+                f"{resource} market has occupied slots below its frontier"
+            )
+        if not 1 <= units_at_cheapest <= capacities[cheapest_price]:
+            raise ModelValidationError(
+                f"{resource} market frontier has an invalid quantity"
+            )
+        if any(
+            amounts.get(price, 0) != capacities[price]
+            for price in ordered_prices
+            if price > cheapest_price
+        ):
+            raise ModelValidationError(
+                f"{resource} market has a non-full price band above its frontier"
+            )
+    return {
+        "empty": not occupied,
+        "cheapest_price": cheapest_price,
+        "units_at_cheapest": units_at_cheapest,
+        "supply": int(state.resource_market.supply[resource]),
+    }
 
 
 def build_public_observation(
@@ -118,6 +181,10 @@ def build_public_observation(
             "next_bidder_id": auction.next_bidder_id,
         }
 
+    resource_market = {
+        resource: _resource_market_frontier(state, resource)
+        for resource in RESOURCE_TYPES
+    }
     payload: dict[str, Any] = {
         "actor_id": actor_id,
         "map_id": state.game_map.id,
@@ -126,6 +193,7 @@ def build_public_observation(
         "step": state.step,
         "phase": state.phase,
         "decision_type": request.decision_type,
+        "resource_purchase_resource": request.metadata.get("resource"),
         "player_count": len(state.players),
         "end_game_cities": int(
             state.rules.player_count_rules[len(state.players)]["end_game_cities"]
@@ -140,17 +208,7 @@ def build_public_observation(
         "auction_step_3_pending": state.auction_step_3_pending,
         "current_market": [_public_plant(plant) for plant in state.current_market],
         "future_market": [_public_plant(plant) for plant in state.future_market],
-        "resource_market": {
-            resource: {
-                "price_bands": {
-                    str(price): int(amount)
-                    for price, amount in state.resource_market.market[resource].items()
-                },
-                "supply": int(state.resource_market.supply[resource]),
-                "unit_prices": list(state.resource_market.available_unit_prices(resource)),
-            }
-            for resource in RESOURCE_TYPES
-        },
+        "resource_market": resource_market,
         "players": [
             {
                 "player_id": player.player_id,
@@ -174,6 +232,12 @@ def build_public_observation(
             "connection_costs": [int(connection.cost) for connection in allowed_connections],
             "build_targets": build_targets,
         },
+        "actor_resource_metrics": resource_planning_metrics(state, actor_id),
+        "pending_resource_discard": (
+            dict(request.metadata)
+            if request.decision_type == "discard_hybrid_resources"
+            else None
+        ),
     }
     return PublicObservation(payload)
 
@@ -195,6 +259,9 @@ def encode_state_features(observation: PublicObservation) -> tuple[list[float], 
         builder.add(f"global.phase.{known_phase}", phase == known_phase)
     for known_decision in DECISION_TYPES:
         builder.add(f"global.decision.{known_decision}", decision_type == known_decision)
+    active_resource = str(payload.get("resource_purchase_resource") or "")
+    for resource in RESOURCE_TYPES:
+        builder.add(f"global.resource_purchase.{resource}", active_resource == resource)
     for map_id in ("germany", "usa", "test"):
         builder.add(f"global.map.{map_id}", payload["map_id"] == map_id)
     builder.add("global.selected_region_count", len(payload["selected_regions"]) / 6.0)
@@ -202,12 +269,20 @@ def encode_state_features(observation: PublicObservation) -> tuple[list[float], 
     resource_market = payload["resource_market"]
     for resource in RESOURCE_TYPES:
         market = resource_market[resource]
-        unit_prices = [int(value) for value in market["unit_prices"]]
-        builder.add(f"market.{resource}.available", len(unit_prices) / 24.0)
-        builder.add(f"market.{resource}.supply", int(market["supply"]) / 24.0)
-        for slot in range(MAX_RESOURCE_PRICE_SLOTS):
-            price = unit_prices[slot] if slot < len(unit_prices) else 0
-            builder.add(f"market.{resource}.unit_price_{slot}", price / 20.0)
+        builder.add(f"market.{resource}.empty", bool(market["empty"]))
+        builder.add(
+            f"market.{resource}.cheapest_price",
+            int(market["cheapest_price"]) / 16.0,
+        )
+        builder.add(
+            f"market.{resource}.units_at_cheapest",
+            int(market["units_at_cheapest"])
+            / (1.0 if resource == "uranium" else 3.0),
+        )
+        builder.add(
+            f"market.{resource}.supply",
+            int(market["supply"]) / _resource_quantity_scale(resource),
+        )
 
     _append_plant_slots(
         builder,
@@ -233,6 +308,12 @@ def encode_state_features(observation: PublicObservation) -> tuple[list[float], 
     for slot in range(MAX_PLAYERS):
         player = ordered_players[slot] if slot < len(ordered_players) else None
         _append_player_slot(builder, slot, player)
+
+    _append_resource_metrics(builder, "actor_resource", payload["actor_resource_metrics"])
+    _append_pending_resource_discard_context(
+        builder,
+        payload["pending_resource_discard"],
+    )
 
     auction = payload["auction"]
     builder.add("auction.present", auction is not None)
@@ -323,7 +404,7 @@ def encode_action_features(
     direct_cost = int(metadata.get("cost", metadata.get("total_cost", bid)))
     builder.add("action.bid", bid / 100.0)
     builder.add("action.plant_price", plant_price / 50.0)
-    builder.add("action.amount", amount / 8.0)
+    builder.add("action.amount", amount / _resource_quantity_scale(resource))
     builder.add("action.direct_cost", direct_cost / 200.0)
     builder.add("action.cash_after", max(0, actor_cash - direct_cost) / 200.0)
     for known_resource in RESOURCE_TYPES:
@@ -348,7 +429,8 @@ def encode_action_features(
     for known_resource in RESOURCE_TYPES:
         builder.add(
             f"action.resource_mix.{known_resource}",
-            int(mix.get(known_resource, intent.payload.get(known_resource, 0))) / 8.0,
+            int(mix.get(known_resource, intent.payload.get(known_resource, 0)))
+            / _resource_quantity_scale(known_resource),
         )
     builder.add(
         "action.discarded_units",
@@ -356,12 +438,115 @@ def encode_action_features(
             int(intent.payload.get("coal", 0))
             + int(intent.payload.get("oil", 0))
         )
-        / 8.0,
+        / 24.0,
+    )
+
+    post_metrics = metadata.get("post_resource_metrics")
+    _append_post_resource_metrics(
+        builder,
+        post_metrics if isinstance(post_metrics, dict) else None,
     )
 
     plant = _find_public_plant(observation, plant_price)
     _append_plant_features(builder, "action.plant", plant)
     return builder.values, tuple(builder.names)
+
+
+def _append_resource_metrics(
+    builder: _FeatureBuilder,
+    prefix: str,
+    metrics: dict[str, Any],
+) -> None:
+    free_storage = dict(metrics["free_storage"])
+    for bucket in STORAGE_BUCKETS:
+        builder.add(f"{prefix}.free_storage.{bucket}", int(free_storage[bucket]) / 24.0)
+    max_additional = dict(metrics["max_additional"])
+    for resource in RESOURCE_TYPES:
+        builder.add(
+            f"{prefix}.max_additional.{resource}",
+            int(max_additional[resource]) / 24.0,
+        )
+    builder.add(
+        f"{prefix}.max_runnable_output",
+        int(metrics["max_runnable_output"]) / 22.0,
+    )
+    builder.add(
+        f"{prefix}.fuel_output_shortfall",
+        int(metrics["fuel_output_shortfall"]) / 22.0,
+    )
+    builder.add(
+        f"{prefix}.max_powered_cities",
+        int(metrics["max_powered_cities"]) / 22.0,
+    )
+    builder.add(
+        f"{prefix}.power_shortfall",
+        int(metrics["power_shortfall"]) / 22.0,
+    )
+
+
+def _append_post_resource_metrics(
+    builder: _FeatureBuilder,
+    metrics: dict[str, Any] | None,
+) -> None:
+    free_storage = dict(metrics.get("free_storage", {})) if metrics else {}
+    for bucket in STORAGE_BUCKETS:
+        builder.add(
+            f"action.post_resource.free_storage.{bucket}",
+            int(free_storage.get(bucket, 0)) / 24.0,
+        )
+    builder.add(
+        "action.post_resource.max_runnable_output",
+        int(metrics.get("max_runnable_output", 0)) / 22.0 if metrics else 0,
+    )
+    builder.add(
+        "action.post_resource.fuel_output_shortfall",
+        int(metrics.get("fuel_output_shortfall", 0)) / 22.0 if metrics else 0,
+    )
+    builder.add(
+        "action.post_resource.delta_max_runnable_output",
+        int(metrics.get("delta_max_runnable_output", 0)) / 22.0 if metrics else 0,
+    )
+    builder.add(
+        "action.post_resource.max_powered_cities",
+        int(metrics.get("max_powered_cities", 0)) / 22.0 if metrics else 0,
+    )
+    builder.add(
+        "action.post_resource.power_shortfall",
+        int(metrics.get("power_shortfall", 0)) / 22.0 if metrics else 0,
+    )
+    builder.add(
+        "action.post_resource.delta_max_powered",
+        int(metrics.get("delta_max_powered", 0)) / 22.0 if metrics else 0,
+    )
+
+
+def _append_pending_resource_discard_context(
+    builder: _FeatureBuilder,
+    metadata: dict[str, Any] | None,
+) -> None:
+    payload = metadata or {}
+    builder.add(
+        "pending_resource_discard.discarded_plant_price",
+        int(payload.get("discarded_power_plant_price", 0)) / 50.0,
+    )
+    capacities = dict(payload.get("storage_capacities", {}))
+    for bucket in ("coal", "oil", "hybrid", "garbage", "uranium"):
+        builder.add(
+            f"pending_resource_discard.capacity.{bucket}",
+            int(capacities.get(bucket, 0)) / 24.0,
+        )
+    target_totals = dict(payload.get("target_resource_totals", {}))
+    auto_discards = dict(payload.get("auto_discard_resources", {}))
+    for resource in RESOURCE_TYPES:
+        scale = _resource_quantity_scale(resource)
+        builder.add(
+            f"pending_resource_discard.target.{resource}",
+            int(target_totals.get(resource, 0)) / scale,
+        )
+        builder.add(
+            f"pending_resource_discard.auto_discard.{resource}",
+            int(auto_discards.get(resource, 0)) / scale,
+        )
 
 
 def _append_player_slot(
@@ -393,7 +578,10 @@ def _append_player_slot(
     )
     resources = player["resources"] if player else {}
     for resource in RESOURCE_TYPES:
-        builder.add(f"{prefix}.resource.{resource}", int(resources.get(resource, 0)) / 8.0)
+        builder.add(
+            f"{prefix}.resource.{resource}",
+            int(resources.get(resource, 0)) / _resource_quantity_scale(resource),
+        )
     plants = list(player["power_plants"]) if player else []
     builder.add(
         f"{prefix}.total_output",
@@ -457,6 +645,10 @@ def _find_public_plant(
             if int(plant["price"]) == plant_price:
                 return plant
     return None
+
+
+def _resource_quantity_scale(resource: str) -> float:
+    return 12.0 if resource == "uranium" else 24.0
 
 
 def _public_plant(plant: PowerPlantCard) -> dict[str, Any]:

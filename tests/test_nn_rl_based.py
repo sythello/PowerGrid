@@ -394,6 +394,10 @@ class RlSemanticSearchTests(unittest.TestCase):
                     or after.state.phase != before.state.phase
                     or after.active_request is not None
                     and after.active_request.player_id != before.active_request.player_id
+                    or before.state.phase == "buy_resources"
+                    and after.active_request is not None
+                    and after.active_request.metadata.get("resource")
+                    != before.active_request.metadata.get("resource")
                     or before.state.phase == "auction"
                     and after.state.auction_state is not None
                     and after.state.auction_state.active_plant_price is None
@@ -673,6 +677,7 @@ class RlDatasetTrainingControllerTests(unittest.TestCase):
                 hidden_dims=(32, 16, 16),
                 q_search_weight=0.0,
             )
+            trained_metadata = NumpyRlPolicyQNetwork.load(checkpoint).metadata
             controller = NnRlBasedAiController(checkpoint)
             session = GameSession.from_scenario("opening", seed=7)
             snapshot = session.snapshot()
@@ -703,6 +708,10 @@ class RlDatasetTrainingControllerTests(unittest.TestCase):
         )
         self.assertTrue(all(len(row["candidate_action_features"]) > 0 for row in records))
         self.assertEqual(training.train_decisions, summary.decisions)
+        self.assertEqual(manifest["observation_schema_version"], 2)
+        self.assertEqual(manifest["action_feature_schema_version"], 2)
+        self.assertEqual(trained_metadata["observation_schema_version"], 2)
+        self.assertEqual(trained_metadata["action_feature_schema_version"], 2)
         self.assertNotEqual(result.event_log[-1].level, "error")
         self.assertIsInstance(
             build_ai_controller("ai_nn_rl_based_v1"), NnRlBasedAiController

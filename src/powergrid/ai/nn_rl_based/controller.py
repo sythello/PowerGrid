@@ -9,6 +9,8 @@ from ...session_types import GameSnapshot, GuiIntent, TurnRequest
 from ..base import BaseAiController
 from ..nn_rank_value.candidates import generate_candidate_actions
 from ..nn_rank_value.observation import (
+    ACTION_FEATURE_SCHEMA_VERSION,
+    OBSERVATION_SCHEMA_VERSION,
     build_public_observation,
     encode_action_features,
     encode_state_features,
@@ -68,6 +70,16 @@ class NnRlBasedAiController(BaseAiController):
             action_names = action_names or current_names
             if current_names != action_names:
                 raise ModelValidationError("RL action feature schema changed during scoring")
+        if model.state_dim != len(state_features) or model.action_dim != len(
+            action_rows[0]
+        ):
+            raise ModelValidationError(
+                "RL checkpoint dimensions "
+                f"{model.state_dim}/{model.action_dim} do not match runtime feature "
+                f"schema v{OBSERVATION_SCHEMA_VERSION}/v{ACTION_FEATURE_SCHEMA_VERSION} "
+                f"({len(state_features)}/{len(action_rows[0])}); regenerate the dataset "
+                "and retrain the checkpoint"
+            )
         if model.state_feature_names != state_names:
             raise ModelValidationError("RL checkpoint state feature schema mismatch")
         if model.action_feature_names != tuple(action_names or ()):
@@ -114,12 +126,15 @@ class NnRlBasedAiController(BaseAiController):
             request,
             label="nn_rl_based_decision",
             state={
-                "schema_version": 1,
+                "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
+                "action_feature_schema_version": ACTION_FEATURE_SCHEMA_VERSION,
                 "checkpoint": str(self._checkpoint_path),
                 "model_metadata": {
                     key: model.metadata[key]
                     for key in (
                         "model_name",
+                        "observation_schema_version",
+                        "action_feature_schema_version",
                         "training_iteration",
                         "training_dataset",
                         "training_dataset_manifest_sha256",
