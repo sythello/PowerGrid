@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d292b" />
+    <title>PowerGrid · 电力调度台</title>
+    <meta
+      name="description"
+      content="PowerGrid 的本地 Web GUI：竞拍电厂、购买资源、建设网络并为城市供电。"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="launcher" class="launcher" aria-labelledby="launcher-title">
+        <div class="launcher-brand">
+          <div class="brand-lockup">
+            <span class="brand-mark" aria-hidden="true">ϟ</span>
+            <div>
+              <p class="eyebrow">ENERGIEVERBUND · 1955</p>
+              <h1 id="launcher-title">POWER<span>GRID</span></h1>
+            </div>
+          </div>
+          <div class="brand-copy">
+            <p class="serial">调度台 / PG–01</p>
+            <h2>让每一座城市亮起来。</h2>
+            <p>竞拍发电厂，追踪燃料价格，建设成本最低的供电网络。</p>
+          </div>
+          <div class="brand-meter" aria-hidden="true">
+            <div class="meter-face">
+              <span>0</span><span>MW</span><span>100</span>
+              <i></i>
+            </div>
+            <p>GRID LOAD</p>
+          </div>
+        </div>
+
+        <form id="new-game-form" class="launcher-panel">
+          <header>
+            <p class="panel-code">新建调度任务</p>
+            <h2>游戏设置</h2>
+            <p>第一席默认为本地玩家，其余席位可交给 AI。</p>
+          </header>
+          <div class="setup-grid">
+            <label>
+              <span>地图</span>
+              <select id="map-select" name="map_id"></select>
+            </label>
+            <label>
+              <span>玩家数量</span>
+              <select id="player-count" name="player_count">
+                <option value="3">3 位</option>
+                <option value="4">4 位</option>
+                <option value="5">5 位</option>
+                <option value="6">6 位</option>
+              </select>
+            </label>
+            <label>
+              <span>随机种子</span>
+              <input id="seed-input" name="seed" type="number" min="0" max="999999" value="7" />
+            </label>
+          </div>
+          <div class="seat-heading">
+            <span>席位配置</span>
+            <span>控制方式</span>
+          </div>
+          <div id="seat-list" class="seat-list"></div>
+          <button id="start-game" class="primary-button" type="submit">
+            <span>启动电网</span><b aria-hidden="true">→</b>
+          </button>
+          <p id="launcher-status" class="launcher-status" role="status">正在读取游戏配置…</p>
+        </form>
+      </section>
+
+      <section id="game-shell" class="game-shell" hidden aria-label="PowerGrid 游戏桌面">
+        <header class="topbar">
+          <div class="compact-brand">
+            <span class="brand-mark small" aria-hidden="true">ϟ</span>
+            <div><b>POWERGRID</b><span>电力调度台</span></div>
+          </div>
+          <div id="phase-track" class="phase-track" aria-label="回合阶段"></div>
+          <div class="round-readout">
+            <span>回合</span><strong id="round-number">1</strong>
+            <span>阶段</span><strong id="step-number">1</strong>
+          </div>
+          <div class="topbar-actions">
+            <button id="ai-toggle" class="tool-button" type="button" hidden>暂停 AI</button>
+            <button id="new-game-button" class="tool-button" type="button">新游戏</button>
+          </div>
+        </header>
+
+        <aside class="player-column panel-surface">
+          <header class="section-heading">
+            <div><span>01</span><h2>运营商</h2></div>
+            <p>按当前顺位</p>
+          </header>
+          <div id="player-list" class="player-list"></div>
+        </aside>
+
+        <section class="board-column">
+          <header class="board-toolbar panel-surface">
+            <div>
+              <p id="map-kicker" class="eyebrow">NETWORK MAP</p>
+              <h2 id="map-title">德国电网</h2>
+            </div>
+            <div id="active-callout" class="active-callout" aria-live="polite"></div>
+            <div class="board-tools">
+              <button
+                id="layout-editor-button"
+                class="layout-editor-button"
+                type="button"
+                data-action="start-layout-editor"
+              >调整城市坐标</button>
+              <div class="zoom-controls" aria-label="地图缩放">
+                <button type="button" data-action="zoom-out" aria-label="缩小地图">−</button>
+                <output id="zoom-output">100%</output>
+                <button type="button" data-action="zoom-in" aria-label="放大地图">＋</button>
+              </div>
+            </div>
+          </header>
+          <div id="board-viewport" class="board-viewport panel-surface" tabindex="0">
+            <div id="board-canvas" class="board-canvas"></div>
+          </div>
+          <section id="action-console" class="action-console panel-surface" aria-live="polite"></section>
+        </section>
+
+        <aside class="market-column">
+          <section class="plant-market panel-surface">
+            <header class="section-heading">
+              <div><span>02</span><h2>发电厂市场</h2></div>
+              <p id="deck-count">牌库</p>
+            </header>
+            <div id="plant-market"></div>
+          </section>
+          <section class="resource-market panel-surface">
+            <header class="section-heading">
+              <div><span>03</span><h2>资源市场</h2></div>
+              <p>数字为单价</p>
+            </header>
+            <div id="resource-market"></div>
+          </section>
+          <section class="event-panel panel-surface">
+            <header class="section-heading">
+              <div><span>04</span><h2>调度记录</h2></div>
+              <p>最近事件</p>
+            </header>
+            <ol id="event-list" class="event-list"></ol>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <div id="winner-dialog" class="winner-backdrop" hidden>
+      <section class="winner-card" role="dialog" aria-modal="true" aria-labelledby="winner-title">
+        <p class="eyebrow">FINAL GRID REPORT</p>
+        <h2 id="winner-title">电网结算完成</h2>
+        <div id="winner-content"></div>
+        <button class="primary-button" type="button" data-action="return-launcher">开始新游戏</button>
+      </section>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

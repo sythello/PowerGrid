@@ -4,6 +4,7 @@ PowerGrid is a Python implementation of the Power Grid board game with:
 
 - a shared rules engine
 - a frontend-neutral session layer
+- a local browser-based Web GUI
 - a Tkinter GUI
 - a terminal CLI
 - deterministic, heuristic-search, and trainable neural AI controllers
@@ -21,7 +22,17 @@ Validate the bundled maps/rules data:
 PYTHONPATH=src python -m powergrid.tools.validate_static_data
 ```
 
-Run the main GUI:
+Run the Web GUI:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.play_web_gui --open
+```
+
+The server listens on `http://127.0.0.1:8765` by default. The Web GUI uses only
+the Python standard library and the existing PowerGrid engine; no Node.js setup
+is required.
+
+Run the Tkinter GUI:
 
 ```bash
 PYTHONPATH=src python -m powergrid.tools.play_tkinter_gui
@@ -43,7 +54,28 @@ On macOS, GUI-related test runs may print LaunchServices warnings. They have bee
 
 ## Main Ways To Use The Repo
 
-### 1. Play a full game in the GUI
+### 1. Play a full game in the Web GUI
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.play_web_gui --open
+```
+
+Useful options:
+
+- `--host 127.0.0.1`
+- `--port 8765`
+- `--open`
+- `--smoke-test`
+
+The local Web GUI supports Germany, USA, and the test map; 3-6 local/AI seats;
+power-plant auctions; resource buying; network building; bureaucracy; pending
+discard choices; AI pause/resume; and final standings. Germany and USA use the
+bundled board artwork, and all base power-plant cards have matched artwork. The
+`调整城市坐标` developer control shows every city anchor, supports drag or
+arrow-key adjustment, and writes confirmed changes to
+`src/powergrid/web/static/data/web_layouts.json`; canceling leaves the file unchanged.
+
+### 2. Play a full game in the Tkinter GUI
 
 ```bash
 PYTHONPATH=src python -m powergrid.tools.play_tkinter_gui
@@ -73,7 +105,7 @@ GUI launcher behavior:
 
 During AI turns, the GUI advances AI actions with a pause between actions and exposes a `Pause AI` / `Resume AI` control.
 
-### 2. Play a full game in the terminal
+### 3. Play a full game in the terminal
 
 ```bash
 PYTHONPATH=src python -m powergrid.tools.play_cli_game --map germany --players 4 --seed 11
@@ -86,7 +118,7 @@ Useful options:
 
 This path uses the older CLI game loop directly over the rules engine, while the GUI uses the newer session layer.
 
-### 3. Run AI-vs-AI games and dump logs
+### 4. Run AI-vs-AI games and dump logs
 
 ```bash
 PYTHONPATH=src python -m powergrid.tools.run_ai_game \
@@ -120,7 +152,7 @@ PYTHONPATH=src python -m powergrid.tools.analyze_strategy_logs \
   --game-dir artifacts/game_logs/heuristic_v005
 ```
 
-### 4. Evaluate AI ratings
+### 5. Evaluate AI ratings
 
 ```bash
 PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings --games-per-lineup 20 --seed-start 1
