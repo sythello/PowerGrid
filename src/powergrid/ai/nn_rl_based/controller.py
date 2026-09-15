@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 
 
 CONTROLLER_NAME = "ai_nn_rl_based_v1"
+# Keep the readable major model name stable while the release version advances.
+# Release versions use "<feature schema>.<checkpoint revision>", zero-padding the
+# revision so the first accepted schema-v2 checkpoint is v 2.01.
+DISPLAY_NAME = "NN RL V1"
+RELEASE_VERSION = "2.01"
+DISPLAY_LABEL = f"{DISPLAY_NAME} (v {RELEASE_VERSION})"
 CHECKPOINT_ENV_VAR = "POWERGRID_NN_RL_BASED_CHECKPOINT"
 DEFAULT_CHECKPOINT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -170,6 +176,9 @@ class NnRlBasedAiController(BaseAiController):
 __all__ = [
     "CHECKPOINT_ENV_VAR",
     "CONTROLLER_NAME",
+    "DISPLAY_LABEL",
+    "DISPLAY_NAME",
     "DEFAULT_CHECKPOINT_PATH",
     "NnRlBasedAiController",
+    "RELEASE_VERSION",
 ]

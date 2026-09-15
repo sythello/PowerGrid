@@ -81,10 +81,10 @@ be powered, while keeping every choice editable. The
 `调整城市坐标` developer control shows every city anchor, supports drag or
 arrow-key adjustment, and writes confirmed changes to
 `src/powergrid/web/static/data/web_layouts.json`; canceling leaves the file unchanged.
-For Germany with 3 players, Web GUI AI seats default to `NN RL v2` (the current
-schema-v2 `ai_nn_rl_based_v1` checkpoint); incompatible maps or player counts
-fall back to `ai_deterministic`. The heuristic controller is not shown in the
-Web GUI picker.
+For Germany with 3 players, Web GUI AI seats default to `NN RL V1 (v 2.01)` (the
+current schema-v2, release-01 `ai_nn_rl_based_v1` checkpoint); incompatible maps
+or player counts fall back to `ai_deterministic`. The heuristic controller is not
+shown in the Web GUI picker.
 
 ### 2. Play a full game in the Tkinter GUI
 

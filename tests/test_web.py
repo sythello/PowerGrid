@@ -17,22 +17,43 @@ class PowerGridWebControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.controller = PowerGridWebController()
 
-    def test_metadata_uses_nn_rl_v2_as_the_default_ai(self) -> None:
+    def test_metadata_uses_versioned_nn_rl_v1_as_the_default_ai(self) -> None:
         metadata = self.controller.metadata()
         controller_ids = [controller["id"] for controller in metadata["controllers"]]
 
-        self.assertEqual(controller_ids, ["human", "ai_nn_rl_v2", "ai_deterministic"])
+        self.assertEqual(controller_ids, ["human", "ai_nn_rl_v1", "ai_deterministic"])
         self.assertNotIn("ai_heuristics", controller_ids)
-        self.assertEqual(metadata["defaults"]["ai_controller"], "ai_nn_rl_v2")
+        self.assertEqual(metadata["defaults"]["ai_controller"], "ai_nn_rl_v1")
         self.assertEqual(
             metadata["defaults"]["controllers"],
-            ["human", "ai_nn_rl_v2", "ai_nn_rl_v2"],
+            ["human", "ai_nn_rl_v1", "ai_nn_rl_v1"],
         )
         nn_option = metadata["controllers"][1]
+        self.assertEqual(nn_option["name"], "NN RL V1 (v 2.01)")
         self.assertEqual(nn_option["supported_maps"], ["germany"])
         self.assertEqual(nn_option["supported_player_counts"], [3])
 
-    def test_new_game_maps_nn_rl_v2_to_the_latest_schema_v2_controller(self) -> None:
+    def test_new_game_maps_nn_rl_v1_to_the_latest_release_controller(self) -> None:
+        payload = self.controller.new_game(
+            {
+                "map_id": "germany",
+                "seed": 7,
+                "players": [
+                    {"name": "Alice", "controller": "human"},
+                    {"name": "Bob", "controller": "ai_nn_rl_v1"},
+                    {"name": "Carol", "controller": "ai_nn_rl_v1"},
+                ],
+            }
+        )
+
+        controllers = {
+            player["name"]: player["controller"]
+            for player in payload["state"]["players"]
+        }
+        self.assertEqual(controllers["Bob"], "ai_nn_rl_based_v1")
+        self.assertEqual(controllers["Carol"], "ai_nn_rl_based_v1")
+
+    def test_legacy_nn_rl_v2_web_id_remains_compatible(self) -> None:
         payload = self.controller.new_game(
             {
                 "map_id": "germany",
@@ -45,11 +66,14 @@ class PowerGridWebControllerTests(unittest.TestCase):
             }
         )
 
-        controllers = {player["name"]: player["controller"] for player in payload["state"]["players"]}
+        controllers = {
+            player["name"]: player["controller"]
+            for player in payload["state"]["players"]
+        }
         self.assertEqual(controllers["Bob"], "ai_nn_rl_based_v1")
         self.assertEqual(controllers["Carol"], "ai_nn_rl_based_v1")
 
-    def test_nn_rl_v2_rejects_unsupported_map_or_player_count(self) -> None:
+    def test_nn_rl_v1_rejects_unsupported_map_or_player_count(self) -> None:
         with self.assertRaisesRegex(ModelValidationError, "3-player Germany"):
             self.controller.new_game(
                 {
@@ -57,8 +81,8 @@ class PowerGridWebControllerTests(unittest.TestCase):
                     "seed": 7,
                     "players": [
                         {"name": "Alice", "controller": "human"},
-                        {"name": "Bob", "controller": "ai_nn_rl_v2"},
-                        {"name": "Carol", "controller": "ai_nn_rl_v2"},
+                        {"name": "Bob", "controller": "ai_nn_rl_v1"},
+                        {"name": "Carol", "controller": "ai_nn_rl_v1"},
                     ],
                 }
             )

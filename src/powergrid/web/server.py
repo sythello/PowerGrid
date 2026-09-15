@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from ..ai import AI_CONTROLLER_REGISTRY
+from ..ai.nn_rl_based.controller import DISPLAY_LABEL as NN_RL_DISPLAY_LABEL
 from ..board_layout import load_board_layout
 from ..model import GameConfig, GameState, ModelValidationError, SeatConfig, apply_builds
 from ..session import GameSession
@@ -31,6 +32,9 @@ MAP_SIZES = {
     "test": {"width": 1200, "height": 780},
 }
 WEB_CONTROLLER_ALIASES = {
+    "ai_nn_rl_v1": "ai_nn_rl_based_v1",
+    # Compatibility for games created before the Web label was aligned with the
+    # controller's actual V1 model family.
     "ai_nn_rl_v2": "ai_nn_rl_based_v1",
 }
 
@@ -59,8 +63,8 @@ class PowerGridWebController:
             "controllers": [
                 {"id": "human", "name": "本地玩家"},
                 {
-                    "id": "ai_nn_rl_v2",
-                    "name": "NN RL v2",
+                    "id": "ai_nn_rl_v1",
+                    "name": NN_RL_DISPLAY_LABEL,
                     "supported_maps": ["germany"],
                     "supported_player_counts": [3],
                 },
@@ -70,8 +74,8 @@ class PowerGridWebController:
                 "map_id": "germany",
                 "player_count": 3,
                 "seed": 7,
-                "ai_controller": "ai_nn_rl_v2",
-                "controllers": ["human", "ai_nn_rl_v2", "ai_nn_rl_v2"],
+                "ai_controller": "ai_nn_rl_v1",
+                "controllers": ["human", "ai_nn_rl_v1", "ai_nn_rl_v1"],
             },
         }
 
@@ -91,7 +95,9 @@ class PowerGridWebController:
             if "ai_nn_rl_based_v1" in canonical_controllers and (
                 map_id != "germany" or len(raw_seats) != 3
             ):
-                raise ModelValidationError("NN RL v2 supports only 3-player Germany games")
+                raise ModelValidationError(
+                    f"{NN_RL_DISPLAY_LABEL} supports only 3-player Germany games"
+                )
             seats = tuple(
                 SeatConfig(
                     player_id=f"p{index + 1}",
