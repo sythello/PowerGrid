@@ -46,6 +46,8 @@
     aiTimer: null,
     aiWorking: false,
     toastTimer: null,
+    plantPreviewTarget: null,
+    globalParametersInvoker: null,
     seatDrafts: [],
     layoutEditor: {
       active: false,
@@ -92,12 +94,21 @@
       resourceMarket: document.querySelector("#resource-market"),
       eventList: document.querySelector("#event-list"),
       toast: document.querySelector("#toast"),
+      plantPreviewTooltip: document.querySelector("#plant-preview-tooltip"),
+      plantPreviewImage: document.querySelector("#plant-preview-image"),
+      plantPreviewLabel: document.querySelector("#plant-preview-label"),
+      globalParametersDialog: document.querySelector("#global-parameters-dialog"),
+      globalParametersContent: document.querySelector("#global-parameters-content"),
       winnerDialog: document.querySelector("#winner-dialog"),
       winnerContent: document.querySelector("#winner-content"),
     });
 
     refs.newGameForm.addEventListener("submit", startGame);
     refs.playerCount.addEventListener("change", () => {
+      captureSeatDrafts();
+      renderSeatRows(Number(refs.playerCount.value));
+    });
+    refs.mapSelect.addEventListener("change", () => {
       captureSeatDrafts();
       renderSeatRows(Number(refs.playerCount.value));
     });
@@ -111,6 +122,16 @@
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("pointercancel", handlePointerUp);
+    document.addEventListener("pointerover", handlePlantPreviewOver);
+    document.addEventListener("pointerout", handlePlantPreviewOut);
+    document.addEventListener("focusin", handlePlantPreviewFocusIn);
+    document.addEventListener("focusout", handlePlantPreviewFocusOut);
+    document.addEventListener("scroll", hidePlantPreview, true);
+    window.addEventListener("resize", hidePlantPreview);
+    refs.plantPreviewImage.addEventListener("load", () => {
+      if (ui.plantPreviewTarget) positionPlantPreview(ui.plantPreviewTarget);
+    });
+    refs.plantPreviewImage.addEventListener("error", hidePlantPreview);
 
     try {
       const [meta, state] = await Promise.all([api("/api/meta"), api("/api/state")]);
@@ -136,7 +157,7 @@
     refs.seedInput.value = String(ui.meta.defaults.seed);
     ui.seatDrafts = Array.from({ length: 6 }, (_, index) => ({
       name: `玩家 ${index + 1}`,
-      controller: ui.meta.defaults.controllers[index] || "ai_heuristics",
+      controller: ui.meta.defaults.controllers[index] || ui.meta.defaults.ai_controller,
     }));
     renderSeatRows(ui.meta.defaults.player_count);
   }
@@ -144,16 +165,20 @@
   function renderSeatRows(count) {
     while (ui.seatDrafts.length < count) {
       const index = ui.seatDrafts.length;
-      ui.seatDrafts.push({ name: `玩家 ${index + 1}`, controller: "ai_heuristics" });
+      ui.seatDrafts.push({ name: `玩家 ${index + 1}`, controller: ui.meta.defaults.ai_controller });
     }
     refs.seatList.innerHTML = ui.seatDrafts
       .slice(0, count)
       .map((seat, index) => {
+        if (!controllerIsAvailable(seat.controller, count)) {
+          seat.controller = firstAvailableAiController(count);
+        }
         const options = ui.meta.controllers
-          .map(
-            (controller) =>
-              `<option value="${escapeHtml(controller.id)}" ${controller.id === seat.controller ? "selected" : ""}>${escapeHtml(controller.name)}</option>`,
-          )
+          .map((controller) => {
+            const available = controllerIsAvailable(controller.id, count);
+            const support = available || controller.id === "human" ? "" : "（仅德国地图 3 人局）";
+            return `<option value="${escapeHtml(controller.id)}" ${controller.id === seat.controller ? "selected" : ""} ${available ? "" : "disabled"}>${escapeHtml(controller.name + support)}</option>`;
+          })
           .join("");
         return `
           <div class="seat-row" data-seat="${index}">
@@ -168,6 +193,20 @@
           </div>`;
       })
       .join("");
+  }
+
+  function controllerIsAvailable(controllerId, playerCount) {
+    const controller = ui.meta.controllers.find((candidate) => candidate.id === controllerId);
+    if (!controller) return false;
+    const mapSupported = !controller.supported_maps || controller.supported_maps.includes(refs.mapSelect.value);
+    const countSupported = !controller.supported_player_counts || controller.supported_player_counts.includes(playerCount);
+    return mapSupported && countSupported;
+  }
+
+  function firstAvailableAiController(playerCount) {
+    return ui.meta.controllers.find(
+      (controller) => controller.id !== "human" && controllerIsAvailable(controller.id, playerCount),
+    )?.id || "human";
   }
 
   function captureSeatDrafts() {
@@ -228,6 +267,7 @@
     clearTimeout(ui.aiTimer);
     ui.aiPaused = true;
     refs.winnerDialog.hidden = true;
+    closeGlobalParameters(false);
     refs.gameShell.hidden = true;
     refs.launcher.hidden = false;
   }
@@ -279,6 +319,7 @@
     renderBoard();
     renderPlantMarket();
     renderResourceMarket();
+    renderGlobalParameters();
     renderActionConsole();
     renderEvents();
     renderWinner();
@@ -309,6 +350,7 @@
   }
 
   function renderPlayers() {
+    hidePlantPreview();
     const { state, request } = ui.snapshot;
     const players = state.player_order.map((playerId) => playerById(playerId)).filter(Boolean);
     refs.playerList.innerHTML = players
@@ -322,7 +364,17 @@
           ? player.power_plants
               .filter((plant) => !plant.is_step_3_placeholder)
               .sort((a, b) => a.price - b.price)
-              .map((plant) => `<span class="plant-number" title="可供 ${plant.output_cities} 城">#${plant.price}</span>`)
+              .map((plant) => {
+                const label = `#${plant.price} 发电厂 · 可供 ${plant.output_cities} 城`;
+                return `<span
+                  class="plant-number owned-plant-number"
+                  data-owned-plant-preview="/assets/plants/${plant.price}.png"
+                  data-plant-preview-label="${escapeHtml(label)}"
+                  tabindex="0"
+                  aria-describedby="plant-preview-tooltip"
+                  aria-label="${escapeHtml(label)}，悬浮或聚焦查看卡牌"
+                >#${plant.price}</span>`;
+              })
               .join("")
           : `<span class="plant-number">暂无电厂</span>`;
         const active = request?.player_id === player.player_id ? "active" : "";
@@ -342,6 +394,62 @@
           </article>`;
       })
       .join("");
+  }
+
+  function handlePlantPreviewOver(event) {
+    const target = event.target.closest?.("[data-owned-plant-preview]");
+    if (!target || target === ui.plantPreviewTarget) return;
+    showPlantPreview(target);
+  }
+
+  function handlePlantPreviewOut(event) {
+    const target = event.target.closest?.("[data-owned-plant-preview]");
+    if (!target || target.contains(event.relatedTarget) || document.activeElement === target) return;
+    hidePlantPreview();
+  }
+
+  function handlePlantPreviewFocusIn(event) {
+    const target = event.target.closest?.("[data-owned-plant-preview]");
+    if (target) showPlantPreview(target);
+  }
+
+  function handlePlantPreviewFocusOut(event) {
+    const target = event.target.closest?.("[data-owned-plant-preview]");
+    if (!target || target.matches(":hover")) return;
+    hidePlantPreview();
+  }
+
+  function showPlantPreview(target) {
+    ui.plantPreviewTarget = target;
+    refs.plantPreviewLabel.textContent = target.dataset.plantPreviewLabel || "发电厂";
+    refs.plantPreviewTooltip.style.left = "-9999px";
+    refs.plantPreviewTooltip.style.top = "-9999px";
+    refs.plantPreviewTooltip.hidden = false;
+    refs.plantPreviewImage.src = target.dataset.ownedPlantPreview;
+    positionPlantPreview(target);
+  }
+
+  function positionPlantPreview(target) {
+    if (target !== ui.plantPreviewTarget || !target.isConnected || refs.plantPreviewTooltip.hidden) return;
+    const anchor = target.getBoundingClientRect();
+    const preview = refs.plantPreviewTooltip.getBoundingClientRect();
+    const gap = 12;
+    const edge = 8;
+    let left = anchor.right + gap;
+    if (left + preview.width > window.innerWidth - edge) left = anchor.left - preview.width - gap;
+    left = clamp(left, edge, Math.max(edge, window.innerWidth - preview.width - edge));
+    const top = clamp(
+      anchor.top + (anchor.height - preview.height) / 2,
+      edge,
+      Math.max(edge, window.innerHeight - preview.height - edge),
+    );
+    refs.plantPreviewTooltip.style.left = `${Math.round(left)}px`;
+    refs.plantPreviewTooltip.style.top = `${Math.round(top)}px`;
+  }
+
+  function hidePlantPreview() {
+    ui.plantPreviewTarget = null;
+    if (refs.plantPreviewTooltip) refs.plantPreviewTooltip.hidden = true;
   }
 
   function renderBoard() {
@@ -494,7 +602,14 @@
     );
     const activePrice = state.auction_state?.active_plant_price;
     const discountPrice = state.auction_state?.discount_token_plant_price;
-    refs.deckCount.textContent = `牌库 ${state.deck_count}`;
+    const backLabels = {
+      plug: "PLUG · 插头",
+      socket: "SOCKET · 插座",
+    };
+    const deckBack = backLabels[state.deck_top_back] ? state.deck_top_back : "empty";
+    refs.deckCount.innerHTML = `
+      <span>牌堆 ${state.deck_count}</span>
+      <span class="deck-back-badge ${deckBack}">牌顶 ${backLabels[state.deck_top_back] || "空"}</span>`;
     const current = state.current_market.map((plant) => renderPlantCard(plant, {
       clickable: startPrices.has(plant.price),
       selected: ui.auctionPlant === plant.price,
@@ -526,6 +641,80 @@
         <span class="plant-fallback" hidden>${plant.is_step_3_placeholder ? "Ⅲ" : plant.price}</span>
         ${options.discount ? '<span class="discount-badge" title="优惠电厂">1</span>' : ""}
       </button>`;
+  }
+
+  function renderGlobalParameters() {
+    const parameters = ui.snapshot?.global_parameters;
+    if (!parameters) {
+      refs.globalParametersContent.innerHTML = '<p class="reference-empty">当前没有可显示的对局参数。</p>';
+      return;
+    }
+    const paymentEntries = Object.entries(parameters.payment_schedule || {})
+      .map(([cities, payout]) => [Number(cities), Number(payout)])
+      .sort(([left], [right]) => left - right);
+    const payoutHeader = paymentEntries.map(([cities]) => `<th scope="col">${cities}</th>`).join("");
+    const payoutValues = paymentEntries.map(([, payout]) => `<td>${payout}</td>`).join("");
+    const refill = parameters.resource_refill || {};
+    const refillRows = [1, 2, 3].map((step) => {
+      const amounts = refill[`step_${step}`] || {};
+      const current = step === Number(parameters.current_step) ? "current" : "";
+      return `<tr class="${current}">
+        <th scope="row">STEP ${step}${current ? '<span class="current-step-dot">当前</span>' : ""}</th>
+        ${RESOURCE_ORDER.map((resource) => `<td>${Number(amounts[resource] || 0)}</td>`).join("")}
+      </tr>`;
+    }).join("");
+    refs.globalParametersContent.innerHTML = `
+      <div class="step-status">
+        <span>当前游戏阶段</span>
+        <strong>STEP ${Number(parameters.current_step)}</strong>
+        <small>${Number(parameters.player_count)} 人局资源补充规则</small>
+      </div>
+      <div class="rule-thresholds" aria-label="城市数量阈值">
+        <div>
+          <span>进入 STEP 2</span>
+          <strong>${Number(parameters.step_2_cities)}</strong>
+          <small>城市</small>
+        </div>
+        <div>
+          <span>触发游戏结束</span>
+          <strong>${Number(parameters.end_game_cities)}</strong>
+          <small>城市</small>
+        </div>
+      </div>
+      <section class="reference-section">
+        <div class="reference-section-title"><h3>供电收入</h3><span>单位：Elektro</span></div>
+        <div class="reference-table-scroll">
+          <table class="parameter-table payout-table">
+            <tbody>
+              <tr><th scope="row">供电城市</th>${payoutHeader}</tr>
+              <tr><th scope="row">收入</th>${payoutValues}</tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="reference-section">
+        <div class="reference-section-title"><h3>资源补充</h3><span>每轮供电结算后</span></div>
+        <div class="reference-table-scroll">
+          <table class="parameter-table refill-table">
+            <thead><tr><th scope="col">阶段</th>${RESOURCE_ORDER.map((resource) => `<th scope="col">${RESOURCE_LABELS[resource]}</th>`).join("")}</tr></thead>
+            <tbody>${refillRows}</tbody>
+          </table>
+        </div>
+      </section>`;
+  }
+
+  function showGlobalParameters(invoker) {
+    ui.globalParametersInvoker = invoker || document.activeElement;
+    renderGlobalParameters();
+    refs.globalParametersDialog.hidden = false;
+    refs.globalParametersDialog.querySelector(".reference-close")?.focus();
+  }
+
+  function closeGlobalParameters(restoreFocus = true) {
+    if (!refs.globalParametersDialog || refs.globalParametersDialog.hidden) return;
+    refs.globalParametersDialog.hidden = true;
+    if (restoreFocus && ui.globalParametersInvoker?.isConnected) ui.globalParametersInvoker.focus();
+    ui.globalParametersInvoker = null;
   }
 
   function renderResourceMarket() {
@@ -740,7 +929,13 @@
     const body = `<div class="run-grid">${cards || "暂无可运行电厂"}</div>`;
     const stock = RESOURCE_ORDER.map((resource) => `${RESOURCE_LABELS[resource]} ${totals[resource]}`).join(" · ");
     const actions = `<button class="action-button" type="button" data-action="run-plants">提交运行方案</button><button class="action-button secondary" type="button" data-action="skip-bureaucracy">不发电</button>`;
-    refs.actionConsole.innerHTML = consoleLayout("PHASE 04 · BUREAUCRACY", `${escapeHtml(player.name)} 供电`, `库存：${stock}`, body, actions);
+    refs.actionConsole.innerHTML = consoleLayout(
+      "PHASE 04 · BUREAUCRACY",
+      `${escapeHtml(player.name)} 供电`,
+      `库存：${stock} · 零燃料电厂优先，其余按编号从大到小补足城市需求`,
+      body,
+      actions,
+    );
   }
 
   function renderPendingDecision(request, player) {
@@ -794,6 +989,18 @@
 
   async function handleClick(event) {
     const control = event.target.closest("[data-action]");
+    if (event.target === refs.globalParametersDialog) {
+      closeGlobalParameters();
+      return;
+    }
+    if (control?.dataset.action === "show-global-parameters") {
+      showGlobalParameters(control);
+      return;
+    }
+    if (control?.dataset.action === "close-global-parameters") {
+      closeGlobalParameters();
+      return;
+    }
     if (ui.layoutEditor.active) {
       if (!control || control.disabled) return;
       const editorAction = control.dataset.action;
@@ -851,9 +1058,11 @@
         renderActionConsole();
       } else if (actionName === "commit-build") {
         const cities = [...ui.buildCities];
-        ui.buildCities = [];
-        ui.buildQuote = null;
-        await submitCurrentIntent("commit_build", { city_ids: cities });
+        const cost = Number(ui.buildQuote?.cost || 0);
+        await submitCurrentIntent("commit_build", { city_ids: cities }, { forceReset: true });
+        if (ui.snapshot.request?.decision_type === "build_houses") {
+          showToast(`已建设 ${cities.length} 座城市，支出 ${cost} Elektro；可以继续选择城市，或结束建设。`);
+        }
       } else if (actionName === "finish-building") await submitCurrentIntent("finish_building", {});
       else if (actionName === "run-plants") await submitRunPlans();
       else if (actionName === "skip-bureaucracy") await submitCurrentIntent("skip_bureaucracy", {});
@@ -1078,6 +1287,11 @@
   }
 
   async function handleKeydown(event) {
+    if (event.key === "Escape" && !refs.globalParametersDialog.hidden) {
+      event.preventDefault();
+      closeGlobalParameters();
+      return;
+    }
     if (ui.layoutEditor.active) {
       if (event.key === "Escape" && !ui.layoutEditor.saving) {
         event.preventDefault();
@@ -1173,7 +1387,7 @@
     }
   }
 
-  async function submitCurrentIntent(intentType, payload) {
+  async function submitCurrentIntent(intentType, payload, options = {}) {
     const request = ui.snapshot.request;
     if (!request) return;
     const result = await api("/api/intent", {
@@ -1182,22 +1396,61 @@
       acceptErrorPayload: true,
     });
     if (result.has_game) {
-      setSnapshot(result);
+      setSnapshot(result, Boolean(options.forceReset && !result.error));
       renderAll();
     }
     if (result.error) throw new Error(result.error);
   }
 
   function initializeRuns(player) {
-    for (const plant of player.power_plants) {
-      if (!ui.runs[plant.price]) {
-        const totals = resourceTotals(player.resource_storage);
-        ui.runs[plant.price] = {
-          selected: false,
-          coal: plant.is_hybrid ? Math.min(plant.resource_cost, totals.coal) : 0,
-        };
-      }
+    if (Object.keys(ui.runs).length) return;
+    ui.runs = greedyRunDefaults(player);
+  }
+
+  function greedyRunDefaults(player) {
+    const remaining = resourceTotals(player.resource_storage);
+    const defaults = {};
+    const plants = player.power_plants
+      .filter((plant) => !plant.is_step_3_placeholder)
+      .slice();
+    const targetCities = player.network_city_ids.length;
+    let selectedOutput = 0;
+
+    for (const plant of plants) {
+      defaults[plant.price] = { selected: false, coal: 0 };
     }
+
+    for (const plant of plants.filter((plant) => plant.resource_cost === 0)) {
+      defaults[plant.price].selected = true;
+      selectedOutput += plant.output_cities;
+    }
+
+    const fueledPlants = plants
+      .filter((plant) => plant.resource_cost > 0)
+      .sort((left, right) => right.price - left.price);
+
+    for (const plant of fueledPlants) {
+      let selected = false;
+      const coal = plant.is_hybrid ? Math.min(plant.resource_cost, remaining.coal) : 0;
+      defaults[plant.price].coal = coal;
+      if (selectedOutput >= targetCities) continue;
+
+      if (plant.is_hybrid) {
+        selected = remaining.coal + remaining.oil >= plant.resource_cost;
+        if (selected) {
+          const oil = plant.resource_cost - coal;
+          remaining.coal -= coal;
+          remaining.oil -= oil;
+        }
+      } else {
+        const resource = plant.resource_types[0];
+        selected = remaining[resource] >= plant.resource_cost;
+        if (selected) remaining[resource] -= plant.resource_cost;
+      }
+      defaults[plant.price].selected = selected;
+      if (selected) selectedOutput += plant.output_cities;
+    }
+    return defaults;
   }
 
   function toggleAi() {

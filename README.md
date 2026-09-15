@@ -71,9 +71,20 @@ The local Web GUI supports Germany, USA, and the test map; 3-6 local/AI seats;
 power-plant auctions; resource buying; network building; bureaucracy; pending
 discard choices; AI pause/resume; and final standings. Germany and USA use the
 bundled board artwork, and all base power-plant cards have matched artwork. The
+top bar includes a global-rule reference for payouts, step-specific resource
+refills, the current step, the Step 2 city threshold, and the game-end city
+threshold; the plant market also shows the top card's back.
+Human players may submit multiple build batches before choosing `结束建设`. The
+Web bureaucracy panel first selects all zero-fuel plants, then greedily selects
+fueled plants from the highest number down only until every connected city can
+be powered, while keeping every choice editable. The
 `调整城市坐标` developer control shows every city anchor, supports drag or
 arrow-key adjustment, and writes confirmed changes to
 `src/powergrid/web/static/data/web_layouts.json`; canceling leaves the file unchanged.
+For Germany with 3 players, Web GUI AI seats default to `NN RL v2` (the current
+schema-v2 `ai_nn_rl_based_v1` checkpoint); incompatible maps or player counts
+fall back to `ai_deterministic`. The heuristic controller is not shown in the
+Web GUI picker.
 
 ### 2. Play a full game in the Tkinter GUI
 

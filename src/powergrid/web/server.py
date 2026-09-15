@@ -30,6 +30,9 @@ MAP_SIZES = {
     "usa": {"width": 2000, "height": 1180},
     "test": {"width": 1200, "height": 780},
 }
+WEB_CONTROLLER_ALIASES = {
+    "ai_nn_rl_v2": "ai_nn_rl_based_v1",
+}
 
 
 def _load_web_layouts(path: Path = WEB_LAYOUTS_PATH) -> dict[str, Any]:
@@ -47,11 +50,6 @@ class PowerGridWebController:
         self._web_layouts = _load_web_layouts(self._web_layouts_path)
 
     def metadata(self) -> dict[str, Any]:
-        controllers = [
-            name
-            for name in sorted(AI_CONTROLLER_REGISTRY)
-            if name in {"ai_deterministic", "ai_heuristics"}
-        ]
         return {
             "maps": [
                 {"id": "germany", "name": "德国"},
@@ -60,19 +58,20 @@ class PowerGridWebController:
             ],
             "controllers": [
                 {"id": "human", "name": "本地玩家"},
-                *[
-                    {
-                        "id": name,
-                        "name": "启发式 AI" if name == "ai_heuristics" else "确定性 AI",
-                    }
-                    for name in controllers
-                ],
+                {
+                    "id": "ai_nn_rl_v2",
+                    "name": "NN RL v2",
+                    "supported_maps": ["germany"],
+                    "supported_player_counts": [3],
+                },
+                {"id": "ai_deterministic", "name": "确定性 AI"},
             ],
             "defaults": {
                 "map_id": "germany",
                 "player_count": 3,
                 "seed": 7,
-                "controllers": ["human", "ai_heuristics", "ai_heuristics"],
+                "ai_controller": "ai_nn_rl_v2",
+                "controllers": ["human", "ai_nn_rl_v2", "ai_nn_rl_v2"],
             },
         }
 
@@ -84,11 +83,20 @@ class PowerGridWebController:
             raw_seats = payload.get("players")
             if not isinstance(raw_seats, list) or not 3 <= len(raw_seats) <= 6:
                 raise ModelValidationError("players must contain between 3 and 6 seats")
+            requested_controllers = [str(raw.get("controller") or "human") for raw in raw_seats]
+            canonical_controllers = [
+                WEB_CONTROLLER_ALIASES.get(controller, controller)
+                for controller in requested_controllers
+            ]
+            if "ai_nn_rl_based_v1" in canonical_controllers and (
+                map_id != "germany" or len(raw_seats) != 3
+            ):
+                raise ModelValidationError("NN RL v2 supports only 3-player Germany games")
             seats = tuple(
                 SeatConfig(
                     player_id=f"p{index + 1}",
                     name=str(raw.get("name") or f"玩家 {index + 1}")[:32],
-                    controller=str(raw.get("controller") or "human"),
+                    controller=canonical_controllers[index],
                 )
                 for index, raw in enumerate(raw_seats)
             )
@@ -110,9 +118,28 @@ class PowerGridWebController:
                 return {"has_game": False, "meta": self.metadata()}
             snapshot = self._session.snapshot()
             state = snapshot.state.to_dict()
-            state["deck_count"] = len(state.pop("power_plant_draw_stack", []))
+            draw_stack = state.pop("power_plant_draw_stack", [])
+            state["deck_count"] = len(draw_stack)
+            if draw_stack:
+                state["deck_top_back"] = draw_stack[0]["deck_back"]
+            elif state["step_3_card_pending"]:
+                # "step3" is the engine's face-up placeholder type. The physical
+                # Step 3 card is face-down here and shows the standard socket back.
+                state["deck_top_back"] = "socket"
+            else:
+                state["deck_top_back"] = None
             state["bottom_deck_count"] = len(state.pop("power_plant_bottom_stack", []))
-            state.pop("rules", None)
+            rules = state.pop("rules")
+            player_count = len(state["players"])
+            player_rules = rules["player_count_rules"][str(player_count)]
+            global_parameters = {
+                "current_step": state["step"],
+                "player_count": player_count,
+                "step_2_cities": player_rules["step_2_cities"],
+                "end_game_cities": player_rules["end_game_cities"],
+                "payment_schedule": rules["payment_schedule"],
+                "resource_refill": player_rules["resource_refill"],
+            }
             request = snapshot.active_request.to_dict() if snapshot.active_request is not None else None
             active_player = None
             if request is not None:
@@ -132,6 +159,7 @@ class PowerGridWebController:
                 "last_round_summary": _to_payload(snapshot.last_round_summary),
                 "winner": _to_payload(snapshot.winner_result),
                 "layout": self._layout_payload(state["game_map"]["id"]),
+                "global_parameters": global_parameters,
                 "needs_ai_advance": needs_ai_advance,
             }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.request import Request, urlopen
@@ -15,6 +16,52 @@ from powergrid.web.server import PowerGridWebController, STATIC_ROOT, make_serve
 class PowerGridWebControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.controller = PowerGridWebController()
+
+    def test_metadata_uses_nn_rl_v2_as_the_default_ai(self) -> None:
+        metadata = self.controller.metadata()
+        controller_ids = [controller["id"] for controller in metadata["controllers"]]
+
+        self.assertEqual(controller_ids, ["human", "ai_nn_rl_v2", "ai_deterministic"])
+        self.assertNotIn("ai_heuristics", controller_ids)
+        self.assertEqual(metadata["defaults"]["ai_controller"], "ai_nn_rl_v2")
+        self.assertEqual(
+            metadata["defaults"]["controllers"],
+            ["human", "ai_nn_rl_v2", "ai_nn_rl_v2"],
+        )
+        nn_option = metadata["controllers"][1]
+        self.assertEqual(nn_option["supported_maps"], ["germany"])
+        self.assertEqual(nn_option["supported_player_counts"], [3])
+
+    def test_new_game_maps_nn_rl_v2_to_the_latest_schema_v2_controller(self) -> None:
+        payload = self.controller.new_game(
+            {
+                "map_id": "germany",
+                "seed": 7,
+                "players": [
+                    {"name": "Alice", "controller": "human"},
+                    {"name": "Bob", "controller": "ai_nn_rl_v2"},
+                    {"name": "Carol", "controller": "ai_nn_rl_v2"},
+                ],
+            }
+        )
+
+        controllers = {player["name"]: player["controller"] for player in payload["state"]["players"]}
+        self.assertEqual(controllers["Bob"], "ai_nn_rl_based_v1")
+        self.assertEqual(controllers["Carol"], "ai_nn_rl_based_v1")
+
+    def test_nn_rl_v2_rejects_unsupported_map_or_player_count(self) -> None:
+        with self.assertRaisesRegex(ModelValidationError, "3-player Germany"):
+            self.controller.new_game(
+                {
+                    "map_id": "usa",
+                    "seed": 7,
+                    "players": [
+                        {"name": "Alice", "controller": "human"},
+                        {"name": "Bob", "controller": "ai_nn_rl_v2"},
+                        {"name": "Carol", "controller": "ai_nn_rl_v2"},
+                    ],
+                }
+            )
 
     def test_new_game_snapshot_contains_browser_ready_layout(self) -> None:
         payload = self.controller.new_game(
@@ -41,13 +88,69 @@ class PowerGridWebControllerTests(unittest.TestCase):
         )
         self.assertIsNotNone(payload["request"])
 
-    def test_germany_edge_city_anchors_match_the_board_art(self) -> None:
-        layout = self.controller._layout_payload("germany")
+    def test_snapshot_exposes_global_parameters_and_only_the_deck_top_back(self) -> None:
+        payload = self.controller.new_game(
+            {
+                "map_id": "germany",
+                "seed": 7,
+                "players": [
+                    {"name": "Alice", "controller": "human"},
+                    {"name": "Bob", "controller": "human"},
+                    {"name": "Carol", "controller": "human"},
+                ],
+            }
+        )
 
-        self.assertAlmostEqual(layout["cities"]["duisburg"]["x"], 0.05478)
-        self.assertAlmostEqual(layout["cities"]["duisburg"]["y"], 0.42600)
-        self.assertAlmostEqual(layout["cities"]["regensburg"]["x"], 0.68400)
-        self.assertAlmostEqual(layout["cities"]["regensburg"]["y"], 0.80050)
+        parameters = payload["global_parameters"]
+        self.assertEqual(parameters["current_step"], 1)
+        self.assertEqual(parameters["player_count"], 3)
+        self.assertEqual(parameters["step_2_cities"], 7)
+        self.assertEqual(parameters["end_game_cities"], 17)
+        self.assertEqual(parameters["payment_schedule"]["0"], 10)
+        self.assertEqual(parameters["payment_schedule"]["20"], 150)
+        self.assertEqual(
+            parameters["resource_refill"]["step_2"],
+            {"coal": 5, "oil": 3, "garbage": 2, "uranium": 1},
+        )
+        expected_back = self.controller._session.snapshot().state.power_plant_draw_stack[0].deck_back
+        self.assertEqual(payload["state"]["deck_top_back"], expected_back)
+        self.assertNotIn("power_plant_draw_stack", payload["state"])
+        self.assertNotIn("rules", payload["state"])
+
+    def test_pending_step_3_card_reports_its_physical_socket_back(self) -> None:
+        self.controller.new_game(
+            {
+                "map_id": "germany",
+                "seed": 7,
+                "players": [
+                    {"name": "Alice", "controller": "human"},
+                    {"name": "Bob", "controller": "human"},
+                    {"name": "Carol", "controller": "human"},
+                ],
+            }
+        )
+        session = self.controller._session
+        session._state = replace(
+            session.snapshot().state,
+            power_plant_draw_stack=(),
+            step_3_card_pending=True,
+        )
+
+        payload = self.controller.snapshot_payload()
+
+        self.assertEqual(payload["state"]["deck_count"], 0)
+        self.assertEqual(payload["state"]["deck_top_back"], "socket")
+
+    def test_germany_saved_city_overrides_are_applied(self) -> None:
+        layout = self.controller._layout_payload("germany")
+        saved = json.loads(
+            (STATIC_ROOT / "data" / "web_layouts.json").read_text(encoding="utf-8")
+        )["germany"]["cities"]
+
+        self.assertEqual(layout["cities"]["duisburg"]["x"], saved["duisburg"]["x"])
+        self.assertEqual(layout["cities"]["duisburg"]["y"], saved["duisburg"]["y"])
+        self.assertEqual(layout["cities"]["regensburg"]["x"], saved["regensburg"]["x"])
+        self.assertEqual(layout["cities"]["regensburg"]["y"], saved["regensburg"]["y"])
 
     def test_city_layout_save_requires_confirmation_and_complete_coordinates(self) -> None:
         snapshot = self.controller.new_game(
@@ -171,6 +274,28 @@ class PowerGridWebControllerTests(unittest.TestCase):
         self.assertTrue(quote["valid"])
         self.assertEqual(quote["cost"], action["payload"]["total_cost"])
 
+    def test_web_controller_accepts_multiple_build_batches_before_finish(self) -> None:
+        self.controller._session = GameSession.from_scenario("build_test")
+        snapshot = self.controller.snapshot_payload()
+        player_id = snapshot["request"]["player_id"]
+
+        for _batch in range(2):
+            action = next(
+                action
+                for action in snapshot["request"]["legal_actions"]
+                if action["action_type"] == "build_city"
+            )
+            snapshot = self.controller.submit_intent(
+                {
+                    "intent_type": "commit_build",
+                    "player_id": player_id,
+                    "payload": {"city_ids": [action["payload"]["city_id"]]},
+                }
+            )
+            self.assertNotIn("error", snapshot)
+            self.assertEqual(snapshot["request"]["player_id"], player_id)
+            self.assertEqual(snapshot["request"]["decision_type"], "build_houses")
+
     def test_every_power_plant_definition_has_an_image(self) -> None:
         definitions = json.loads(
             (Path(__file__).parents[1] / "src/powergrid/data/rules/power_plants.json").read_text(
@@ -183,6 +308,44 @@ class PowerGridWebControllerTests(unittest.TestCase):
             if not (STATIC_ROOT / "assets" / "plants" / f"{plant['price']}.png").is_file()
         ]
         self.assertEqual(missing, [])
+
+    def test_owned_power_plants_expose_hover_card_previews(self) -> None:
+        html = (STATIC_ROOT / "index.html").read_text(encoding="utf-8")
+        script = (STATIC_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="plant-preview-tooltip"', html)
+        self.assertIn('data-owned-plant-preview="/assets/plants/${plant.price}.png"', script)
+        self.assertIn('aria-describedby="plant-preview-tooltip"', script)
+        self.assertIn("function positionPlantPreview(target)", script)
+
+    def test_web_build_submission_resets_the_batch_for_continued_building(self) -> None:
+        script = (STATIC_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'submitCurrentIntent("commit_build", { city_ids: cities }, { forceReset: true })',
+            script,
+        )
+        self.assertIn("可以继续选择城市，或结束建设", script)
+
+    def test_bureaucracy_defaults_to_descending_greedy_plant_selection(self) -> None:
+        script = (STATIC_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("ui.runs = greedyRunDefaults(player)", script)
+        self.assertIn("plants.filter((plant) => plant.resource_cost === 0)", script)
+        self.assertIn("const targetCities = player.network_city_ids.length", script)
+        self.assertIn("if (selectedOutput >= targetCities) continue", script)
+        self.assertIn(".sort((left, right) => right.price - left.price)", script)
+        self.assertIn("selected = remaining.coal + remaining.oil >= plant.resource_cost", script)
+        self.assertIn("selected = remaining[resource] >= plant.resource_cost", script)
+        self.assertIn("if (selected) selectedOutput += plant.output_cities", script)
+
+    def test_global_parameters_render_city_thresholds(self) -> None:
+        script = (STATIC_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("进入 STEP 2", script)
+        self.assertIn("parameters.step_2_cities", script)
+        self.assertIn("触发游戏结束", script)
+        self.assertIn("parameters.end_game_cities", script)
 
 
 class PowerGridWebHttpTests(unittest.TestCase):

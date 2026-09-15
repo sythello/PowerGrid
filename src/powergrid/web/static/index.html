@@ -86,6 +86,7 @@
           </div>
           <div class="topbar-actions">
             <button id="ai-toggle" class="tool-button" type="button" hidden>暂停 AI</button>
+            <button class="tool-button" type="button" data-action="show-global-parameters">全局参数</button>
             <button id="new-game-button" class="tool-button" type="button">新游戏</button>
           </div>
         </header>
@@ -152,6 +153,22 @@
     </main>
 
     <div id="toast" class="toast" role="status" hidden></div>
+    <div id="global-parameters-dialog" class="reference-backdrop" hidden>
+      <section class="reference-card" role="dialog" aria-modal="true" aria-labelledby="global-parameters-title">
+        <header class="reference-header">
+          <div>
+            <p class="eyebrow">GLOBAL RULE REFERENCE</p>
+            <h2 id="global-parameters-title">全局参数</h2>
+          </div>
+          <button class="reference-close" type="button" data-action="close-global-parameters" aria-label="关闭全局参数">×</button>
+        </header>
+        <div id="global-parameters-content" class="reference-content"></div>
+      </section>
+    </div>
+    <div id="plant-preview-tooltip" class="plant-preview-tooltip" role="tooltip" hidden>
+      <img id="plant-preview-image" alt="" />
+      <span id="plant-preview-label"></span>
+    </div>
     <div id="winner-dialog" class="winner-backdrop" hidden>
       <section class="winner-card" role="dialog" aria-modal="true" aria-labelledby="winner-title">
         <p class="eyebrow">FINAL GRID REPORT</p>
