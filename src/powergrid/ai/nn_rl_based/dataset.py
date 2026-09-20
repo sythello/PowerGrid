@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import time
 from typing import Any, Callable, Iterator
@@ -36,8 +37,10 @@ from ..nn_rank_value.observation import (
     encode_state_features,
     player_slot_ids,
 )
+from .controller import CONTROLLER_NAME, NnRlBasedAiController
 from .model import MAX_PLAYERS, NumpyRlPolicyQNetwork
 from .search import (
+    FullActionPairedMcEvaluator,
     FullActionSemanticSearcher,
     SearchConfig,
     pad_player_values,
@@ -48,6 +51,7 @@ from .search import (
 DATASET_FORMAT_NAME = "powergrid.nn_rl_based.parquet"
 DATASET_FORMAT_VERSION = 1
 EXAMPLE_GAME_COUNT = 3
+TARGET_METHODS = ("semantic_search", "paired_mc")
 
 
 @dataclass(frozen=True)
@@ -89,9 +93,13 @@ class _GameTask:
     selected_regions: tuple[str, ...]
     behavior_controller: str
     target_checkpoint: str
+    target_method: str
     search_fraction: float
     split_seed: int
     search_config: SearchConfig
+    paired_mc_max_actions: int
+    paired_mc_confirmation_rollouts: int
+    paired_mc_confirmation_confidence_z: float
     max_actions: int
 
 
@@ -123,6 +131,7 @@ def generate_rl_dataset(
     selected_regions: tuple[str, ...] = (),
     region_sets: tuple[tuple[str, ...], ...] = (),
     target_checkpoint: str | Path | None = None,
+    target_method: str = "semantic_search",
     search_fraction: float = 0.0,
     search_depth: int = 1,
     adaptive_depth_2: bool = True,
@@ -131,6 +140,9 @@ def generate_rl_dataset(
     leaf_policy: str = "deterministic",
     search_policy_mix: float = 0.5,
     search_temperature: float = 0.25,
+    paired_mc_max_actions: int = 5000,
+    paired_mc_confirmation_rollouts: int = 0,
+    paired_mc_confirmation_confidence_z: float = 1.645,
     max_actions_per_game: int = 5000,
     target_shard_size_bytes: int = DEFAULT_TARGET_SHARD_SIZE_BYTES,
     split_fractions: tuple[float, float, float] = DEFAULT_SPLIT_FRACTIONS,
@@ -142,18 +154,55 @@ def generate_rl_dataset(
         raise ValueError("games must be positive")
     if map_id != "germany" or player_count != 3:
         raise ValueError("ai_nn_rl_based_v1 datasets support Germany with 3 players")
-    if behavior_controller != "ai_deterministic":
-        raise ValueError("ai_nn_rl_based_v1 requires canonical ai_deterministic behavior")
-    if continuation_controller != "ai_deterministic":
+    if target_method not in TARGET_METHODS:
+        raise ValueError("target_method must be one of " + ", ".join(TARGET_METHODS))
+    supported_controllers = {"ai_deterministic", CONTROLLER_NAME}
+    if target_method == "semantic_search":
+        if behavior_controller != "ai_deterministic":
+            raise ValueError(
+                "semantic-search data requires canonical ai_deterministic behavior"
+            )
+        if continuation_controller != "ai_deterministic":
+            raise ValueError(
+                "semantic-search data requires canonical ai_deterministic continuation"
+            )
+    elif (
+        behavior_controller not in supported_controllers
+        or continuation_controller not in supported_controllers
+    ):
         raise ValueError(
-            "ai_nn_rl_based_v1 requires canonical ai_deterministic continuation"
+            "paired-MC controllers must be ai_deterministic or ai_nn_rl_based_v1"
         )
     if not 0.0 <= search_fraction <= 1.0:
         raise ValueError("search_fraction must be between 0 and 1")
-    if search_fraction > 0.0 and target_checkpoint is None:
+    if (
+        search_fraction > 0.0
+        and target_method == "semantic_search"
+        and target_checkpoint is None
+    ):
         raise ValueError("searched datasets require --target-checkpoint")
-    if workers <= 0 or target_shard_size_bytes <= 0 or max_actions_per_game <= 0:
+    if (
+        CONTROLLER_NAME in {behavior_controller, continuation_controller}
+        and target_checkpoint is None
+    ):
+        raise ValueError("checkpoint Policy behavior/continuation requires --target-checkpoint")
+    if (
+        workers <= 0
+        or target_shard_size_bytes <= 0
+        or max_actions_per_game <= 0
+        or paired_mc_max_actions <= 0
+    ):
         raise ValueError("workers, shard size, and max actions must be positive")
+    if paired_mc_confirmation_rollouts < 0 or paired_mc_confirmation_rollouts == 1:
+        raise ValueError(
+            "paired_mc_confirmation_rollouts must be zero or at least two"
+        )
+    if paired_mc_confirmation_confidence_z < 0.0:
+        raise ValueError(
+            "paired_mc_confirmation_confidence_z may not be negative"
+        )
+    if target_method != "paired_mc" and paired_mc_confirmation_rollouts:
+        raise ValueError("hidden-state confirmation is only valid for paired_mc")
     if selected_regions and region_sets:
         raise ValueError("selected_regions and region_sets may not both be supplied")
     all_legal_region_sets = legal_region_sets(map_id, player_count)
@@ -206,9 +255,15 @@ def generate_rl_dataset(
             ],
             behavior_controller=behavior_controller,
             target_checkpoint=checkpoint,
+            target_method=target_method,
             search_fraction=search_fraction,
             split_seed=split_seed,
             search_config=search_config,
+            paired_mc_max_actions=paired_mc_max_actions,
+            paired_mc_confirmation_rollouts=paired_mc_confirmation_rollouts,
+            paired_mc_confirmation_confidence_z=(
+                paired_mc_confirmation_confidence_z
+            ),
             max_actions=max_actions_per_game,
         )
         for offset in range(games)
@@ -343,6 +398,7 @@ def generate_rl_dataset(
             ],
             "resolved_region_sets": [list(values) for values in sorted(resolved_region_sets)],
             "search_fraction": search_fraction,
+            "target_method": target_method,
             "search_depth": search_depth,
             "adaptive_depth_2": adaptive_depth_2,
             "max_search_nodes": max_search_nodes,
@@ -350,7 +406,22 @@ def generate_rl_dataset(
             "leaf_policy": leaf_policy,
             "search_policy_mix": search_policy_mix,
             "search_temperature": search_temperature,
-            "hidden_state_sampling": "single_common_determinization",
+            "paired_mc_max_actions": paired_mc_max_actions,
+            "paired_mc_confirmation_rollouts": paired_mc_confirmation_rollouts,
+            "paired_mc_confirmation_confidence_z": (
+                paired_mc_confirmation_confidence_z
+            ),
+            "search_nodes_unit": (
+                "terminal_rollout_branches"
+                if target_method == "paired_mc"
+                else "semantic_action_edges"
+            ),
+            "hidden_state_sampling": (
+                "single_screen_then_resampled_hidden_order_confirmation"
+                if target_method == "paired_mc"
+                and paired_mc_confirmation_rollouts
+                else "single_common_determinization"
+            ),
             "target_checkpoint": checkpoint,
             "target_checkpoint_sha256": sha256_file(checkpoint) if checkpoint else "",
             "max_actions_per_game": max_actions_per_game,
@@ -582,14 +653,41 @@ def _generate_one_game(task: _GameTask) -> _CompletedGame:
         selected_regions=task.selected_regions,
     )
     session = GameSession.new_game(config)
-    behavior_agents = {
-        player.player_id: build_ai_controller(task.behavior_controller)
-        for player in session.snapshot().state.players
-    }
-    target_model = _load_target_model(task.target_checkpoint) if task.target_checkpoint else None
+    players = session.snapshot().state.players
+    behavior_agents = _build_game_agents(
+        players,
+        task.behavior_controller,
+        checkpoint_path=task.target_checkpoint,
+    )
+    continuation_agents = (
+        behavior_agents
+        if task.search_config.continuation_controller == task.behavior_controller
+        else _build_game_agents(
+            players,
+            task.search_config.continuation_controller,
+            checkpoint_path=task.target_checkpoint,
+        )
+    )
+    target_model = (
+        _load_target_model(task.target_checkpoint)
+        if task.target_method == "semantic_search" and task.target_checkpoint
+        else None
+    )
     searcher = (
         FullActionSemanticSearcher(target_model, task.search_config)
         if target_model is not None
+        else None
+    )
+    paired_mc = (
+        FullActionPairedMcEvaluator(
+            continuation_agents,
+            max_actions=task.paired_mc_max_actions,
+            confirmation_rollouts=task.paired_mc_confirmation_rollouts,
+            confirmation_confidence_z=(
+                task.paired_mc_confirmation_confidence_z
+            ),
+        )
+        if task.target_method == "paired_mc"
         else None
     )
     game_id = f"rl-{task.map_id}-{task.player_count}p-{task.seed:010d}"
@@ -647,10 +745,26 @@ def _generate_one_game(task: _GameTask) -> _CompletedGame:
             )
         teacher_index = next(index for index, item in enumerate(candidates) if item.key == chosen.key)
         do_search = bool(
-            searcher is not None
-            and _should_search(game_id, decision_index, task.split_seed, task.search_fraction)
+            (searcher is not None or paired_mc is not None)
+            and _should_search(
+                game_id,
+                decision_index,
+                task.split_seed,
+                task.search_fraction,
+            )
         )
-        search_result = searcher.search(session) if do_search and searcher is not None else None
+        if do_search and searcher is not None:
+            search_result = searcher.search(session)
+        elif do_search and paired_mc is not None:
+            search_result = paired_mc.search(
+                session,
+                teacher_action_index=teacher_index,
+                confirmation_seed=_paired_mc_confirmation_seed(
+                    game_id, decision_index, task.split_seed
+                ),
+            )
+        else:
+            search_result = None
         if search_result is not None:
             if search_result.player_ids != slot_ids:
                 raise ModelValidationError("search root player slots do not match dataset observation")
@@ -688,6 +802,16 @@ def _generate_one_game(task: _GameTask) -> _CompletedGame:
                     if search_result is not None
                     else []
                 ),
+                "search_policy_advantages": (
+                    list(search_result.policy_advantages)
+                    if search_result is not None
+                    else []
+                ),
+                "search_policy_confirmed": (
+                    list(search_result.policy_confirmed)
+                    if search_result is not None
+                    else []
+                ),
                 "search_depth_used": search_result.depth_used if search_result else 0,
                 "search_nodes_evaluated": search_result.nodes_evaluated if search_result else 0,
                 "depth_2_completed": search_result.depth_2_completed if search_result else False,
@@ -699,6 +823,24 @@ def _generate_one_game(task: _GameTask) -> _CompletedGame:
                 f"teacher produced invalid action in {game_id}: {result.event_log[-1].message}"
             )
     raise ModelValidationError(f"RL game {game_id} exceeded {task.max_actions} actions")
+
+
+def _build_game_agents(
+    players: tuple[Any, ...],
+    controller_name: str,
+    *,
+    checkpoint_path: str,
+) -> dict[str, Any]:
+    if controller_name == CONTROLLER_NAME:
+        if not checkpoint_path:
+            raise ModelValidationError(
+                "checkpoint Policy controller requires a checkpoint path"
+            )
+        controller = NnRlBasedAiController(checkpoint_path)
+        return {player.player_id: controller for player in players}
+    return {
+        player.player_id: build_ai_controller(controller_name) for player in players
+    }
 
 
 def _load_target_model(path: str) -> NumpyRlPolicyQNetwork:
@@ -721,6 +863,15 @@ def _should_search(game_id: str, decision_index: int, seed: int, fraction: float
     digest = hashlib.sha256(f"{seed}:{game_id}:{decision_index}".encode("utf-8")).digest()
     value = int.from_bytes(digest[:8], "big") / float(1 << 64)
     return value < fraction
+
+
+def _paired_mc_confirmation_seed(
+    game_id: str, decision_index: int, seed: int
+) -> int:
+    digest = hashlib.sha256(
+        f"confirm:{seed}:{game_id}:{decision_index}".encode("utf-8")
+    ).digest()
+    return int.from_bytes(digest[:8], "big") & ((1 << 63) - 1)
 
 
 def _build_schema(pa: Any, state_dim: int, action_dim: int) -> Any:
@@ -749,6 +900,12 @@ def _build_schema(pa: Any, state_dim: int, action_dim: int) -> Any:
             pa.field("terminal_rank_values", player_vector, nullable=False),
             pa.field("has_search_targets", pa.bool_(), nullable=False),
             pa.field("search_q_values", pa.list_(player_vector), nullable=False),
+            pa.field(
+                "search_policy_advantages", pa.list_(pa.float32()), nullable=False
+            ),
+            pa.field(
+                "search_policy_confirmed", pa.list_(pa.bool_()), nullable=False
+            ),
             pa.field("search_depth_used", pa.int8(), nullable=False),
             pa.field("search_nodes_evaluated", pa.int32(), nullable=False),
             pa.field("depth_2_completed", pa.bool_(), nullable=False),
@@ -793,6 +950,8 @@ def _validate_record(
         raise ModelValidationError("RL terminal rank vector is invalid")
     searched = bool(record["has_search_targets"])
     search_q = record["search_q_values"]
+    policy_advantages = record["search_policy_advantages"]
+    policy_confirmed = record["search_policy_confirmed"]
     depth = int(record["search_depth_used"])
     nodes = int(record["search_nodes_evaluated"])
     depth_2_completed = bool(record["depth_2_completed"])
@@ -801,9 +960,28 @@ def _validate_record(
             len(row) != MAX_PLAYERS for row in search_q
         ):
             raise ModelValidationError("RL searched decision does not label every candidate")
+        if policy_advantages or policy_confirmed:
+            if (
+                len(policy_advantages) != candidate_count
+                or len(policy_confirmed) != candidate_count
+            ):
+                raise ModelValidationError(
+                    "RL confirmed policy labels must align with candidates"
+                )
+            if any(math.isinf(float(value)) for value in policy_advantages):
+                raise ModelValidationError(
+                    "RL confirmed policy advantages may not contain infinity"
+                )
         if depth not in (1, 2) or nodes <= 0 or depth_2_completed != (depth == 2):
             raise ModelValidationError("RL search metadata is inconsistent")
-    elif search_q or depth != 0 or nodes != 0 or depth_2_completed:
+    elif (
+        search_q
+        or policy_advantages
+        or policy_confirmed
+        or depth != 0
+        or nodes != 0
+        or depth_2_completed
+    ):
         raise ModelValidationError("RL non-search decision contains search targets")
 
 
@@ -835,13 +1013,21 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for record in records:
-            handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")))
+            handle.write(
+                json.dumps(
+                    record,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            )
             handle.write("\n")
 
 
 __all__ = [
     "DATASET_FORMAT_NAME",
     "DATASET_FORMAT_VERSION",
+    "TARGET_METHODS",
     "RlDatasetProgress",
     "RlDatasetSummary",
     "generate_rl_dataset",

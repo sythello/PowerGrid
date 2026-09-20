@@ -216,3 +216,4 @@ artifacts/datasets/nn_rl_*/
 artifacts/models/ai_nn_rl_based*.npz
 artifacts/validation/ai_nn_rl_based*.json
 artifacts/ai_ratings/ai_nn_rl_based*.json
+artifacts/experiments/

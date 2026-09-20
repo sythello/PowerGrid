@@ -330,8 +330,12 @@ speed controls, and generation benchmarks are documented in
 ### Train and validate the neural RL Policy/Q AI
 
 `ai_nn_rl_based_v1` behavior-clones `ai_deterministic`, anchors vector Q with terminal
-rank, then distills full-action finite-depth semantic search into a Policy-only online
-controller. Bootstrap, search-iteration, validation, and evaluation commands are in
+rank, then improves the Policy from either full-action finite-depth semantic search or
+paired terminal Monte Carlo labels. Paired-MC can use one-rollout screening followed by
+selective 8--16 rollout hidden-order confirmation, so Policy targets only consume
+advantages whose one-sided confidence bound stays positive. The online controller remains
+Policy-only and does no rollout. Bootstrap, policy-iteration, validation, direct
+candidate-vs-incumbent checkpoint duels, and evaluation commands are in
 [docs/ai_nn_rl_based_v1.md](docs/ai_nn_rl_based_v1.md).
 Dataset generation defaults to a deterministic seed-based cycle over all 13 legal
 Germany/3-player region sets.
@@ -339,6 +343,7 @@ Germany/3-player region sets.
 ```bash
 PYTHONPATH=src python -m unittest tests.test_nn_rl_based -v
 PYTHONPATH=src python -m powergrid.tools.validate_nn_rl_based --section all
+PYTHONPATH=src python -m powergrid.tools.evaluate_nn_rl_checkpoint_duel --help
 ```
 
 ### Explore manual interactive scripts

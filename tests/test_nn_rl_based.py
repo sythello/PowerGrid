@@ -28,9 +28,12 @@ from powergrid.ai.nn_rl_based.model import (
     build_policy_targets,
 )
 from powergrid.ai.nn_rl_based.search import (
+    FullActionPairedMcEvaluator,
     FullActionSemanticSearcher,
     SearchConfig,
+    _resample_hidden_plant_order,
     advance_to_semantic_boundary,
+    rollout_terminal_values,
 )
 from powergrid.ai.nn_rl_based.training import _iter_array_batches, train_rl_model
 from powergrid.model import ModelValidationError, add_power_plant_to_player
@@ -41,9 +44,41 @@ from powergrid.tools.evaluate_nn_rl_paired_rollouts import (
     _summarize_checkpoint,
 )
 from powergrid.tools.evaluate_nn_rl_deterministic_suite import _summarize_opponent
+from powergrid.tools.evaluate_nn_rl_checkpoint_duel import (
+    CANDIDATE,
+    DUEL_LINEUPS,
+    _summarize_duel_games,
+    evaluate_checkpoint_duel,
+)
 
 
 class RlPolicyQModelTests(unittest.TestCase):
+    def test_confirmed_policy_labels_override_single_rollout_improvements(self) -> None:
+        offsets = np.asarray([0, 4], dtype=np.int32)
+        teacher = np.asarray([0], dtype=np.int32)
+        searched = np.asarray([True], dtype=bool)
+        actions = np.arange(4, dtype=np.float32).reshape(4, 1)
+        search_q = np.zeros((4, 6), dtype=np.float32)
+        search_q[:, 0] = [0.0, 1.0, 0.0, 0.0]
+        policy_advantages = np.asarray([0.0, 0.8, 0.4, np.nan], dtype=np.float32)
+        policy_confirmed = np.asarray([False, False, True, False], dtype=bool)
+
+        targets, accepted, improved = build_policy_targets(
+            offsets,
+            teacher,
+            searched,
+            search_q,
+            actions,
+            policy_target_mode="advantage_gate",
+            improved_action_weight=0.75,
+            search_policy_advantages=policy_advantages,
+            search_policy_confirmed=policy_confirmed,
+        )
+
+        np.testing.assert_allclose(targets, [0.25, 0.0, 0.75, 0.0])
+        np.testing.assert_array_equal(accepted, [True])
+        np.testing.assert_array_equal(improved, [2])
+
     def test_advantage_gate_targets_and_feature_collision_fallback(self) -> None:
         offsets = np.asarray([0, 3, 6, 9, 12], dtype=np.int32)
         teacher = np.asarray([0, 0, 0, 0], dtype=np.int32)
@@ -104,6 +139,37 @@ class RlPolicyQModelTests(unittest.TestCase):
         np.testing.assert_allclose(targets, expected, atol=1e-7)
         np.testing.assert_array_equal(accepted, [False])
         np.testing.assert_array_equal(improved, teacher)
+
+    def test_advantage_weighted_targets_share_mass_by_terminal_advantage(self) -> None:
+        offsets = np.asarray([0, 4, 6], dtype=np.int32)
+        teacher = np.asarray([0, 1], dtype=np.int32)
+        searched = np.asarray([True, False], dtype=bool)
+        actions = np.asarray(
+            [[0.0], [1.0], [2.0], [3.0], [0.0], [1.0]], dtype=np.float32
+        )
+        search_q = np.zeros((6, 6), dtype=np.float32)
+        search_q[:4, 0] = [0.0, 0.2, 0.4, -0.2]
+        targets, accepted, improved = build_policy_targets(
+            offsets,
+            teacher,
+            searched,
+            search_q,
+            actions,
+            policy_target_mode="advantage_weighted",
+            search_temperature=0.2,
+            improved_action_weight=0.75,
+            min_search_advantage=0.1,
+        )
+        weights = np.exp(np.asarray([0.2, 0.4], dtype=np.float32) / 0.2)
+        weights /= weights.sum()
+        np.testing.assert_allclose(
+            targets[:4],
+            [0.25, 0.75 * weights[0], 0.75 * weights[1], 0.0],
+            atol=1e-7,
+        )
+        np.testing.assert_allclose(targets[4:6], [0.0, 1.0])
+        np.testing.assert_array_equal(accepted, [True, False])
+        np.testing.assert_array_equal(improved, [2, 1])
 
     def test_advantage_gate_policy_overfits_accepted_and_fallback_targets(self) -> None:
         decisions = 32
@@ -276,6 +342,107 @@ class RlPairedTerminalRolloutTests(unittest.TestCase):
         self.assertEqual(session.snapshot().state, before.state)
         self.assertIsNone(session.snapshot().winner_result)
 
+    def test_full_action_paired_mc_labels_every_candidate(self) -> None:
+        session = GameSession.from_scenario("endgame", seed=61)
+        before = session.snapshot()
+        assert before.active_request is not None
+        agents = {
+            player.player_id: build_ai_controller("ai_deterministic")
+            for player in before.state.players
+        }
+        candidates = generate_candidate_actions(before.active_request, before)
+        result = FullActionPairedMcEvaluator(agents).search(session)
+
+        self.assertEqual(len(result.q_values), len(candidates))
+        self.assertEqual(result.nodes_evaluated, len(candidates))
+        self.assertEqual(result.depth_used, 1)
+        self.assertFalse(result.depth_2_completed)
+        expected = rollout_terminal_values(
+            session,
+            candidates[0].intent,
+            agents,
+            max_actions=5000,
+        )
+        observation = build_public_observation(before.state, before.active_request)
+        slots = player_slot_ids(observation)
+        np.testing.assert_allclose(
+            result.q_values[0][: len(slots)],
+            [expected[player_id] for player_id in slots],
+        )
+        self.assertEqual(session.snapshot().state, before.state)
+        self.assertIsNone(session.snapshot().winner_result)
+
+    def test_paired_mc_confirms_only_single_rollout_improvements(self) -> None:
+        session = GameSession.from_scenario("endgame", seed=61)
+        before = session.snapshot()
+        assert before.active_request is not None
+        agents = {
+            player.player_id: build_ai_controller("ai_deterministic")
+            for player in before.state.players
+        }
+        candidates = generate_candidate_actions(before.active_request, before)
+        teacher_intent = agents[before.active_request.player_id].choose_intent(
+            before.active_request, before
+        )
+        teacher_index = next(
+            index
+            for index, candidate in enumerate(candidates)
+            if candidate.intent == teacher_intent
+        )
+        base = FullActionPairedMcEvaluator(agents).search(session)
+        evaluator = FullActionPairedMcEvaluator(
+            agents,
+            confirmation_rollouts=2,
+            confirmation_confidence_z=1.645,
+        )
+        confirmed = evaluator.search(
+            session,
+            teacher_action_index=teacher_index,
+            confirmation_seed=991,
+        )
+        duplicate = evaluator.search(
+            session,
+            teacher_action_index=teacher_index,
+            confirmation_seed=991,
+        )
+
+        np.testing.assert_allclose(confirmed.q_values, base.q_values)
+        np.testing.assert_allclose(
+            confirmed.policy_advantages,
+            duplicate.policy_advantages,
+            equal_nan=True,
+        )
+        self.assertEqual(confirmed.policy_confirmed, duplicate.policy_confirmed)
+        self.assertEqual(confirmed.q_values, duplicate.q_values)
+        self.assertEqual(confirmed.nodes_evaluated, duplicate.nodes_evaluated)
+        self.assertEqual(len(confirmed.policy_advantages), len(candidates))
+        self.assertEqual(len(confirmed.policy_confirmed), len(candidates))
+        self.assertEqual(confirmed.policy_advantages[teacher_index], 0.0)
+        screened = sum(
+            float(row[0]) > float(base.q_values[teacher_index][0])
+            for index, row in enumerate(base.q_values)
+            if index != teacher_index
+        )
+        self.assertEqual(
+            confirmed.nodes_evaluated,
+            len(candidates) + (2 * (1 + screened) if screened else 0),
+        )
+        self.assertEqual(session.snapshot().state, before.state)
+
+        resampled = _resample_hidden_plant_order(session, seed=12345)
+        assert resampled.snapshot().active_request is not None
+        original_features, original_names = encode_state_features(
+            build_public_observation(before.state, before.active_request)
+        )
+        resampled_features, resampled_names = encode_state_features(
+            build_public_observation(
+                resampled.snapshot().state,
+                resampled.snapshot().active_request,
+            )
+        )
+        self.assertEqual(original_names, resampled_names)
+        np.testing.assert_allclose(original_features, resampled_features)
+
     def test_paired_summary_uses_deviations_and_baseline_decision_coverage(self) -> None:
         def record(
             game_index: int, advantage: float, decision_type: str
@@ -364,6 +531,75 @@ class RlPairedTerminalRolloutTests(unittest.TestCase):
         self.assertTrue(result["score_above_0_50"])
         self.assertAlmostEqual(result["rl_average_finish"], 5 / 3)
         self.assertAlmostEqual(result["opponent_average_finish"], 7 / 3)
+
+    def test_checkpoint_duel_summary_bootstraps_complete_seed_clusters(self) -> None:
+        games = []
+        for seed, candidate_wins in ((101, True), (102, False)):
+            for lineup_index, lineup in enumerate(DUEL_LINEUPS):
+                games.append(
+                    {
+                        "seed": seed,
+                        "selected_regions": ["black", "blue", "magenta"],
+                        "score": 2.0 if candidate_wins else 0.0,
+                        "comparisons": 2,
+                        "wins": 2 if candidate_wins else 0,
+                        "draws": 0,
+                        "losses": 0 if candidate_wins else 2,
+                        "standings": [
+                            {
+                                "duel_role": role,
+                                "place": 1
+                                if (role == CANDIDATE) == candidate_wins
+                                else 3,
+                            }
+                            for role in lineup
+                        ],
+                        "lineup_index": lineup_index,
+                        "composition": (
+                            "candidate_majority"
+                            if lineup.count(CANDIDATE) == 2
+                            else "incumbent_majority"
+                        ),
+                    }
+                )
+        result = _summarize_duel_games(
+            games,
+            bootstrap_samples=200,
+            bootstrap_seed=23,
+        )
+        self.assertEqual(result["seeds"], 2)
+        self.assertEqual(result["games_completed"], 12)
+        self.assertEqual(result["seat_pair_comparisons"], 24)
+        self.assertEqual((result["wins"], result["draws"], result["losses"]), (12, 0, 12))
+        self.assertAlmostEqual(result["pairwise_score"], 0.5)
+        self.assertEqual(result["pairwise_score_95_ci"], [0.0, 1.0])
+
+    def test_identical_checkpoint_duel_is_seat_symmetric(self) -> None:
+        checkpoint = NnRlBasedAiController().checkpoint_path
+        result = evaluate_checkpoint_duel(
+            checkpoint,
+            checkpoint,
+            seeds=1,
+            seed_start=63001,
+            bootstrap_samples=20,
+            bootstrap_seed=29,
+        )
+        self.assertEqual(result["configuration"]["games"], 6)
+        self.assertEqual(len(result["games"]), 6)
+        self.assertEqual(
+            {tuple(game["lineup"]) for game in result["games"]},
+            set(DUEL_LINEUPS),
+        )
+        self.assertEqual(result["overall"]["seat_pair_comparisons"], 12)
+        self.assertAlmostEqual(result["overall"]["pairwise_score"], 0.5)
+        self.assertEqual(result["overall"]["pairwise_score_95_ci"], [0.5, 0.5])
+        self.assertTrue(
+            all(
+                summary["pairwise_score"] == 0.5
+                for summary in result["compositions"].values()
+            )
+        )
+        self.assertFalse(result["eligibility"]["promote_candidate"])
 
 
 class RlSemanticSearchTests(unittest.TestCase):
@@ -641,6 +877,97 @@ class RlDatasetTrainingControllerTests(unittest.TestCase):
             self.assertEqual(epoch_counts["searched"], expected_searched)
             self.assertEqual(epoch_counts["non_search"], expected_searched)
             self.assertEqual(metadata["policy_target_mode"], "advantage_gate")
+
+    def test_checkpoint_policy_paired_mc_dataset_and_training(self) -> None:
+        source_checkpoint = NnRlBasedAiController().checkpoint_path
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset_path = root / "paired_mc"
+            summary = generate_rl_dataset(
+                dataset_path,
+                games=1,
+                seed_start=8081,
+                behavior_controller="ai_nn_rl_based_v1",
+                continuation_controller="ai_nn_rl_based_v1",
+                target_checkpoint=source_checkpoint,
+                target_method="paired_mc",
+                search_fraction=0.02,
+                paired_mc_max_actions=5000,
+                paired_mc_confirmation_rollouts=2,
+                split_fractions=(1.0, 0.0, 0.0),
+                target_shard_size_bytes=64 * 1024,
+            )
+            records = load_rl_dataset_records(dataset_path, split="train")
+            manifest = load_rl_dataset_metadata(dataset_path)
+            searched = [row for row in records if row["has_search_targets"]]
+
+            self.assertGreater(summary.searched_decisions, 0)
+            self.assertEqual(summary.searched_decisions, len(searched))
+            self.assertEqual(manifest["generation"]["target_method"], "paired_mc")
+            self.assertEqual(
+                manifest["generation"]["search_nodes_unit"],
+                "terminal_rollout_branches",
+            )
+            self.assertEqual(
+                manifest["generation"]["behavior_controller"],
+                "ai_nn_rl_based_v1",
+            )
+            self.assertEqual(
+                manifest["generation"]["paired_mc_confirmation_rollouts"], 2
+            )
+            self.assertEqual(
+                manifest["generation"]["hidden_state_sampling"],
+                "single_screen_then_resampled_hidden_order_confirmation",
+            )
+            for row in searched:
+                self.assertEqual(
+                    len(row["search_q_values"]),
+                    len(row["candidate_action_features"]),
+                )
+                self.assertEqual(row["search_depth_used"], 1)
+                self.assertFalse(row["depth_2_completed"])
+                self.assertEqual(
+                    len(row["search_policy_advantages"]),
+                    len(row["candidate_action_features"]),
+                )
+                self.assertEqual(
+                    len(row["search_policy_confirmed"]),
+                    len(row["candidate_action_features"]),
+                )
+                self.assertEqual(
+                    row["search_policy_advantages"][row["teacher_action_index"]],
+                    0.0,
+                )
+                self.assertTrue(
+                    all(
+                        abs(float(value)) <= 1.0
+                        for values in row["search_q_values"]
+                        for value in values
+                    )
+                )
+
+            output = root / "paired_mc_model.npz"
+            train_rl_model(
+                dataset_path,
+                output,
+                init_checkpoint=source_checkpoint,
+                epochs=1,
+                batch_decisions=64,
+                policy_target_mode="advantage_weighted",
+                improved_action_weight=0.75,
+                min_search_advantage=0.0,
+                training_sampling="balanced_search",
+            )
+            trained = NumpyRlPolicyQNetwork.load(output)
+            self.assertEqual(trained.metadata["policy_target_mode"], "advantage_weighted")
+            self.assertEqual(
+                trained.metadata["source_search_configuration"]["target_method"],
+                "paired_mc",
+            )
+            self.assertEqual(
+                trained.metadata["label_definition"]["q_search"],
+                "full-action paired terminal Monte Carlo target",
+            )
 
     def test_streamed_dataset_training_and_controller(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

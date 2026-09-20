@@ -1,0 +1,88 @@
+{
+  "k16_collisions": {
+    "auction_bid_searched": 573,
+    "build_houses_searched": 166,
+    "auction_start_searched": 67,
+    "bureaucracy_searched": 62,
+    "bureaucracy_collisions": 21,
+    "discard_power_plant_searched": 39,
+    "buy_resources_searched": 123,
+    "build_houses_collisions": 55,
+    "build_houses_collision_conflicting_rank_labels": 21
+  },
+  "ai_nn_rl_based_v1_schema_v2_d010_deterministic_suite_400_each.json": {
+    "ai_deterministic": {
+      "score": 0.704375,
+      "seed_cluster_95_ci": [
+        0.664375,
+        0.744375
+      ],
+      "seeds": 200
+    },
+    "ai_deterministic_efficiency": {
+      "score": 0.79,
+      "seed_cluster_95_ci": [
+        0.755,
+        0.8225
+      ],
+      "seeds": 200
+    },
+    "ai_deterministic_expansion": {
+      "score": 0.59125,
+      "seed_cluster_95_ci": [
+        0.55125,
+        0.6325
+      ],
+      "seeds": 200
+    },
+    "ai_deterministic_reserve": {
+      "score": 0.8625,
+      "seed_cluster_95_ci": [
+        0.835,
+        0.88875
+      ],
+      "seeds": 200
+    }
+  },
+  "ai_nn_rl_based_v1_schema_v2_final_deterministic_suite_fresh_200_each.json": {
+    "ai_deterministic": {
+      "score": 0.715,
+      "seed_cluster_95_ci": [
+        0.6625,
+        0.765
+      ],
+      "seeds": 100
+    },
+    "ai_deterministic_efficiency": {
+      "score": 0.81375,
+      "seed_cluster_95_ci": [
+        0.77,
+        0.855
+      ],
+      "seeds": 100
+    },
+    "ai_deterministic_expansion": {
+      "score": 0.5975,
+      "seed_cluster_95_ci": [
+        0.5425,
+        0.655
+      ],
+      "seeds": 100
+    },
+    "ai_deterministic_reserve": {
+      "score": 0.885,
+      "seed_cluster_95_ci": [
+        0.8475,
+        0.92
+      ],
+      "seeds": 100
+    }
+  },
+  "initial_hidden_sampler": {
+    "original_top_back": "plug",
+    "resampled_top_backs": {
+      "socket": 12,
+      "plug": 4
+    }
+  }
+}

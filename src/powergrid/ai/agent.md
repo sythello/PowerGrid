@@ -63,7 +63,7 @@ This means the core contract is:
 - [profiled_deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/profiled_deterministic.py): three no-lookahead, strength-calibrated data-generation policies
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
 - [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value): public observation, candidates, dataset generation, NumPy MLP/training, and neural controller
-- [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based): listwise Policy/vector-Q model, full-action semantic search, decision-grouped dataset/training, and Policy-only controller
+- [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based): listwise Policy/vector-Q model, full-action semantic search and paired terminal Monte Carlo labels, decision-grouped dataset/training, and Policy-only controller
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py): registry and controller construction
 
@@ -331,14 +331,25 @@ Training/search support:
 - Deterministically sampled roots receive labels for every candidate from a frozen target Q
 - Every edge applies one candidate, then continues to an auction/resource/build/bureaucracy/pending semantic boundary
 - Depth 1 is complete; adaptive depth 2 is accepted only when every action fits the node budget
+- `--target-method paired_mc` alternatively enumerates every legal root action from the same
+  hidden-deck fork and continues each branch with a frozen controller all the way to terminal
+- Paired-MC generation may use the current `ai_nn_rl_based_v1` checkpoint for both behavior
+  trajectories and continuation, providing an on-policy approximate-policy-iteration step
 - Player values are remapped by player id whenever the current actor changes
 - Sibling forks share one hidden-deck determinization while observations continue to exclude hidden order
+- Optional paired-MC confirmation first screens every action once, then resamples only hidden
+  plant order and re-evaluates the behavior action plus screened improvements; the screening
+  sample is excluded from the paired mean, and only positive one-sided confidence bounds may
+  drive Policy targets
 - Data uses one decision per Parquet row, one complete game per row group, checksummed shards, game-exclusive splits, and three JSONL examples
 - Stage-1 conservative improvement can retain every searched row plus an equal deterministic
   non-search anchor sample with `--training-sampling balanced_search`
 - `advantage_gate` keeps the deterministic one-hot target unless a representable searched action
   clears the configured actor-Q margin; accepted targets assign 0.75 to that action and 0.25 to
   the deterministic action
+- `advantage_weighted` preserves a configurable behavior anchor and distributes the improvement
+  mass across every representable positive-advantage action using a temperature softmax; it is
+  the recommended target for paired terminal labels
 - Germany/3-player generation cycles by seed over all 13 legal contiguous region sets unless an explicit set/list is supplied
 - Parallel generation keeps at most `2 * workers` complete games in flight and falls back to a bounded thread pool where process semaphores are unavailable
 - Online controller inference never forks or searches
@@ -349,6 +360,9 @@ Training/search support:
   against the canonical, efficiency, expansion, and reserve deterministic controllers
   with balanced seats and all-region cycling; the current bundled v1 checkpoint is the
   `delta=0.10` model selected by paired-rollout plus end-to-end point-score gates
+- `powergrid.tools.evaluate_nn_rl_checkpoint_duel` compares candidate and incumbent RL
+  checkpoints directly; every seed runs both 2-vs-1 compositions and all six seat
+  placements, and its 95% interval bootstraps complete six-game seed clusters
 
 ## Important Supporting Patterns
 

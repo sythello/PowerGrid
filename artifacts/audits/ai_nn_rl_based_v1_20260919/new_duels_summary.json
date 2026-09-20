@@ -1,0 +1,175 @@
+{
+  "bc": {
+    "overall": {
+      "candidate_average_finish": 1.9966666666666666,
+      "draws": 2,
+      "games_completed": 600,
+      "incumbent_average_finish": 2.0,
+      "losses": 597,
+      "pairwise_score": 0.5016666666666667,
+      "pairwise_score_95_ci": [
+        0.465,
+        0.5375
+      ],
+      "region_game_counts": {
+        "black,blue,magenta": 48,
+        "black,blue,yellow": 48,
+        "black,cyan,yellow": 48,
+        "black,green,yellow": 48,
+        "black,magenta,yellow": 48,
+        "blue,cyan,yellow": 48,
+        "blue,green,magenta": 48,
+        "blue,green,yellow": 48,
+        "blue,magenta,yellow": 48,
+        "cyan,green,magenta": 42,
+        "cyan,green,yellow": 42,
+        "cyan,magenta,yellow": 42,
+        "green,magenta,yellow": 42
+      },
+      "region_pairwise_scores": {
+        "black,blue,magenta": 0.5833333333333334,
+        "black,blue,yellow": 0.5625,
+        "black,cyan,yellow": 0.5625,
+        "black,green,yellow": 0.4375,
+        "black,magenta,yellow": 0.4166666666666667,
+        "blue,cyan,yellow": 0.4791666666666667,
+        "blue,green,magenta": 0.3958333333333333,
+        "blue,green,yellow": 0.4791666666666667,
+        "blue,magenta,yellow": 0.4270833333333333,
+        "cyan,green,magenta": 0.6666666666666666,
+        "cyan,green,yellow": 0.5119047619047619,
+        "cyan,magenta,yellow": 0.4642857142857143,
+        "green,magenta,yellow": 0.5595238095238095
+      },
+      "score_above_0_50": true,
+      "seat_pair_comparisons": 1200,
+      "seeds": 100,
+      "statistically_superior": false,
+      "wins": 601
+    },
+    "checkpoint_sha256": "cda28b554377b830dfd6033f91217b5da5d7d5e1fc53db16292a8177efaf3254"
+  },
+  "policy_only": {
+    "overall": {
+      "candidate_average_finish": 2.1033333333333335,
+      "draws": 0,
+      "games_completed": 600,
+      "incumbent_average_finish": 1.8966666666666667,
+      "losses": 693,
+      "pairwise_score": 0.4225,
+      "pairwise_score_95_ci": [
+        0.38664583333333336,
+        0.4583333333333333
+      ],
+      "region_game_counts": {
+        "black,blue,magenta": 48,
+        "black,blue,yellow": 48,
+        "black,cyan,yellow": 48,
+        "black,green,yellow": 48,
+        "black,magenta,yellow": 48,
+        "blue,cyan,yellow": 48,
+        "blue,green,magenta": 48,
+        "blue,green,yellow": 48,
+        "blue,magenta,yellow": 48,
+        "cyan,green,magenta": 42,
+        "cyan,green,yellow": 42,
+        "cyan,magenta,yellow": 42,
+        "green,magenta,yellow": 42
+      },
+      "region_pairwise_scores": {
+        "black,blue,magenta": 0.4895833333333333,
+        "black,blue,yellow": 0.3125,
+        "black,cyan,yellow": 0.40625,
+        "black,green,yellow": 0.3541666666666667,
+        "black,magenta,yellow": 0.5,
+        "blue,cyan,yellow": 0.4270833333333333,
+        "blue,green,magenta": 0.5,
+        "blue,green,yellow": 0.375,
+        "blue,magenta,yellow": 0.3958333333333333,
+        "cyan,green,magenta": 0.39285714285714285,
+        "cyan,green,yellow": 0.5,
+        "cyan,magenta,yellow": 0.36904761904761907,
+        "green,magenta,yellow": 0.47619047619047616
+      },
+      "score_above_0_50": false,
+      "seat_pair_comparisons": 1200,
+      "seeds": 100,
+      "statistically_superior": false,
+      "wins": 507
+    },
+    "checkpoint_sha256": "4d7c2c55e1b85af661f686602747b723e9c9677121675fcfb18b6bf66cff7a1e"
+  },
+  "joint": {
+    "overall": {
+      "candidate_average_finish": 2.077777777777778,
+      "draws": 1,
+      "games_completed": 600,
+      "incumbent_average_finish": 1.92,
+      "losses": 670,
+      "pairwise_score": 0.44125,
+      "pairwise_score_95_ci": [
+        0.4066666666666667,
+        0.47708333333333336
+      ],
+      "region_game_counts": {
+        "black,blue,magenta": 48,
+        "black,blue,yellow": 48,
+        "black,cyan,yellow": 48,
+        "black,green,yellow": 48,
+        "black,magenta,yellow": 48,
+        "blue,cyan,yellow": 48,
+        "blue,green,magenta": 48,
+        "blue,green,yellow": 48,
+        "blue,magenta,yellow": 48,
+        "cyan,green,magenta": 42,
+        "cyan,green,yellow": 42,
+        "cyan,magenta,yellow": 42,
+        "green,magenta,yellow": 42
+      },
+      "region_pairwise_scores": {
+        "black,blue,magenta": 0.3958333333333333,
+        "black,blue,yellow": 0.4583333333333333,
+        "black,cyan,yellow": 0.4375,
+        "black,green,yellow": 0.53125,
+        "black,magenta,yellow": 0.4791666666666667,
+        "blue,cyan,yellow": 0.4479166666666667,
+        "blue,green,magenta": 0.4479166666666667,
+        "blue,green,yellow": 0.3697916666666667,
+        "blue,magenta,yellow": 0.4583333333333333,
+        "cyan,green,magenta": 0.42857142857142855,
+        "cyan,green,yellow": 0.36904761904761907,
+        "cyan,magenta,yellow": 0.4642857142857143,
+        "green,magenta,yellow": 0.44047619047619047
+      },
+      "score_above_0_50": false,
+      "seat_pair_comparisons": 1200,
+      "seeds": 100,
+      "statistically_superior": false,
+      "wins": 529
+    },
+    "checkpoint_sha256": "3b2d0f6c381cfc416caa94bb7b461cab4f25a9ec164f5db912539688bde0e07f"
+  },
+  "paired_score_differences": {
+    "policy_only_minus_bc": {
+      "mean": -0.07916666666666666,
+      "same_seed_cluster_bootstrap_95_ci": [
+        -0.12333333333333335,
+        -0.034999999999999996
+      ]
+    },
+    "joint_minus_bc": {
+      "mean": -0.06041666666666667,
+      "same_seed_cluster_bootstrap_95_ci": [
+        -0.10583333333333333,
+        -0.013333333333333334
+      ]
+    },
+    "joint_minus_policy_only": {
+      "mean": 0.01875,
+      "same_seed_cluster_bootstrap_95_ci": [
+        -0.02375,
+        0.06291666666666666
+      ]
+    }
+  }
+}

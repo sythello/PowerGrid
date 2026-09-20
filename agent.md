@@ -113,7 +113,8 @@ The most important architectural boundary is:
   - NumPy MLP training/checkpoints and `ai_nn_rank_value_v1` controller
 - [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based)
   - listwise Policy and multi-player vector-Q model
-  - full-action semantic search, decision-grouped Parquet data, training, and `ai_nn_rl_based_v1`
+  - full-action semantic search and paired terminal Monte Carlo labels
+  - decision-grouped Parquet data, training, and `ai_nn_rl_based_v1`
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py)
   - offline Elo evaluation system
 - [agent.md](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/agent.md)
@@ -130,6 +131,8 @@ User-facing entrypoints:
 - [generate_nn_rank_value_dataset.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/generate_nn_rank_value_dataset.py)
 - [train_nn_rank_value.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/train_nn_rank_value.py)
 - `generate_nn_rl_based_dataset.py`, `train_nn_rl_based.py`, `validate_nn_rl_based.py`
+- `evaluate_nn_rl_paired_rollouts.py`, `evaluate_nn_rl_deterministic_suite.py`,
+  `evaluate_nn_rl_checkpoint_duel.py`
 - [validate_profiled_deterministic_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/validate_profiled_deterministic_ai.py)
 - `validate_nn_observation.py`, `validate_nn_candidates.py`, `validate_nn_dataset.py`, `validate_nn_model.py`, `validate_nn_training.py`, `validate_nn_controller.py`
 - [show_initial_state.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/tools/show_initial_state.py)

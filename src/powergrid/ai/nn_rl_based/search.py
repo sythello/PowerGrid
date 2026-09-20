@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 from typing import Mapping
 
 import numpy as np
 
 from ...model import ModelValidationError
 from ...session import GameSession
-from ...session_types import GameSnapshot, TurnRequest
+from ...session_types import GameSnapshot, GuiIntent, TurnRequest
 from .. import build_ai_controller, derive_final_standings
 from ..base import BaseAiController
 from ..nn_rank_value.candidates import (
@@ -55,6 +56,8 @@ class SearchResult:
     depth_used: int
     nodes_evaluated: int
     depth_2_completed: bool
+    policy_advantages: tuple[float, ...] = ()
+    policy_confirmed: tuple[bool, ...] = ()
 
 
 class _SearchBudgetExceeded(RuntimeError):
@@ -228,6 +231,196 @@ class FullActionSemanticSearcher:
         return self._continuation_agents
 
 
+class FullActionPairedMcEvaluator:
+    """Evaluate every legal root action with a shared frozen continuation policy."""
+
+    def __init__(
+        self,
+        continuation_agents: Mapping[str, BaseAiController],
+        *,
+        max_actions: int = 5000,
+        confirmation_rollouts: int = 0,
+        confirmation_confidence_z: float = 1.645,
+    ) -> None:
+        if max_actions <= 0:
+            raise ValueError("paired-MC max_actions must be positive")
+        if confirmation_rollouts < 0:
+            raise ValueError("paired-MC confirmation_rollouts may not be negative")
+        if confirmation_rollouts == 1:
+            raise ValueError("paired-MC confirmation_rollouts must be zero or at least two")
+        if confirmation_confidence_z < 0.0:
+            raise ValueError("paired-MC confirmation_confidence_z may not be negative")
+        self.continuation_agents = continuation_agents
+        self.max_actions = max_actions
+        self.confirmation_rollouts = confirmation_rollouts
+        self.confirmation_confidence_z = confirmation_confidence_z
+
+    def search(
+        self,
+        session: GameSession,
+        *,
+        teacher_action_index: int | None = None,
+        confirmation_seed: int = 0,
+    ) -> SearchResult:
+        snapshot = session.snapshot()
+        request = snapshot.active_request
+        if request is None or snapshot.winner_result is not None:
+            raise ModelValidationError(
+                "paired-MC root requires a non-terminal active request"
+            )
+        observation = build_public_observation(snapshot.state, request)
+        player_ids = player_slot_ids(observation)
+        candidates = generate_candidate_actions(request, snapshot)
+        rows: list[list[float]] = []
+        for candidate in candidates:
+            values = rollout_terminal_values(
+                session,
+                candidate.intent,
+                self.continuation_agents,
+                max_actions=self.max_actions,
+            )
+            rows.append([values[player_id] for player_id in player_ids])
+        policy_advantages: tuple[float, ...] = ()
+        policy_confirmed: tuple[bool, ...] = ()
+        nodes = len(candidates)
+        if self.confirmation_rollouts:
+            if (
+                teacher_action_index is None
+                or not 0 <= teacher_action_index < len(candidates)
+            ):
+                raise ValueError(
+                    "paired-MC hidden-state confirmation requires a valid teacher action index"
+                )
+            base_actor_values = np.asarray(rows, dtype=np.float32)[:, 0]
+            teacher_base = float(base_actor_values[teacher_action_index])
+            screened = [
+                index
+                for index, value in enumerate(base_actor_values)
+                if index != teacher_action_index and float(value) > teacher_base
+            ]
+            # Unscreened actions remain zero with a false confirmation mask. This
+            # keeps JSONL examples standards-compliant without making them eligible.
+            advantages = np.zeros(len(candidates), dtype=np.float32)
+            confirmed = np.zeros(len(candidates), dtype=bool)
+            advantages[teacher_action_index] = 0.0
+            samples_by_candidate = {
+                candidate_index: np.empty(
+                    self.confirmation_rollouts, dtype=np.float32
+                )
+                for candidate_index in screened
+            }
+            if screened:
+                for rollout_index in range(self.confirmation_rollouts):
+                    resampled = _resample_hidden_plant_order(
+                        session,
+                        seed=_derived_confirmation_seed(
+                            confirmation_seed, rollout_index
+                        ),
+                    )
+                    teacher_values = rollout_terminal_values(
+                        resampled,
+                        candidates[teacher_action_index].intent,
+                        self.continuation_agents,
+                        max_actions=self.max_actions,
+                    )
+                    teacher_actor_value = float(teacher_values[player_ids[0]])
+                    for candidate_index in screened:
+                        candidate_values = rollout_terminal_values(
+                            resampled,
+                            candidates[candidate_index].intent,
+                            self.continuation_agents,
+                            max_actions=self.max_actions,
+                        )
+                        samples_by_candidate[candidate_index][rollout_index] = (
+                            float(candidate_values[player_ids[0]])
+                            - teacher_actor_value
+                        )
+                nodes += self.confirmation_rollouts * (1 + len(screened))
+            for candidate_index in screened:
+                # The original rollout is deliberately excluded: it selected the
+                # candidates and would bias their confirmation estimate upward.
+                samples = samples_by_candidate[candidate_index]
+                mean_advantage = float(np.mean(samples))
+                standard_error = float(np.std(samples, ddof=1)) / np.sqrt(
+                    len(samples)
+                )
+                lower_bound = (
+                    mean_advantage
+                    - self.confirmation_confidence_z * standard_error
+                )
+                advantages[candidate_index] = mean_advantage
+                confirmed[candidate_index] = lower_bound > 0.0
+            policy_advantages = tuple(float(value) for value in advantages)
+            policy_confirmed = tuple(bool(value) for value in confirmed)
+        return _result(
+            np.asarray(rows, dtype=np.float32),
+            player_ids,
+            1,
+            nodes,
+            False,
+            policy_advantages=policy_advantages,
+            policy_confirmed=policy_confirmed,
+        )
+
+
+def _derived_confirmation_seed(seed: int, rollout_index: int) -> int:
+    return (int(seed) * 1_000_003 + int(rollout_index) * 97_409) & ((1 << 63) - 1)
+
+
+def _resample_hidden_plant_order(session: GameSession, *, seed: int) -> GameSession:
+    """Resample only plant information omitted from the policy observation."""
+
+    resampled = session.fork()
+    rng = random.Random(seed)
+    draw_stack = list(resampled._state.power_plant_draw_stack)
+    bottom_stack = list(resampled._state.power_plant_bottom_stack)
+    rng.shuffle(draw_stack)
+    rng.shuffle(bottom_stack)
+    resampled._state.power_plant_draw_stack = tuple(draw_stack)
+    resampled._state.power_plant_bottom_stack = tuple(bottom_stack)
+    return resampled
+
+
+def rollout_terminal_values(
+    session: GameSession,
+    first_intent: GuiIntent,
+    continuation_agents: Mapping[str, BaseAiController],
+    *,
+    max_actions: int = 5000,
+) -> dict[str, float]:
+    """Fork a root, apply one action, then use a frozen policy through terminal."""
+
+    if max_actions <= 0:
+        raise ValueError("terminal rollout max_actions must be positive")
+    rollout = session.fork()
+    result = rollout.submit_intent(first_intent, auto_advance=False)
+    _raise_last_error(result, "paired-MC root action")
+    actions = 1
+    while True:
+        snapshot = rollout.advance_until_blocked()
+        if snapshot.winner_result is not None:
+            return terminal_rank_values(snapshot)
+        if actions >= max_actions:
+            break
+        request = snapshot.active_request
+        if request is None:
+            raise ModelValidationError(
+                "paired-MC rollout stopped without an active request"
+            )
+        agent = continuation_agents.get(request.player_id)
+        if agent is None:
+            raise ModelValidationError(
+                f"paired-MC continuation policy is missing player {request.player_id!r}"
+            )
+        intent = agent.choose_intent(request, snapshot)
+        result = rollout.submit_intent(intent, auto_advance=False)
+        _raise_last_error(result, "paired-MC continuation policy")
+        actions += 1
+    raise ModelValidationError(
+        f"paired-MC rollout exceeded {max_actions} actions"
+    )
+
+
 def advance_to_semantic_boundary(
     session: GameSession,
     candidate: CandidateAction,
@@ -391,6 +584,9 @@ def _result(
     depth: int,
     nodes: int,
     completed: bool,
+    *,
+    policy_advantages: tuple[float, ...] = (),
+    policy_confirmed: tuple[bool, ...] = (),
 ) -> SearchResult:
     padded_rows = []
     for row in q_values:
@@ -403,14 +599,18 @@ def _result(
         depth_used=depth,
         nodes_evaluated=nodes,
         depth_2_completed=completed,
+        policy_advantages=policy_advantages,
+        policy_confirmed=policy_confirmed,
     )
 
 
 __all__ = [
+    "FullActionPairedMcEvaluator",
     "FullActionSemanticSearcher",
     "SearchConfig",
     "SearchResult",
     "advance_to_semantic_boundary",
     "pad_player_values",
+    "rollout_terminal_values",
     "terminal_rank_values",
 ]

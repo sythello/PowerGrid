@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 
+from powergrid.ai.nn_rl_based.model import POLICY_TARGET_MODES
 from powergrid.ai.nn_rl_based.training import RlTrainingProgress, train_rl_model
 
 
@@ -20,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--q-search-weight", type=float, default=1.0)
     parser.add_argument(
         "--policy-target-mode",
-        choices=("legacy_soft_mix", "advantage_gate"),
+        choices=POLICY_TARGET_MODES,
         default="legacy_soft_mix",
     )
     parser.add_argument("--search-policy-mix", type=float, default=0.5)

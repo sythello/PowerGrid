@@ -16,7 +16,11 @@ except ImportError as exc:  # pragma: no cover
 MODEL_FORMAT_NAME = "powergrid.ai_nn_rl_based"
 MODEL_FORMAT_VERSION = 1
 MAX_PLAYERS = 6
-POLICY_TARGET_MODES = ("legacy_soft_mix", "advantage_gate")
+POLICY_TARGET_MODES = (
+    "legacy_soft_mix",
+    "advantage_gate",
+    "advantage_weighted",
+)
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,8 @@ class NumpyRlPolicyQNetwork:
         player_masks: "np.ndarray",
         has_search_targets: "np.ndarray",
         search_q_values: "np.ndarray",
+        search_policy_advantages: "np.ndarray | None" = None,
+        search_policy_confirmed: "np.ndarray | None" = None,
         *,
         learning_rate: float,
         policy_weight: float = 1.0,
@@ -152,6 +158,11 @@ class NumpyRlPolicyQNetwork:
             search_q_values,
         )
         teacher, terminal, masks, searched, search_q = labels
+        policy_advantages, policy_confirmed = _validate_policy_confirmation_labels(
+            offsets,
+            search_policy_advantages,
+            search_policy_confirmed,
+        )
         if learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
         _validate_policy_target_config(
@@ -177,6 +188,8 @@ class NumpyRlPolicyQNetwork:
             search_temperature=search_temperature,
             improved_action_weight=improved_action_weight,
             min_search_advantage=min_search_advantage,
+            search_policy_advantages=policy_advantages,
+            search_policy_confirmed=policy_confirmed,
         )
         decision_count = len(states)
         eps = 1e-7
@@ -280,6 +293,8 @@ class NumpyRlPolicyQNetwork:
         player_masks: "np.ndarray",
         has_search_targets: "np.ndarray",
         search_q_values: "np.ndarray",
+        search_policy_advantages: "np.ndarray | None" = None,
+        search_policy_confirmed: "np.ndarray | None" = None,
         *,
         policy_target_mode: str = "legacy_soft_mix",
         search_policy_mix: float = 0.5,
@@ -297,6 +312,11 @@ class NumpyRlPolicyQNetwork:
             player_masks,
             has_search_targets,
             search_q_values,
+        )
+        policy_advantages, policy_confirmed = _validate_policy_confirmation_labels(
+            offsets,
+            search_policy_advantages,
+            search_policy_confirmed,
         )
         predictions = self.predict(states, actions, offsets)
         _validate_policy_target_config(
@@ -317,6 +337,8 @@ class NumpyRlPolicyQNetwork:
             search_temperature=search_temperature,
             improved_action_weight=improved_action_weight,
             min_search_advantage=min_search_advantage,
+            search_policy_advantages=policy_advantages,
+            search_policy_confirmed=policy_confirmed,
         )
         eps = 1e-7
         policy_loss = -sum(
@@ -583,6 +605,8 @@ def build_policy_targets(
     search_temperature: float = 0.25,
     improved_action_weight: float = 0.75,
     min_search_advantage: float = 0.0,
+    search_policy_advantages: "np.ndarray | None" = None,
+    search_policy_confirmed: "np.ndarray | None" = None,
 ) -> tuple["np.ndarray", "np.ndarray", "np.ndarray"]:
     """Build listwise Policy targets and report accepted improvement actions."""
 
@@ -591,6 +615,11 @@ def build_policy_targets(
     searched = np.asarray(searched, dtype=bool)
     search_q = np.asarray(search_q, dtype=np.float32)
     actions = np.asarray(action_features, dtype=np.float32)
+    policy_advantages, policy_confirmed = _validate_policy_confirmation_labels(
+        offsets,
+        search_policy_advantages,
+        search_policy_confirmed,
+    )
     _validate_policy_target_config(
         policy_target_mode=policy_target_mode,
         search_policy_mix=search_policy_mix,
@@ -617,27 +646,71 @@ def build_policy_targets(
             targets[start:end] = search_policy_mix * soft
             targets[teacher_row] += 1.0 - search_policy_mix
             continue
-        if policy_target_mode == "advantage_gate" and searched[index]:
-            actor_q = search_q[start:end, 0]
+        if (
+            policy_target_mode in {"advantage_gate", "advantage_weighted"}
+            and searched[index]
+        ):
             teacher_features = actions[teacher_row]
-            best_index = -1
-            best_q = -np.inf
-            for local_index, value in enumerate(actor_q):
-                if local_index == teacher_index or not np.isfinite(value):
+            eligible: list[int] = []
+            for local_index in range(end - start):
+                if local_index == teacher_index:
                     continue
                 if np.array_equal(actions[start + local_index], teacher_features):
                     continue
-                if float(value) > best_q:
-                    best_index = local_index
-                    best_q = float(value)
-            teacher_q = float(actor_q[teacher_index])
-            if (
-                best_index >= 0
-                and np.isfinite(teacher_q)
-                and best_q - teacher_q > min_search_advantage
-            ):
+                eligible.append(local_index)
+            has_confirmed_policy_labels = bool(
+                policy_advantages is not None
+                and np.any(np.isfinite(policy_advantages[start:end]))
+            )
+            if has_confirmed_policy_labels:
+                assert policy_advantages is not None
+                assert policy_confirmed is not None
+                candidate_advantages = policy_advantages[start:end]
+                improving = [
+                    local_index
+                    for local_index in eligible
+                    if policy_confirmed[start + local_index]
+                    and np.isfinite(candidate_advantages[local_index])
+                    and float(candidate_advantages[local_index])
+                    > min_search_advantage
+                ]
+            else:
+                actor_q = search_q[start:end, 0]
+                teacher_q = float(actor_q[teacher_index])
+                candidate_advantages = actor_q - teacher_q
+                improving = [
+                    local_index
+                    for local_index in eligible
+                    if np.isfinite(teacher_q)
+                    and np.isfinite(candidate_advantages[local_index])
+                    and float(candidate_advantages[local_index])
+                    > min_search_advantage
+                ]
+            best_index = (
+                max(
+                    improving,
+                    key=lambda item: (float(candidate_advantages[item]), -item),
+                )
+                if improving
+                else -1
+            )
+            if best_index >= 0:
                 targets[teacher_row] = 1.0 - improved_action_weight
-                targets[start + best_index] = improved_action_weight
+                if policy_target_mode == "advantage_weighted":
+                    advantages = np.asarray(
+                        [float(candidate_advantages[item]) for item in improving],
+                        dtype=np.float32,
+                    )
+                    logits = advantages / search_temperature
+                    logits -= np.max(logits)
+                    weights = np.exp(np.clip(logits, -30.0, 30.0))
+                    weights /= np.sum(weights)
+                    for local_index, weight in zip(improving, weights):
+                        targets[start + local_index] = (
+                            improved_action_weight * float(weight)
+                        )
+                else:
+                    targets[start + best_index] = improved_action_weight
                 accepted[index] = True
                 improved_indices[index] = best_index
                 continue
@@ -665,6 +738,29 @@ def _validate_policy_target_config(
         raise ValueError("improved_action_weight must be in (0.5, 1.0]")
     if min_search_advantage < 0:
         raise ValueError("min_search_advantage may not be negative")
+
+
+def _validate_policy_confirmation_labels(
+    offsets: "np.ndarray",
+    advantages: "np.ndarray | None",
+    confirmed: "np.ndarray | None",
+) -> tuple["np.ndarray | None", "np.ndarray | None"]:
+    if advantages is None and confirmed is None:
+        return None, None
+    if advantages is None or confirmed is None:
+        raise ValueError(
+            "search policy advantages and confirmation mask must be supplied together"
+        )
+    values = np.asarray(advantages, dtype=np.float32).reshape(-1)
+    mask = np.asarray(confirmed, dtype=bool).reshape(-1)
+    expected = int(np.asarray(offsets, dtype=np.int32)[-1])
+    if len(values) != expected or len(mask) != expected:
+        raise ValueError("confirmed policy labels do not align with candidate actions")
+    if np.any(np.isinf(values)):
+        raise ValueError("confirmed policy advantages may not contain infinity")
+    if np.any(mask & ~np.isfinite(values)):
+        raise ValueError("confirmed policy actions require finite advantages")
+    return values, mask
 
 
 def _huber(differences: "np.ndarray", delta: float) -> tuple["np.ndarray", "np.ndarray"]:

@@ -1,0 +1,2004 @@
+{
+  "checkpoints": {
+    "src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz": {
+      "sha256": "466d8d507c406215014f222de8d5720ebd96bcbb8465b3b7e1d8061284a5bc0c",
+      "training_dataset": "artifacts/datasets/nn_rl_search_schema_v2_1",
+      "training_seed": 0,
+      "training_epochs": 20,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_gate",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.1,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 1789210,
+        "searched": 198263
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_deterministic",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "search_depth": 1,
+        "search_fraction": 0.1
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 30261.0,
+        "accepted_improvement_rate": 0.15263059673262283,
+        "accepted_policy_top1_accuracy": 0.06995803179009286,
+        "decisions": 1987473.0,
+        "gated_policy_cross_entropy": 0.1519531170554812,
+        "non_search_decisions": 1789210.0,
+        "non_search_teacher_accuracy": 0.9754590014587443,
+        "policy_accuracy": 0.9752706074497616,
+        "policy_loss": 0.1519531170554812,
+        "policy_target_top1_accuracy": 0.9623657780508214,
+        "q_mc_elements": 5962419.0,
+        "q_mc_mae": 0.41353663802285806,
+        "q_search_elements": 1981518.0,
+        "q_search_mae": 0.1381749725914346,
+        "searched_decisions": 198263.0,
+        "searched_fallback_decisions": 168002.0,
+        "searched_fallback_teacher_accuracy": 0.9836668611087963
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 3690.0,
+        "accepted_improvement_rate": 0.15377562927154526,
+        "accepted_policy_top1_accuracy": 0.054742547425474256,
+        "decisions": 242710.0,
+        "gated_policy_cross_entropy": 0.15899586398366736,
+        "non_search_decisions": 218714.0,
+        "non_search_teacher_accuracy": 0.9739111350896604,
+        "policy_accuracy": 0.9737876478101438,
+        "policy_loss": 0.15899586398366736,
+        "policy_target_top1_accuracy": 0.9605001854064521,
+        "q_mc_elements": 728130.0,
+        "q_mc_mae": 0.4191120029886797,
+        "q_search_elements": 243021.0,
+        "q_search_mae": 0.1432196053071926,
+        "searched_decisions": 23996.0,
+        "searched_fallback_decisions": 20306.0,
+        "searched_fallback_teacher_accuracy": 0.9806461144489313
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 1,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 2,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 3,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 4,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 5,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 6,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 7,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 8,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 9,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 10,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 11,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 12,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 13,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 14,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 15,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 16,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 17,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 18,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 19,
+          "non_search": 198263,
+          "searched": 198263
+        },
+        {
+          "accepted_improvements": 30261,
+          "decisions": 396526,
+          "epoch": 20,
+          "non_search": 198263,
+          "searched": 198263
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_confirm_20260919/models/k0_weighted075.npz": {
+      "sha256": "9fdc4c099e405f3b952913f8f1bd2f5e7fbe86e54f6406b6599f7596bf0e7699",
+      "training_dataset": "artifacts/experiments/paired_mc_confirm_20260919/data_smoke_k0",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 39485,
+        "searched": 837
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_confirmation_confidence_z": 1.645,
+        "paired_mc_confirmation_rollouts": 0,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 144.0,
+        "accepted_improvement_rate": 0.17204301075268819,
+        "accepted_policy_top1_accuracy": 0.1111111111111111,
+        "decisions": 40322.0,
+        "gated_policy_cross_entropy": 0.143699288363035,
+        "non_search_decisions": 39485.0,
+        "non_search_teacher_accuracy": 0.9816639230087375,
+        "policy_accuracy": 0.9814989335846436,
+        "policy_loss": 0.143699288363035,
+        "policy_target_top1_accuracy": 0.9792669014433808,
+        "q_mc_elements": 120966.0,
+        "q_mc_mae": 0.4877546671426548,
+        "q_search_elements": 8676.0,
+        "q_search_mae": 0.4692575194356427,
+        "searched_decisions": 837.0,
+        "searched_fallback_decisions": 693.0,
+        "searched_fallback_teacher_accuracy": 1.0
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 19.0,
+        "accepted_improvement_rate": 0.1958762886597938,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 4549.0,
+        "gated_policy_cross_entropy": 0.1630960518750034,
+        "non_search_decisions": 4452.0,
+        "non_search_teacher_accuracy": 0.9824797843665768,
+        "policy_accuracy": 0.9819740602330183,
+        "policy_loss": 0.1630960518750034,
+        "policy_target_top1_accuracy": 0.978017146625632,
+        "q_mc_elements": 13647.0,
+        "q_mc_mae": 0.5409614006311205,
+        "q_search_elements": 1089.0,
+        "q_search_mae": 0.5136183908347535,
+        "searched_decisions": 97.0,
+        "searched_fallback_decisions": 78.0,
+        "searched_fallback_teacher_accuracy": 0.9487179487179487
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 1,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 2,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 3,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 4,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 5,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 6,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 7,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 8,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 9,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 144,
+          "decisions": 1674,
+          "epoch": 10,
+          "non_search": 837,
+          "searched": 837
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_confirm_20260919/models/k16_weighted075.npz": {
+      "sha256": "a9f24d5d749acaf5774c6ecd4151caa019148d212925ddb00683fa386c117d19",
+      "training_dataset": "artifacts/experiments/paired_mc_confirm_20260919/data_smoke_k16",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 39485,
+        "searched": 837
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_screen_then_resampled_hidden_order_confirmation",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_confirmation_confidence_z": 1.645,
+        "paired_mc_confirmation_rollouts": 16,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 64.0,
+        "accepted_improvement_rate": 0.07646356033452807,
+        "accepted_policy_top1_accuracy": 0.1875,
+        "decisions": 40322.0,
+        "gated_policy_cross_entropy": 0.10192218048890811,
+        "non_search_decisions": 39485.0,
+        "non_search_teacher_accuracy": 0.9874129416234013,
+        "policy_accuracy": 0.987302217151927,
+        "policy_loss": 0.10192218048890811,
+        "policy_target_top1_accuracy": 0.9865086057239224,
+        "q_mc_elements": 120966.0,
+        "q_mc_mae": 0.48757246718926295,
+        "q_search_elements": 8676.0,
+        "q_search_mae": 0.46658938410200745,
+        "searched_decisions": 837.0,
+        "searched_fallback_decisions": 773.0,
+        "searched_fallback_teacher_accuracy": 1.0
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 6.0,
+        "accepted_improvement_rate": 0.061855670103092786,
+        "accepted_policy_top1_accuracy": 0.16666666666666666,
+        "decisions": 4549.0,
+        "gated_policy_cross_entropy": 0.11106149501091753,
+        "non_search_decisions": 4452.0,
+        "non_search_teacher_accuracy": 0.9860736747529201,
+        "policy_accuracy": 0.9857111453066608,
+        "policy_loss": 0.11106149501091753,
+        "policy_target_top1_accuracy": 0.984831831171686,
+        "q_mc_elements": 13647.0,
+        "q_mc_mae": 0.5397072624034581,
+        "q_search_elements": 1089.0,
+        "q_search_mae": 0.5139835212242647,
+        "searched_decisions": 97.0,
+        "searched_fallback_decisions": 91.0,
+        "searched_fallback_teacher_accuracy": 0.978021978021978
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 1,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 2,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 3,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 4,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 5,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 6,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 7,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 8,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 9,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 64,
+          "decisions": 1674,
+          "epoch": 10,
+          "non_search": 837,
+          "searched": 837
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_confirm_20260919/models/k8_weighted075.npz": {
+      "sha256": "1eb2dc5d436e2e95c2eb749d0efbef005ede01f1acdc7abdfdd48d7dac09f968",
+      "training_dataset": "artifacts/experiments/paired_mc_confirm_20260919/data_smoke_k8",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 39485,
+        "searched": 837
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_screen_then_resampled_hidden_order_confirmation",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_confirmation_confidence_z": 1.645,
+        "paired_mc_confirmation_rollouts": 8,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 56.0,
+        "accepted_improvement_rate": 0.06690561529271206,
+        "accepted_policy_top1_accuracy": 0.21428571428571427,
+        "decisions": 40322.0,
+        "gated_policy_cross_entropy": 0.09664364762426961,
+        "non_search_decisions": 39485.0,
+        "non_search_teacher_accuracy": 0.9878434848676713,
+        "policy_accuracy": 0.9877486235801796,
+        "policy_loss": 0.09664364762426961,
+        "policy_target_top1_accuracy": 0.9871038142949259,
+        "q_mc_elements": 120966.0,
+        "q_mc_mae": 0.4868512573633662,
+        "q_search_elements": 8676.0,
+        "q_search_mae": 0.4637114499373022,
+        "searched_decisions": 837.0,
+        "searched_fallback_decisions": 781.0,
+        "searched_fallback_teacher_accuracy": 1.0
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 4.0,
+        "accepted_improvement_rate": 0.041237113402061855,
+        "accepted_policy_top1_accuracy": 0.25,
+        "decisions": 4549.0,
+        "gated_policy_cross_entropy": 0.1042460804231999,
+        "non_search_decisions": 4452.0,
+        "non_search_teacher_accuracy": 0.9876460017969452,
+        "policy_accuracy": 0.9874697735766103,
+        "policy_loss": 0.1042460804231999,
+        "policy_target_top1_accuracy": 0.9870301165091229,
+        "q_mc_elements": 13647.0,
+        "q_mc_mae": 0.539788345120276,
+        "q_search_elements": 1089.0,
+        "q_search_mae": 0.511026508472877,
+        "searched_decisions": 97.0,
+        "searched_fallback_decisions": 93.0,
+        "searched_fallback_teacher_accuracy": 0.989247311827957
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 1,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 2,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 3,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 4,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 5,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 6,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 7,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 8,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 9,
+          "non_search": 837,
+          "searched": 837
+        },
+        {
+          "accepted_improvements": 56,
+          "decisions": 1674,
+          "epoch": 10,
+          "non_search": 837,
+          "searched": 837
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/diagnostic_policy_only.npz": {
+      "sha256": "4d7c2c55e1b85af661f686602747b723e9c9677121675fcfb18b6bf66cff7a1e",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 0.0,
+        "q_search": 0.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 775.0,
+        "accepted_improvement_rate": 0.18893222818137495,
+        "accepted_policy_top1_accuracy": 0.08,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.15418718973158546,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.9807138365417774,
+        "policy_accuracy": 0.9806249689502707,
+        "policy_loss": 0.15418718973158546,
+        "policy_target_top1_accuracy": 0.9779074966466292,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.7291558582852367,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.7311025725413767,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 3327.0,
+        "searched_fallback_teacher_accuracy": 0.9981965734896303
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 80.0,
+        "accepted_improvement_rate": 0.17777777777777778,
+        "accepted_policy_top1_accuracy": 0.0125,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.16176290411193794,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.9784383047444459,
+        "policy_accuracy": 0.9785968066435512,
+        "policy_loss": 0.16176290411193794,
+        "policy_target_top1_accuracy": 0.9757715851205,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.7311424846082227,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.7287953041600447,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 370.0,
+        "searched_fallback_teacher_accuracy": 0.9945945945945946
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/diagnostic_q_only.npz": {
+      "sha256": "74fb33b1e0c8017ddddb09f7586c01522ec9c9d4643fd6c8a1ffca9655e44f14",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 0.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 775.0,
+        "accepted_improvement_rate": 0.18893222818137495,
+        "accepted_policy_top1_accuracy": 0.12903225806451613,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.4481315258481135,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.8899527354605757,
+        "policy_accuracy": 0.889607034626658,
+        "policy_loss": 0.4481315258481135,
+        "policy_target_top1_accuracy": 0.8874211336877142,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.46773221414593663,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.41163403359137835,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 3327.0,
+        "searched_fallback_teacher_accuracy": 0.893297264803126
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 80.0,
+        "accepted_improvement_rate": 0.17777777777777778,
+        "accepted_policy_top1_accuracy": 0.1125,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.44696148896083737,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.8904019903103313,
+        "policy_accuracy": 0.8907581011086854,
+        "policy_loss": 0.44696148896083737,
+        "policy_target_top1_accuracy": 0.8885749753863277,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.523440796255917,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.4945095396250777,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 370.0,
+        "searched_fallback_teacher_accuracy": 0.9297297297297298
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/diagnostic_teacher_only_balanced.npz": {
+      "sha256": "cda28b554377b830dfd6033f91217b5da5d7d5e1fc53db16292a8177efaf3254",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 0.0,
+        "q_search": 0.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 3.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 0.0,
+        "accepted_improvement_rate": 0.0,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.07455959359296076,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.9889547031259509,
+        "policy_accuracy": 0.9891599185255104,
+        "policy_loss": 0.07455959359296076,
+        "policy_target_top1_accuracy": 0.9891599185255104,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.7293559378214465,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.7312785433506136,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 4102.0,
+        "searched_fallback_teacher_accuracy": 0.9990248659190639
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 0.0,
+        "accepted_improvement_rate": 0.0,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.0788917411812176,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.9881279734625289,
+        "policy_accuracy": 0.9882282436539531,
+        "policy_loss": 0.0788917411812176,
+        "policy_target_top1_accuracy": 0.9882282436539531,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.7313570104172729,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.7289768742256039,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 450.0,
+        "searched_fallback_teacher_accuracy": 0.9933333333333333
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 0,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/gate075.npz": {
+      "sha256": "fb944286555b0b253f7e3a09f2f1f3a424311da4b3e9fe69ad3a3aa01505592c",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_gate",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 775.0,
+        "accepted_improvement_rate": 0.18893222818137495,
+        "accepted_policy_top1_accuracy": 0.10580645161290322,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.15417442527741507,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.9798314299044567,
+        "policy_accuracy": 0.9796810571811814,
+        "policy_loss": 0.15417442527741507,
+        "policy_target_top1_accuracy": 0.976774802523722,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.4779342034329595,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.4545898214959575,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 3327.0,
+        "searched_fallback_teacher_accuracy": 0.998497144574692
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 80.0,
+        "accepted_improvement_rate": 0.17777777777777778,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.160302889646614,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.978787481995548,
+        "policy_accuracy": 0.9788964513505415,
+        "policy_loss": 0.160302889646614,
+        "policy_target_top1_accuracy": 0.9756431659603613,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.5238559258752931,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.48843317779848644,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 370.0,
+        "searched_fallback_teacher_accuracy": 0.9918918918918919
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/weighted075.npz": {
+      "sha256": "3b2d0f6c381cfc416caa94bb7b461cab4f25a9ec164f5db912539688bde0e07f",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 775.0,
+        "accepted_improvement_rate": 0.18893222818137495,
+        "accepted_policy_top1_accuracy": 0.07225806451612904,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.1581068479260073,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.9798111446944033,
+        "policy_accuracy": 0.9797804163147698,
+        "policy_loss": 0.1581068479260073,
+        "policy_target_top1_accuracy": 0.9769983605742958,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.47780422906013226,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.4545698306990287,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 3327.0,
+        "searched_fallback_teacher_accuracy": 0.998497144574692
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 80.0,
+        "accepted_improvement_rate": 0.17777777777777778,
+        "accepted_policy_top1_accuracy": 0.025,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.16497634455575444,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.978045480336956,
+        "policy_accuracy": 0.9780403236162836,
+        "policy_loss": 0.16497634455575444,
+        "policy_target_top1_accuracy": 0.9752579084799452,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.5241624393672224,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.48813385572964507,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 370.0,
+        "searched_fallback_teacher_accuracy": 0.9837837837837838
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/weighted075_smoke.npz": {
+      "sha256": "70785df583d4a722ac5d4cece3e150456d3d4cfddb3da8e8e3e0fd1567e84a1d",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_smoke",
+      "training_seed": 1701,
+      "training_epochs": 3,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.75,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 40493,
+        "searched": 374
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.01,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 61.0,
+        "accepted_improvement_rate": 0.16310160427807488,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 40867.0,
+        "gated_policy_cross_entropy": 0.13112951303165185,
+        "non_search_decisions": 40493.0,
+        "non_search_teacher_accuracy": 0.9872570567752451,
+        "policy_accuracy": 0.9873247363398341,
+        "policy_loss": 0.13112951303165185,
+        "policy_target_top1_accuracy": 0.9860033768076932,
+        "q_mc_elements": 122601.0,
+        "q_mc_mae": 0.46130529643964985,
+        "q_search_elements": 3540.0,
+        "q_search_mae": 0.43601619289928323,
+        "searched_decisions": 374.0,
+        "searched_fallback_decisions": 313.0,
+        "searched_fallback_teacher_accuracy": 1.0
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 8.0,
+        "accepted_improvement_rate": 0.18181818181818182,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 3529.0,
+        "gated_policy_cross_entropy": 0.1343779457577719,
+        "non_search_decisions": 3485.0,
+        "non_search_teacher_accuracy": 0.9865136298421808,
+        "policy_accuracy": 0.9863984131482006,
+        "policy_loss": 0.1343779457577719,
+        "policy_target_top1_accuracy": 0.984131482006234,
+        "q_mc_elements": 10587.0,
+        "q_mc_mae": 0.5710007424775004,
+        "q_search_elements": 441.0,
+        "q_search_mae": 0.5480256321312159,
+        "searched_decisions": 44.0,
+        "searched_fallback_decisions": 36.0,
+        "searched_fallback_teacher_accuracy": 0.9722222222222222
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 61,
+          "decisions": 748,
+          "epoch": 1,
+          "non_search": 374,
+          "searched": 374
+        },
+        {
+          "accepted_improvements": 61,
+          "decisions": 748,
+          "epoch": 2,
+          "non_search": 374,
+          "searched": 374
+        },
+        {
+          "accepted_improvements": 61,
+          "decisions": 748,
+          "epoch": 3,
+          "non_search": 374,
+          "searched": 374
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    },
+    "artifacts/experiments/paired_mc_pi_20260918/models/weighted090.npz": {
+      "sha256": "6de5b8bf7c781520b904b5feace3f9e45121a6c3ea39b650bd2025b03c7edb35",
+      "training_dataset": "artifacts/experiments/paired_mc_pi_20260918/data_medium_500",
+      "training_seed": 1701,
+      "training_epochs": 10,
+      "training_batch_decisions": 128,
+      "learning_rate": 0.001,
+      "loss_weights": {
+        "policy": 1.0,
+        "q_mc": 1.0,
+        "q_search": 1.0
+      },
+      "policy_target_mode": "advantage_weighted",
+      "improved_action_weight": 0.9,
+      "min_search_advantage": 0.0,
+      "training_sampling": "balanced_search",
+      "training_sampling_source_counts": {
+        "non_search": 197188,
+        "searched": 4102
+      },
+      "source_search_configuration": {
+        "adaptive_depth_2": true,
+        "continuation_controller": "ai_nn_rl_based_v1",
+        "hidden_state_sampling": "single_common_determinization",
+        "leaf_policy": "deterministic",
+        "max_boundary_actions": 128,
+        "max_search_nodes": 512,
+        "paired_mc_max_actions": 5000,
+        "search_depth": 1,
+        "search_fraction": 0.02,
+        "search_nodes_unit": "terminal_rollout_branches",
+        "target_method": "paired_mc"
+      },
+      "final_train_metrics": {
+        "accepted_improvement_decisions": 775.0,
+        "accepted_improvement_rate": 0.18893222818137495,
+        "accepted_policy_top1_accuracy": 0.10709677419354839,
+        "decisions": 201290.0,
+        "gated_policy_cross_entropy": 0.17351636019381372,
+        "non_search_decisions": 197188.0,
+        "non_search_teacher_accuracy": 0.9773617055804613,
+        "policy_accuracy": 0.9771623031447165,
+        "policy_loss": 0.17351636019381372,
+        "policy_target_top1_accuracy": 0.9743405037508073,
+        "q_mc_elements": 603870.0,
+        "q_mc_mae": 0.4785001282266627,
+        "q_search_elements": 42351.0,
+        "q_search_mae": 0.4563127466068321,
+        "searched_decisions": 4102.0,
+        "searched_fallback_decisions": 3327.0,
+        "searched_fallback_teacher_accuracy": 0.9972948602344455
+      },
+      "final_validation_metrics": {
+        "accepted_improvement_decisions": 80.0,
+        "accepted_improvement_rate": 0.17777777777777778,
+        "accepted_policy_top1_accuracy": 0.0,
+        "decisions": 23361.0,
+        "gated_policy_cross_entropy": 0.18047417659483056,
+        "non_search_decisions": 22911.0,
+        "non_search_teacher_accuracy": 0.9747282964514862,
+        "policy_accuracy": 0.9747870382261034,
+        "policy_loss": 0.18047417659483056,
+        "policy_target_top1_accuracy": 0.9714481400624974,
+        "q_mc_elements": 70083.0,
+        "q_mc_mae": 0.5244175915452918,
+        "q_search_elements": 4545.0,
+        "q_search_mae": 0.48902838052290404,
+        "searched_decisions": 450.0,
+        "searched_fallback_decisions": 370.0,
+        "searched_fallback_teacher_accuracy": 0.9783783783783784
+      },
+      "training_sampling_epoch_counts": [
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 1,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 2,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 3,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 4,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 5,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 6,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 7,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 8,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 9,
+          "non_search": 4102,
+          "searched": 4102
+        },
+        {
+          "accepted_improvements": 775,
+          "decisions": 8204,
+          "epoch": 10,
+          "non_search": 4102,
+          "searched": 4102
+        }
+      ],
+      "release_status": "current_best",
+      "training_iteration": 1
+    }
+  },
+  "labels": {
+    "paired_mc_pi_20260918/data_medium_500": {
+      "train": {
+        "counts": {
+          "rows": 201290,
+          "searched": 4102,
+          "accepted": 775,
+          "positive_target_actions": 1295,
+          "accepted_target_argmax_is_teacher": 94,
+          "accepted_target_teacher_at_least_joint_max": 108,
+          "accepted_with_duplicate_improved_features": 26
+        },
+        "by_type": {
+          "buy_resources": {
+            "accepted": 139
+          },
+          "auction_bid": {
+            "accepted": 350
+          },
+          "auction_start": {
+            "accepted": 96
+          },
+          "build_houses": {
+            "accepted": 65
+          },
+          "bureaucracy": {
+            "accepted": 73
+          },
+          "discard_power_plant": {
+            "accepted": 52
+          }
+        }
+      },
+      "validation": {
+        "counts": {
+          "rows": 23361,
+          "searched": 450,
+          "accepted": 80,
+          "positive_target_actions": 127,
+          "accepted_target_teacher_at_least_joint_max": 12,
+          "accepted_target_argmax_is_teacher": 9,
+          "accepted_with_duplicate_improved_features": 1
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 39
+          },
+          "bureaucracy": {
+            "accepted": 4
+          },
+          "auction_start": {
+            "accepted": 13
+          },
+          "buy_resources": {
+            "accepted": 10
+          },
+          "build_houses": {
+            "accepted": 7
+          },
+          "discard_power_plant": {
+            "accepted": 7
+          }
+        }
+      },
+      "test": {
+        "counts": {
+          "rows": 24928,
+          "searched": 471,
+          "accepted": 95,
+          "positive_target_actions": 183,
+          "accepted_with_duplicate_improved_features": 5,
+          "accepted_target_argmax_is_teacher": 17,
+          "accepted_target_teacher_at_least_joint_max": 18
+        },
+        "by_type": {
+          "build_houses": {
+            "accepted": 13
+          },
+          "auction_bid": {
+            "accepted": 37
+          },
+          "auction_start": {
+            "accepted": 16
+          },
+          "bureaucracy": {
+            "accepted": 9
+          },
+          "discard_power_plant": {
+            "accepted": 5
+          },
+          "buy_resources": {
+            "accepted": 15
+          }
+        }
+      }
+    },
+    "paired_mc_confirm_20260919/data_smoke_k0": {
+      "train": {
+        "counts": {
+          "rows": 40322,
+          "searched": 837,
+          "accepted": 144,
+          "positive_target_actions": 273,
+          "accepted_target_teacher_at_least_joint_max": 25,
+          "accepted_target_argmax_is_teacher": 22,
+          "accepted_with_duplicate_improved_features": 6
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 67
+          },
+          "bureaucracy": {
+            "accepted": 12
+          },
+          "buy_resources": {
+            "accepted": 23
+          },
+          "build_houses": {
+            "accepted": 21
+          },
+          "discard_power_plant": {
+            "accepted": 6
+          },
+          "auction_start": {
+            "accepted": 15
+          }
+        }
+      },
+      "validation": {
+        "counts": {
+          "rows": 4549,
+          "searched": 97,
+          "accepted": 19,
+          "positive_target_actions": 30,
+          "accepted_target_teacher_at_least_joint_max": 2,
+          "accepted_with_duplicate_improved_features": 2,
+          "accepted_target_argmax_is_teacher": 1
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 11
+          },
+          "build_houses": {
+            "accepted": 4
+          },
+          "discard_power_plant": {
+            "accepted": 1
+          },
+          "auction_start": {
+            "accepted": 1
+          },
+          "buy_resources": {
+            "accepted": 2
+          }
+        }
+      },
+      "test": {
+        "counts": {
+          "rows": 5445,
+          "searched": 96,
+          "accepted": 18,
+          "positive_target_actions": 36,
+          "accepted_target_teacher_at_least_joint_max": 4,
+          "accepted_target_argmax_is_teacher": 2
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 8
+          },
+          "buy_resources": {
+            "accepted": 4
+          },
+          "bureaucracy": {
+            "accepted": 2
+          },
+          "auction_start": {
+            "accepted": 2
+          },
+          "build_houses": {
+            "accepted": 2
+          }
+        }
+      }
+    },
+    "paired_mc_confirm_20260919/data_smoke_k8": {
+      "train": {
+        "counts": {
+          "rows": 40322,
+          "searched": 837,
+          "accepted": 56,
+          "positive_target_actions": 97,
+          "accepted_target_teacher_at_least_joint_max": 7,
+          "accepted_target_argmax_is_teacher": 5,
+          "accepted_with_duplicate_improved_features": 4
+        },
+        "by_type": {
+          "buy_resources": {
+            "accepted": 7
+          },
+          "auction_bid": {
+            "accepted": 26
+          },
+          "auction_start": {
+            "accepted": 7
+          },
+          "build_houses": {
+            "accepted": 11
+          },
+          "discard_power_plant": {
+            "accepted": 1
+          },
+          "bureaucracy": {
+            "accepted": 4
+          }
+        }
+      },
+      "validation": {
+        "counts": {
+          "rows": 4549,
+          "searched": 97,
+          "accepted": 4,
+          "positive_target_actions": 4
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 4
+          }
+        }
+      },
+      "test": {
+        "counts": {
+          "rows": 5445,
+          "searched": 96,
+          "accepted": 5,
+          "accepted_target_teacher_at_least_joint_max": 2,
+          "positive_target_actions": 14,
+          "accepted_target_argmax_is_teacher": 1
+        },
+        "by_type": {
+          "buy_resources": {
+            "accepted": 1
+          },
+          "bureaucracy": {
+            "accepted": 1
+          },
+          "auction_bid": {
+            "accepted": 2
+          },
+          "auction_start": {
+            "accepted": 1
+          }
+        }
+      }
+    },
+    "paired_mc_confirm_20260919/data_smoke_k16": {
+      "train": {
+        "counts": {
+          "rows": 40322,
+          "searched": 837,
+          "accepted": 64,
+          "positive_target_actions": 116,
+          "accepted_target_teacher_at_least_joint_max": 7,
+          "accepted_target_argmax_is_teacher": 5,
+          "accepted_with_duplicate_improved_features": 4
+        },
+        "by_type": {
+          "auction_bid": {
+            "accepted": 27
+          },
+          "buy_resources": {
+            "accepted": 9
+          },
+          "bureaucracy": {
+            "accepted": 6
+          },
+          "auction_start": {
+            "accepted": 9
+          },
+          "build_houses": {
+            "accepted": 12
+          },
+          "discard_power_plant": {
+            "accepted": 1
+          }
+        }
+      },
+      "validation": {
+        "counts": {
+          "rows": 4549,
+          "searched": 97,
+          "accepted": 6,
+          "positive_target_actions": 6
+        },
+        "by_type": {
+          "auction_start": {
+            "accepted": 1
+          },
+          "auction_bid": {
+            "accepted": 5
+          }
+        }
+      },
+      "test": {
+        "counts": {
+          "rows": 5445,
+          "searched": 96,
+          "accepted": 5,
+          "accepted_target_teacher_at_least_joint_max": 2,
+          "positive_target_actions": 14,
+          "accepted_target_argmax_is_teacher": 1
+        },
+        "by_type": {
+          "buy_resources": {
+            "accepted": 1
+          },
+          "bureaucracy": {
+            "accepted": 1
+          },
+          "auction_bid": {
+            "accepted": 2
+          },
+          "auction_start": {
+            "accepted": 1
+          }
+        }
+      }
+    }
+  },
+  "k16_validation_forward_audit": {
+    "totals": {
+      "decisions": 4549,
+      "incumbent_teacher_mismatches": 0,
+      "kl_old_new_sum": 294.6216828966032,
+      "hard_bc_ce_at_incumbent_sum": 607.2045371851104,
+      "accepted": 6,
+      "changed": 65,
+      "non_search": 4452,
+      "non_search_changed": 62,
+      "changed_on_accepted": 1,
+      "changed_to_confirmed_positive": 1,
+      "changed_q_disagrees": 39,
+      "changed_on_same_feature": 0
+    },
+    "by_type": {
+      "auction_start": {
+        "decisions": 300,
+        "changed": 16
+      },
+      "auction_bid": {
+        "decisions": 2506,
+        "changed": 18
+      },
+      "buy_resources": {
+        "decisions": 562,
+        "changed": 9
+      },
+      "build_houses": {
+        "decisions": 712,
+        "changed": 2
+      },
+      "bureaucracy": {
+        "decisions": 300,
+        "changed": 7
+      },
+      "discard_power_plant": {
+        "decisions": 169,
+        "changed": 13
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ import numpy as np
 
 from powergrid.ai import build_ai_controller
 from powergrid.ai.nn_rl_based.controller import NnRlBasedAiController
-from powergrid.ai.nn_rl_based.search import terminal_rank_values
+from powergrid.ai.nn_rl_based.search import rollout_terminal_values
 from powergrid.model import GameConfig, ModelValidationError, SeatConfig, legal_region_sets
 from powergrid.session import GameSession
 from powergrid.session_types import GuiIntent
@@ -230,21 +230,11 @@ def _rollout_terminal_values(
     *,
     max_actions: int,
 ) -> dict[str, float]:
-    rollout = root.fork()
-    result = rollout.submit_intent(first_intent, auto_advance=False)
-    _raise_last_error(result, "paired rollout first action")
-    for _ in range(max_actions):
-        snapshot = rollout.advance_until_blocked()
-        if snapshot.winner_result is not None:
-            return terminal_rank_values(snapshot)
-        request = snapshot.active_request
-        if request is None:
-            raise ModelValidationError("paired rollout stopped without a request")
-        intent = baseline_agents[request.player_id].choose_intent(request, snapshot)
-        result = rollout.submit_intent(intent, auto_advance=False)
-        _raise_last_error(result, "paired rollout continuation")
-    raise ModelValidationError(
-        f"paired rollout exceeded {max_actions} continuation actions"
+    return rollout_terminal_values(
+        root,
+        first_intent,
+        baseline_agents,
+        max_actions=max_actions,
     )
 
 

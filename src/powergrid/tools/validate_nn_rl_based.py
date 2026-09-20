@@ -572,7 +572,14 @@ def _dataset_model_metrics(
         "player_mask",
         "has_search_targets",
         "search_q_values",
+        "search_policy_advantages",
+        "search_policy_confirmed",
     )
+    available_columns = {
+        str(field["name"])
+        for field in load_rl_dataset_metadata(dataset)["parquet_schema"]
+    }
+    columns = tuple(column for column in columns if column in available_columns)
     decisions = policy_correct = searched_decisions = 0
     accepted_decisions = accepted_correct = 0
     fallback_decisions = fallback_correct = 0
@@ -632,6 +639,16 @@ def _dataset_model_metrics(
                 search_temperature=temperature,
                 improved_action_weight=improved_action_weight,
                 min_search_advantage=min_search_advantage,
+                search_policy_advantages=(
+                    np.asarray(row.get("search_policy_advantages", []), dtype=np.float32)
+                    if row.get("search_policy_advantages")
+                    else None
+                ),
+                search_policy_confirmed=(
+                    np.asarray(row.get("search_policy_confirmed", []), dtype=bool)
+                    if row.get("search_policy_confirmed")
+                    else None
+                ),
             )
             policy_cross_entropy -= float(
                 np.sum(target * np.log(np.clip(probabilities, 1e-7, 1.0)))

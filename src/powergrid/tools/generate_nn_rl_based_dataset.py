@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import argparse
 
-from powergrid.ai.nn_rl_based.dataset import RlDatasetProgress, generate_rl_dataset
+from powergrid.ai.nn_rl_based.dataset import (
+    TARGET_METHODS,
+    RlDatasetProgress,
+    generate_rl_dataset,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,6 +34,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--target-checkpoint")
+    parser.add_argument(
+        "--target-method",
+        choices=TARGET_METHODS,
+        default="semantic_search",
+        help="Use frozen-Q semantic search or full terminal paired-MC labels.",
+    )
     parser.add_argument("--search-fraction", type=float, default=0.0)
     parser.add_argument("--search-depth", type=int, default=1)
     parser.add_argument(
@@ -44,6 +54,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--search-policy-mix", type=float, default=0.5)
     parser.add_argument("--search-temperature", type=float, default=0.25)
+    parser.add_argument("--paired-mc-max-actions", type=int, default=5000)
+    parser.add_argument(
+        "--paired-mc-confirmation-rollouts",
+        type=int,
+        default=0,
+        help=(
+            "After one-rollout screening, re-evaluate only the incumbent and "
+            "screened actions on this many resampled hidden plant orders."
+        ),
+    )
+    parser.add_argument(
+        "--paired-mc-confirmation-confidence-z",
+        type=float,
+        default=1.645,
+        help="One-sided normal critical value for accepting a confirmed advantage.",
+    )
     parser.add_argument("--max-actions-per-game", type=int, default=5000)
     parser.add_argument("--target-shard-size-mib", type=int, default=512)
     parser.add_argument("--train-fraction", type=float, default=0.8)
@@ -85,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         selected_regions=regions,
         region_sets=region_sets,
         target_checkpoint=args.target_checkpoint,
+        target_method=args.target_method,
         search_fraction=args.search_fraction,
         search_depth=args.search_depth,
         adaptive_depth_2=args.adaptive_depth_2,
@@ -93,6 +120,11 @@ def main(argv: list[str] | None = None) -> int:
         leaf_policy=args.leaf_policy,
         search_policy_mix=args.search_policy_mix,
         search_temperature=args.search_temperature,
+        paired_mc_max_actions=args.paired_mc_max_actions,
+        paired_mc_confirmation_rollouts=args.paired_mc_confirmation_rollouts,
+        paired_mc_confirmation_confidence_z=(
+            args.paired_mc_confirmation_confidence_z
+        ),
         max_actions_per_game=args.max_actions_per_game,
         target_shard_size_bytes=args.target_shard_size_mib * 1024 * 1024,
         split_fractions=(

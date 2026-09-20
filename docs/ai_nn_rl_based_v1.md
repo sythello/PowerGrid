@@ -6,9 +6,11 @@
 > `ai_nn_rl_based_v1` checkpoint uses schema v2. Measurements explicitly marked as
 > schema v1 below are retained as historical records.
 
-`ai_nn_rl_based_v1` 是 Power Grid 的第一版离线 RL / 搜索蒸馏 AI。当前默认模型使用
+`ai_nn_rl_based_v1` 是 Power Grid 的第一版离线 RL / 策略迭代 AI。当前默认模型使用
 schema-v2 的公开 520 维状态特征、52 维动作特征和候选动作生成器，并用一个
 listwise Policy head 和一个多玩家 vector-Q head 替代 behavior-only rank-value 打分。
+训练端同时保留 frozen-Q 语义搜索，并支持以冻结 checkpoint 自博弈轨迹为状态分布、
+以同一隐藏牌堆上的全动作 paired terminal Monte Carlo 为改进标签。
 
 每个原始特征的类型与中文含义见
 [`ai_nn_rank_value_v1_feature_dictionary.md`](ai_nn_rank_value_v1_feature_dictionary.md)；
@@ -58,15 +60,19 @@ loss = policy_loss + q_mc_loss + q_search_loss
 
 - `policy_loss`：每个 decision 等权的 listwise cross entropy。
 - `q_mc_loss`：实际 behavior action 对所有玩家的终局 rank vector Huber loss。
-- `q_search_loss`：搜索状态全部候选、全部玩家的 frozen-Q 搜索 label Huber loss。
+- `q_search_loss`：抽样状态全部候选、全部玩家的 frozen-Q 语义搜索或 paired terminal
+  Monte Carlo label Huber loss；具体语义由 dataset manifest 的 `target_method` 指定。
 - 非搜索状态 Policy target 为 deterministic one-hot。
 - `legacy_soft_mix` 搜索 target 为
   `0.5 * teacher + 0.5 * softmax(search_actor_q / 0.25)`，仅用于复现早期实验。
 - Stage-1 推荐 `advantage_gate`：没有足够优势时使用 teacher one-hot；存在可表示且
   `search_actor_q(best) - search_actor_q(teacher) > delta` 的新动作时，target 为
   `0.25 * teacher + 0.75 * best-action-one-hot`。
+- Paired-MC 迭代推荐 `advantage_weighted`：保留 `1 - improved_action_weight` 的
+  behavior anchor，把其余概率按正优势的 softmax 分给所有通过 margin 的可表示动作；
+  没有动作通过时仍为 behavior one-hot。
 
-## `E_pi(Q)` 与语义搜索
+## `E_pi(Q)`、语义搜索与 Paired-MC
 
 本模型不训练独立 V：
 
@@ -96,6 +102,36 @@ teacher action 的 Q。后续迭代可改为 checkpoint Policy。对手节点按
 determinization；模型 observation 仍不包含牌序或 seed。它是一个有方差的环境样本，
 不是在线可见信息。
 
+### Paired-MC Policy Iteration
+
+`--target-method paired_mc` 不用当前 Q 网络自举标签。在每个被确定性抽样的真实轨迹
+root 上，它枚举全部合法候选；每个候选都从同一个 `GameSession` fork 执行首动作，
+再由冻结 continuation policy 推进到终局，最终排名向量直接写入
+`search_q_values[][6]`。Sibling 分支共享 root 的完整隐藏牌序，因此动作间比较使用
+common random numbers；不同 root 仍提供不同 seed 和牌序样本。
+
+Paired-MC 支持 `ai_deterministic` 和 `ai_nn_rl_based_v1` 作为 behavior/continuation。
+使用后者时，`--target-checkpoint` 同时提供冻结的轨迹策略和续局策略；生成过程中不
+更新模型。若 behavior 与 continuation 相同，同一组无状态 controller 实例会复用。
+实际数据轨迹继续执行 behavior action，候选 fork 不修改 root session。
+
+默认标签是“每个候选一个终局样本”。设置
+`--paired-mc-confirmation-rollouts K`（K 为 0 或至少 2）后改为两阶段：先用当前隐藏
+牌序对全部动作做一次筛选；只有单次 actor rank 优于 behavior/teacher 的动作进入确认。
+确认阶段生成 K 个新的隐藏电厂牌序，每个牌序只 rollout teacher 和入围动作，原始筛选
+样本不进入均值，避免 post-selection bias。只有配对 advantage 的
+`mean - z * standard_error > 0` 才写入可用 Policy 改进标签；z 由
+`--paired-mc-confirmation-confidence-z` 控制，默认 1.645（单侧 95% 正态近似）。
+
+确认阶段只重排当前 state 中尚未公开的 draw/bottom stack，保持公开 observation、候选
+动作和 continuation policy 不变。它消除了主要的隐藏顺序 hindsight，但仍条件于本局
+未公开卡牌的组成，并不是完整 information-set posterior sampler。
+
+manifest 用
+`target_method=paired_mc`、`search_nodes_unit=terminal_rollout_branches` 标明语义；
+行内 `search_depth_used=1` 表示一次完整终局 rollout 层，不代表原语义搜索深度。
+`--paired-mc-max-actions` 是单个候选分支的安全上限。
+
 ## 数据格式
 
 格式名：`powergrid.nn_rl_based.parquet`，version 1。每个 decision 一行：
@@ -111,6 +147,7 @@ teacher_action_index
 terminal_rank_values[6]
 has_search_targets
 search_q_values[][6]
+search_policy_advantages[] / search_policy_confirmed[]
 search_depth_used / search_nodes_evaluated / depth_2_completed
 ```
 
@@ -168,6 +205,40 @@ PYTHONPATH=src .venv/bin/python -m powergrid.tools.train_nn_rl_based \
   --search-policy-mix 0.5 --search-temperature 0.25
 ```
 
+基于当前冻结 Policy 的 Paired-MC 迭代（先写候选路径，不覆盖默认 checkpoint）：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m powergrid.tools.generate_nn_rl_based_dataset \
+  --output artifacts/datasets/nn_rl_paired_mc_1 \
+  --games 5000 --seed-start 40001 \
+  --target-method paired_mc \
+  --behavior-controller ai_nn_rl_based_v1 \
+  --continuation-controller ai_nn_rl_based_v1 \
+  --target-checkpoint src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz \
+  --search-fraction 0.02 --paired-mc-max-actions 5000 \
+  --paired-mc-confirmation-rollouts 8 \
+  --paired-mc-confirmation-confidence-z 1.645 --workers 4
+
+PYTHONPATH=src .venv/bin/python -m powergrid.tools.train_nn_rl_based \
+  --dataset artifacts/datasets/nn_rl_paired_mc_1 \
+  --init-checkpoint src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz \
+  --output artifacts/models/ai_nn_rl_based_v1_paired_mc_1.npz \
+  --epochs 20 --batch-decisions 128 --learning-rate 0.001 \
+  --policy-weight 1 --q-mc-weight 1 --q-search-weight 1 \
+  --policy-target-mode advantage_weighted \
+  --search-temperature 0.25 --improved-action-weight 0.75 \
+  --min-search-advantage 0.0 \
+  --training-sampling balanced_search
+```
+
+建议先用较少游戏和 `--search-fraction 0.01`–`0.02` 做成本/接受率 smoke，再扩大数据。
+`balanced_search` 要求 train split 的 non-search 行不少于 searched 行。Paired-MC 的
+确认模式下，原始 `search_q_values` 仍保留完整单次 rollout 向量用于 Q 诊断；Policy
+target 只使用通过置信门槛的 `search_policy_advantages/search_policy_confirmed`。
+终局 rank 优势是离散的；`search_temperature` 控制多个正优势动作之间的质量权重，
+`improved_action_weight` 控制偏离冻结 behavior 的总强度。旧 semantic-search 流程仍是
+默认值，既有命令和 Parquet version 1 数据保持兼容。
+
 保守 Stage-1 Policy improvement 复用同一 search 数据和 Stage-0 checkpoint，不改变
 Parquet schema。每个 epoch 保留全部 searched rows，并确定性抽取等量 non-search
 BC anchor；validation/test 仍按自然分布评估。分别用 `--min-search-advantage` 的
@@ -186,10 +257,12 @@ PYTHONPATH=src .venv/bin/python -m powergrid.tools.train_nn_rl_based \
   --training-sampling balanced_search
 ```
 
-在 `advantage_gate` 下，搜索 label 的 actor slot 0 决定候选优势。与 teacher 的动作
-action feature 完全相同的候选不可由当前网络区分，不允许触发 target 切换。相同最高
-Q 按候选顺序稳定选择。checkpoint 记录 target/sampling 配置、源 searched/non-search
-行数，以及每个 epoch 实际训练和 accepted improvement 数量。
+在 `advantage_gate` 和 `advantage_weighted` 下，搜索 label 的 actor slot 0 决定候选
+优势。与 behavior/teacher 的 action feature 完全相同的候选不可由当前网络区分，不
+允许触发 target 切换。Gate 对相同最高 Q 按候选顺序稳定选择；weighted 模式用同一
+稳定顺序报告最佳动作，但把目标质量分配给全部通过 margin 的候选。checkpoint 记录
+target/sampling 配置、源 searched/non-search 行数、dataset target method，以及每个
+epoch 实际训练和 accepted improvement 数量。
 
 新增验证指标：`accepted_improvement_rate`、`accepted_policy_top1_accuracy`、
 `searched_fallback_teacher_accuracy`、`non_search_teacher_accuracy` 和
@@ -220,13 +293,33 @@ PYTHONPATH=src POWERGRID_NN_RL_BASED_CHECKPOINT=src/powergrid/data/ai_models/ai_
   .venv/bin/python -m powergrid.tools.evaluate_ai_ratings \
   --controllers ai_nn_rl_based_v1 ai_deterministic \
   --players 3 --games-per-lineup 200 --seed-start 50001
+
+# 正式候选与当前 checkpoint 的直接晋级赛：400 seeds × 6 lineups = 2400 games。
+PYTHONPATH=src .venv/bin/python -m powergrid.tools.evaluate_nn_rl_checkpoint_duel \
+  --candidate artifacts/models/ai_nn_rl_based_v1_candidate.npz \
+  --incumbent src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz \
+  --seeds 400 --seed-start 400001 \
+  --bootstrap-samples 5000 --bootstrap-seed 9301 \
+  --output artifacts/validation/ai_nn_rl_checkpoint_duel.json
 ```
 
 通用 Elo 工具默认根据 game seed 从德国 3 人局的全部合法连续区域组合中可复现地
 随机采样；相同 seed 的两种换座 lineup 使用同一区域组合。用 `--regions` 可显式
 固定一组区域，或用 `--region-sampling-seed` 改变区域调度。
 
+Checkpoint duel 对每个 seed 固定相同区域与初始随机源，并运行
+`candidate/candidate/incumbent` 和 `candidate/incumbent/incumbent` 两种人数构成的全部
+六个座位排列。每局统计所有 candidate-incumbent 玩家对，平局计 0.5；95% CI 按
+seed 聚类 bootstrap，一个样本 seed 始终保留其全部六局。报告同时给出总体、两种
+人数构成、六个排列和区域分层结果。`promote_candidate=true` 要求总体 score 大于
+0.50、95% CI 下界严格大于 0.50，且两种人数构成的点估计均不低于 0.50。
+
 ## 发布验收门槛
+
+准备替换当前默认 checkpoint 的新候选必须先通过 checkpoint duel。相对
+deterministic 的 paired rollout 和多策略 suite 用于验证机制及外部泛化，但不能代替
+候选与当前版本的直接比较。Teacher/non-search action agreement、Q MAE 和 target CE
+保留为训练诊断，不应覆盖显著的端到端收益证据。
 
 `validate_nn_rl_based --section training` 会在 game-exclusive validation/test 上流式
 计算以下指标；`--enforce-acceptance` 使任一失败返回非零状态：

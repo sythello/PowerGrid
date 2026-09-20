@@ -20,6 +20,8 @@ TRAINING_COLUMNS = (
     "player_mask",
     "has_search_targets",
     "search_q_values",
+    "search_policy_advantages",
+    "search_policy_confirmed",
 )
 TRAINING_SAMPLING_MODES = ("all", "balanced_search")
 
@@ -150,6 +152,8 @@ def train_rl_model(
                 arrays["player_masks"],
                 arrays["searched"],
                 arrays["search_q"],
+                arrays["search_policy_advantages"],
+                arrays["search_policy_confirmed"],
                 learning_rate=learning_rate,
                 policy_weight=policy_weight,
                 q_mc_weight=q_mc_weight,
@@ -223,6 +227,9 @@ def train_rl_model(
             "target_checkpoint_sha256": metadata["generation"].get(
                 "target_checkpoint_sha256", ""
             ),
+            "init_checkpoint_sha256": (
+                sha256_file(init_checkpoint) if init_checkpoint is not None else ""
+            ),
             "training_iteration": 1 if init_checkpoint is not None else 0,
             "training_seed": seed,
             "training_epochs": epochs,
@@ -255,12 +262,22 @@ def train_rl_model(
                     "leaf_policy",
                     "continuation_controller",
                     "hidden_state_sampling",
+                    "target_method",
+                    "paired_mc_max_actions",
+                    "paired_mc_confirmation_rollouts",
+                    "paired_mc_confirmation_confidence_z",
+                    "search_nodes_unit",
+                    "hidden_state_sampling",
                 )
             },
             "label_definition": {
                 "rank": "(player_count + 1 - 2 * final_place) / (player_count - 1)",
                 "q_mc": "terminal rank vector for the behavior action",
-                "q_search": "full-action frozen-Q semantic-search target",
+                "q_search": (
+                    "full-action paired terminal Monte Carlo target"
+                    if metadata["generation"].get("target_method") == "paired_mc"
+                    else "full-action frozen-Q semantic-search target"
+                ),
                 "discount": 1.0,
             },
             "split_decisions": split_counts,
@@ -295,6 +312,7 @@ def _iter_array_batches(
 ) -> Iterator[dict[str, np.ndarray]]:
     if training_sampling not in TRAINING_SAMPLING_MODES:
         raise ValueError("unsupported training sampling mode")
+    columns = _available_training_columns(root)
     if training_sampling == "balanced_search":
         if split != "train":
             raise ValueError("balanced_search may only be used for the training split")
@@ -309,6 +327,7 @@ def _iter_array_batches(
             shuffle_seed=shuffle_seed,
             searched_count=searched_count,
             non_search_count=non_search_count,
+            columns=columns,
         )
         return
     for batch in iter_rl_parquet_batches(
@@ -316,7 +335,7 @@ def _iter_array_batches(
         split,
         batch_size=batch_decisions,
         shuffle_seed=shuffle_seed,
-        columns=TRAINING_COLUMNS,
+        columns=columns,
     ):
         rows = batch.to_pylist()
         if not rows:
@@ -332,6 +351,7 @@ def _iter_balanced_search_batches(
     shuffle_seed: int | None,
     searched_count: int,
     non_search_count: int,
+    columns: tuple[str, ...],
 ) -> Iterator[dict[str, np.ndarray]]:
     if searched_count <= 0 or non_search_count < searched_count:
         raise ValueError("balanced_search source counts are invalid")
@@ -358,10 +378,10 @@ def _iter_balanced_search_batches(
         split,
         batch_size=source_batch_size,
         shuffle_seed=shuffle_seed,
-        columns=TRAINING_COLUMNS,
+        columns=columns,
     ):
         search_flags = np.asarray(
-            batch.column(TRAINING_COLUMNS.index("has_search_targets")).to_numpy(
+            batch.column(columns.index("has_search_targets")).to_numpy(
                 zero_copy_only=False
             ),
             dtype=bool,
@@ -404,6 +424,8 @@ def _iter_balanced_search_batches(
 def _rows_to_arrays(rows: list[dict[str, Any]]) -> dict[str, np.ndarray]:
     actions: list[list[float]] = []
     search_q: list[list[float]] = []
+    search_policy_advantages: list[float] = []
+    search_policy_confirmed: list[bool] = []
     offsets = [0]
     for row in rows:
         candidate_actions = row["candidate_action_features"]
@@ -415,6 +437,22 @@ def _rows_to_arrays(rows: list[dict[str, Any]]) -> dict[str, np.ndarray]:
             search_q.extend(row["search_q_values"])
         else:
             search_q.extend([[0.0] * 6 for _ in candidate_actions])
+        advantages = row.get("search_policy_advantages", [])
+        confirmed = row.get("search_policy_confirmed", [])
+        if advantages or confirmed:
+            if len(advantages) != len(candidate_actions) or len(confirmed) != len(
+                candidate_actions
+            ):
+                raise ValueError(
+                    "confirmed policy labels do not align with candidate actions"
+                )
+            search_policy_advantages.extend(advantages)
+            search_policy_confirmed.extend(confirmed)
+        else:
+            search_policy_advantages.extend(
+                [float("nan")] * len(candidate_actions)
+            )
+            search_policy_confirmed.extend([False] * len(candidate_actions))
     return {
         "states": np.asarray([row["state_features"] for row in rows], dtype=np.float32),
         "actions": np.asarray(actions, dtype=np.float32),
@@ -430,7 +468,19 @@ def _rows_to_arrays(rows: list[dict[str, Any]]) -> dict[str, np.ndarray]:
             [row["has_search_targets"] for row in rows], dtype=bool
         ),
         "search_q": np.asarray(search_q, dtype=np.float32),
+        "search_policy_advantages": np.asarray(
+            search_policy_advantages, dtype=np.float32
+        ),
+        "search_policy_confirmed": np.asarray(
+            search_policy_confirmed, dtype=bool
+        ),
     }
+
+
+def _available_training_columns(root: Path) -> tuple[str, ...]:
+    manifest = load_rl_dataset_metadata(root)
+    available = {str(field["name"]) for field in manifest["parquet_schema"]}
+    return tuple(column for column in TRAINING_COLUMNS if column in available)
 
 
 def _count_search_rows(root: Path, split: str) -> tuple[int, int]:
@@ -527,6 +577,8 @@ def _evaluate_split(
             arrays["player_masks"],
             arrays["searched"],
             arrays["search_q"],
+            arrays["search_policy_advantages"],
+            arrays["search_policy_confirmed"],
             policy_target_mode=policy_target_mode,
             search_policy_mix=search_policy_mix,
             search_temperature=search_temperature,
