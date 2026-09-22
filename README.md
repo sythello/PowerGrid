@@ -83,8 +83,19 @@ arrow-key adjustment, and writes confirmed changes to
 `src/powergrid/web/static/data/web_layouts.json`; canceling leaves the file unchanged.
 For Germany with 3 players, Web GUI AI seats default to `NN RL V1 (v 2.01)` (the
 current schema-v2, release-01 `ai_nn_rl_based_v1` checkpoint); incompatible maps
-or player counts fall back to `ai_deterministic`. The heuristic controller is not
-shown in the Web GUI picker.
+or player counts fall back to `ai_deterministic`. The Web and Tkinter pickers also
+offer **经验启发式v1** (`ai_humanexp_heuristics_v1`), implementing the human-experience
+auction, resource, construction, and generation rules for 3–6 players. The older
+`ai_heuristics` controller is not shown in the Web GUI picker.
+
+Run the new controller from the command line:
+
+```bash
+PYTHONPATH=src python -m powergrid.tools.run_ai_game --controllers ai_humanexp_heuristics_v1
+```
+
+See [the implementation conventions](docs/ai_humanexp_heuristics_v1.md) for the
+interpretations used where the original strategy leaves details unspecified.
 
 ### 2. Play a full game in the Tkinter GUI
 
@@ -107,6 +118,7 @@ GUI launcher behavior:
 - choose each seat as `human` or `ai`
 - when a seat is `ai`, choose an AI version:
     - `ai_heuristics`: stronger rule-based AI
+    - `经验启发式v1` (`ai_humanexp_heuristics_v1`): human-experience rules
     - `ai_deterministic`: simpler, more predictable baseline AI
     - `ai_deterministic_efficiency`: no-search plant/fuel-efficiency data policy
     - `ai_deterministic_expansion`: no-search output/network-growth data policy
@@ -218,6 +230,8 @@ Seat controller names:
 - `human`
 - `ai_deterministic`
 - `ai_heuristics`
+- `ai_humanexp_heuristics_v1`
+  - human-experience rules, displayed as `经验启发式v1`; seeded per-game price ranges
 - `ai_deterministic_efficiency`
 - `ai_deterministic_expansion`
 - `ai_deterministic_reserve`

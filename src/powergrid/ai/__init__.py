@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..model import ModelValidationError
 from .base import BaseAiController
 from .deterministic import DeterministicAiController
+from .humanexp import HumanExpHeuristicsAiController, DISPLAY_LABEL as HUMANEXP_DISPLAY_LABEL
 from .evaluation import (
     AiControllerPairSummary,
     AiControllerRatingSummary,
@@ -28,6 +29,7 @@ from .strategic import StrategicAiController
 DeterministicAiSeat = DeterministicAiController
 
 AI_CONTROLLER_REGISTRY: dict[str, type[BaseAiController]] = {
+    "ai_humanexp_heuristics_v1": HumanExpHeuristicsAiController,
     "ai_nn_rl_based_v1": NnRlBasedAiController,
     "ai_nn_rank_value_v1": NnRankValueAiController,
     "ai_heuristics": StrategicAiController,
@@ -37,6 +39,8 @@ AI_CONTROLLER_REGISTRY: dict[str, type[BaseAiController]] = {
     "ai_deterministic": DeterministicAiController,
     "ai": DeterministicAiController,
 }
+
+AI_CONTROLLER_LABELS = {"ai_humanexp_heuristics_v1": HUMANEXP_DISPLAY_LABEL}
 
 
 def register_ai_controller(controller_name: str, controller_class: type[BaseAiController]) -> None:
@@ -56,6 +60,7 @@ def build_ai_controller(controller_name: str) -> BaseAiController:
 
 __all__ = [
     "AI_CONTROLLER_REGISTRY",
+    "AI_CONTROLLER_LABELS",
     "AiControllerPairSummary",
     "AiControllerRatingSummary",
     "AiEvaluationBucketConfig",
@@ -68,6 +73,7 @@ __all__ = [
     "DeterministicAiSeat",
     "EfficiencyDeterministicAiController",
     "ExpansionDeterministicAiController",
+    "HumanExpHeuristicsAiController",
     "NnRankValueAiController",
     "NnRlBasedAiController",
     "ReserveDeterministicAiController",

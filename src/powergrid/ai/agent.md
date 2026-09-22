@@ -35,6 +35,7 @@ The AI layer is intentionally small at the public seam:
   - Abstract seat agent interface.
   - Every AI must implement `choose_intent(request, snapshot) -> GuiIntent`.
 - Registry in [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py)
+  - `ai_humanexp_heuristics_v1` -> `HumanExpHeuristicsAiController`
   - `ai_nn_rl_based_v1` -> `NnRlBasedAiController`
   - `ai_nn_rank_value_v1` -> `NnRankValueAiController`
   - `ai_heuristics` -> `StrategicAiController`
@@ -62,6 +63,7 @@ This means the core contract is:
 - [deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/deterministic.py): simple baseline AI
 - [profiled_deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/profiled_deterministic.py): three no-lookahead, strength-calibrated data-generation policies
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
+- [humanexp.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/humanexp.py): human-experience rules, with `经验启发式v1` labels in both UIs
 - [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value): public observation, candidates, dataset generation, NumPy MLP/training, and neural controller
 - [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based): listwise Policy/vector-Q model, full-action semantic search and paired terminal Monte Carlo labels, decision-grouped dataset/training, and Policy-only controller
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
@@ -127,6 +129,9 @@ Recommended usage inside controllers:
 
 Current shipped AIs:
 
+- human-experience controllers emit `humanexp_heuristics_decision`, including
+  sampled bid caps, opening-card probabilities, economic projections, resource
+  baskets/build reserves, and contested-city adjustments
 - deterministic controllers emit one compact structured AI decision log entry per chosen intent
 - profiled deterministic controllers emit `profiled_deterministic_decision` entries
   with controller/profile angle and the chosen intent
@@ -145,6 +150,45 @@ Current shipped AIs:
   - includes checkpoint/player-slot metadata, Policy probabilities, actor Q, all-player Q vectors, and selection
 
 ## Current Controller Behavior
+
+### `HumanExpHeuristicsAiController`
+
+- Controller id: `ai_humanexp_heuristics_v1`; UI label: `经验启发式v1`.
+- Implements `docs/ai_humanexp_instructions.txt`; explicit conventions and edge
+  cases are recorded in `docs/ai_humanexp_heuristics_v1.md`.
+- Opening auctions use the numbered preference table and game/seat/plant-seeded
+  integer price ranges. Near the cap, unseen plug cards are weighted uniformly;
+  only the public top-card back is read from the draw stack.
+  Every buyer, including the sole remaining buyer, filters nominations by its
+  psychological cap. If none qualify, nominate the cheapest legal opening price
+  (including discounts) to satisfy the mandatory first-round purchase.
+- Later auctions forecast resources and construction, filter upgrades, classify
+  terminal plants, and preserve the required city budget when deriving bid caps.
+  The controller records its first three terminal plants in recognition order;
+  historical P1/P2 survive discards. After three, a candidate must exceed the
+  lowest current plant output and satisfy C_i >= P+1, including discounted plants.
+  These two conditions replace the earlier capacity/upgrade/discount-ratio gates.
+  Existing plants are recognized immediately when a new acquisition lowers the
+  next threshold, including before mandatory discards; acquisition order breaks
+  ties among simultaneously qualifying plants.
+  Hypothetical portfolios never enter this history. Midgame scenarios without
+  controller history initialize from the available owned-plant order only.
+- Resource buying enumerates plant subsets and all aggregate hybrid fuel splits,
+  maximizes income minus fuel cost, then stockpiles positive resource deficits.
+  A complete basket is cached across the session's fixed resource-type sequence;
+  the selected construction budget is reserved before stockpiling.
+- Construction applies additive opponent-city discounts and obeys capacity,
+  except when the current first player can retain first place next round.
+- Generation reuses the deterministic exhaustive legal generator; discard and
+  purchase forecasts both replace the lowest-numbered existing plant until three
+  terminals have been recognized. Thereafter they replace the lowest-output
+  existing plant, breaking ties by number, and reuse model helpers. The rule for
+  a purchase is fixed from the history before that purchase.
+- Does not mutate the input state or use hidden card identities/order. Default
+  controller aliases and UI defaults remain unchanged.
+- Validate with `PYTHONPATH=src python -m unittest tests.test_humanexp_ai -q`;
+  this covers the price table, boundaries, economy/storage rules, registration,
+  UI label mapping, and full 3–6-player games on Germany and USA.
 
 ### `DeterministicAiController`
 

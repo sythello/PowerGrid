@@ -5,6 +5,7 @@ import math
 import tkinter as tk
 from tkinter import ttk
 
+from ..ai import AI_CONTROLLER_LABELS
 from ..session import GameSnapshot
 from .board_view import PLAYER_COLOR_MAP, draw_power_plant_card
 
@@ -126,7 +127,7 @@ class PlayerRail(SnapshotRenderable):
 
         tk.Label(
             card,
-            text=f"{player.player_id} [{player.controller}]",
+            text=f"{player.player_id} [{AI_CONTROLLER_LABELS.get(player.controller, player.controller)}]",
             bg="#fffaf0",
             fg="#475569",
             font=("Helvetica", 9),

@@ -21,7 +21,8 @@ class PowerGridWebControllerTests(unittest.TestCase):
         metadata = self.controller.metadata()
         controller_ids = [controller["id"] for controller in metadata["controllers"]]
 
-        self.assertEqual(controller_ids, ["human", "ai_nn_rl_v1", "ai_deterministic"])
+        self.assertEqual(controller_ids, ["human", "ai_nn_rl_v1", "ai_deterministic", "ai_humanexp_heuristics_v1"])
+        self.assertEqual(metadata["controllers"][3]["name"], "经验启发式v1")
         self.assertNotIn("ai_heuristics", controller_ids)
         self.assertEqual(metadata["defaults"]["ai_controller"], "ai_nn_rl_v1")
         self.assertEqual(

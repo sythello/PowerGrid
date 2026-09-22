@@ -107,6 +107,10 @@ The most important architectural boundary is:
   - three fast, no-lookahead behavior policies for diverse dataset generation
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py)
   - stronger heuristic AI
+- [humanexp.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/humanexp.py)
+  - `ai_humanexp_heuristics_v1`, shown as `经验启发式v1` in Web/Tkinter
+  - public-information opening probabilities, seeded bid caps, economy forecasts,
+    resource subset enumeration, contested-city priority, and maximum generation
 - [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value)
   - public observation and candidate encoding
   - terminal-label dataset/counterfactual rollout generation
@@ -204,6 +208,7 @@ Current controller names:
 - `human`
 - `ai_deterministic`
 - `ai_heuristics`
+- `ai_humanexp_heuristics_v1`
 - `ai_deterministic_efficiency`
 - `ai_deterministic_expansion`
 - `ai_deterministic_reserve`
@@ -216,6 +221,8 @@ Current meanings:
 - generic alias `ai` resolves to `ai_deterministic`
 - helper-generated AI seats from `make_default_seat_configs(..., ai_players=...)` use `ai_deterministic`
 - the GUI AI picker defaults to `ai_heuristics`
+- the new human-experience option is selectable in both UIs without changing defaults;
+  its conventions are documented in `docs/ai_humanexp_heuristics_v1.md`
 
 If any of these change, update both docs and tests.
 
@@ -311,6 +318,7 @@ Start with:
 Validate with:
 
 - [tests/test_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai.py)
+- [tests/test_humanexp_ai.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_humanexp_ai.py)
 - [tests/test_nn_rank_value.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_nn_rank_value.py)
 - [tests/test_ai_evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_ai_evaluation.py)
 - [tests/test_session.py](/Users/mac/Desktop/syt/Projects/PowerGrid/tests/test_session.py) if logging or session coupling changes

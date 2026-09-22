@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from powergrid.ai import DeterministicAiController
+from powergrid.ai import DeterministicAiController, HumanExpHeuristicsAiController
 from powergrid.gui import create_root
 from powergrid.gui.app import PowerGridApp
 from powergrid.model import GameConfig, SeatConfig
@@ -100,7 +100,16 @@ class PowerGridGuiTests(unittest.TestCase):
         values = tuple(app.launcher.ai_version_boxes[0].cget("values"))
         self.assertEqual(app.launcher.ai_version_vars[0].get(), "ai_heuristics")
         self.assertEqual(values[:2], ("ai_heuristics", "ai_deterministic"))
+        self.assertIn("经验启发式v1", values)
         self.assertNotIn("ai", values)
+
+    def test_launcher_can_start_human_experience_ai_by_display_label(self) -> None:
+        app = PowerGridApp(self.root)
+        app.pack(fill="both", expand=True)
+        app.launcher.seat_type_vars[0].set("ai")
+        app.launcher.ai_version_vars[0].set("经验启发式v1")
+        app.launcher._start_new_game()
+        self.assertIsInstance(app.session._seat_agents["p1"], HumanExpHeuristicsAiController)
 
     def test_gui_ai_actions_are_not_auto_played_synchronously(self) -> None:
         app = PowerGridApp(self.root)

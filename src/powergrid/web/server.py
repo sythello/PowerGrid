@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from ..ai import AI_CONTROLLER_REGISTRY
+from ..ai import AI_CONTROLLER_LABELS, AI_CONTROLLER_REGISTRY
 from ..ai.nn_rl_based.controller import DISPLAY_LABEL as NN_RL_DISPLAY_LABEL
 from ..board_layout import load_board_layout
 from ..model import GameConfig, GameState, ModelValidationError, SeatConfig, apply_builds
@@ -69,6 +69,7 @@ class PowerGridWebController:
                     "supported_player_counts": [3],
                 },
                 {"id": "ai_deterministic", "name": "确定性 AI"},
+                {"id": "ai_humanexp_heuristics_v1", "name": AI_CONTROLLER_LABELS["ai_humanexp_heuristics_v1"]},
             ],
             "defaults": {
                 "map_id": "germany",

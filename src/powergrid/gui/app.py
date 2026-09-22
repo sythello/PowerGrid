@@ -3,7 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from ..ai import AI_CONTROLLER_REGISTRY
+from ..ai import AI_CONTROLLER_LABELS, AI_CONTROLLER_REGISTRY
 from ..model import GameConfig, SeatConfig
 from ..scenarios import SCENARIO_NAMES
 from ..session import GameSession, GameSnapshot, GuiIntent
@@ -103,7 +103,7 @@ class LauncherFrame(ttk.Frame):
             version_box = ttk.Combobox(
                 self.seat_frame,
                 textvariable=self.ai_version_vars[index],
-                values=self.ai_controller_names,
+                values=tuple(AI_CONTROLLER_LABELS.get(name, name) for name in self.ai_controller_names),
                 state="readonly",
                 width=18,
             )
@@ -123,7 +123,7 @@ class LauncherFrame(ttk.Frame):
                 player_id=f"p{index + 1}",
                 name=f"Player {index + 1}",
                 controller=(
-                    self.ai_version_vars[index].get()
+                    _controller_from_label(self.ai_version_vars[index].get())
                     if self.seat_type_vars[index].get() == "ai"
                     else "human"
                 ),
@@ -372,6 +372,10 @@ def launch_app(*, board_render_mode: str = "drawn") -> PowerGridApp:
     app = PowerGridApp(root, board_render_mode=board_render_mode)
     app.pack(fill="both", expand=True)
     return app
+
+
+def _controller_from_label(label: str) -> str:
+    return next((name for name, value in AI_CONTROLLER_LABELS.items() if value == label), label)
 
 
 def _available_ai_controller_names() -> tuple[str, ...]:
