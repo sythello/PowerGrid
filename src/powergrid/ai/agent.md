@@ -519,6 +519,13 @@ PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings \
 - Default output path:
   - `artifacts/ai_ratings/germany_3p.json`
 
+The measured human-experience v1 comparison is stored in
+`artifacts/ai_ratings/humanexp_v1_20260922/`: `report.md` documents the 500-game
+schedule and reproduction command; `games.jsonl` and `decisions.csv` preserve
+game outcomes and individual decision timings. The standalone runner uses fresh
+controllers per seat/game, both 2-to-1 compositions, and rotating seats. Its
+controller championship share and pairwise placement score are distinct metrics.
+
 If you change naming or defaults, update all of:
 
 - [__init__.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/__init__.py)

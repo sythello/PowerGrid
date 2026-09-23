@@ -1,0 +1,179 @@
+{
+  "format": "powergrid.humanexp_benchmark.v1",
+  "started_at_utc": "2026-09-22T07:44:42.222106+00:00",
+  "configuration": {
+    "new_controller": "ai_humanexp_heuristics_v1",
+    "opponents": [
+      "ai_deterministic",
+      "ai_deterministic_efficiency",
+      "ai_deterministic_expansion",
+      "ai_deterministic_reserve",
+      "ai_nn_rl_based_v1"
+    ],
+    "map": "germany",
+    "players": 3,
+    "seed_start": 920001,
+    "seed_pairs": 50,
+    "games_per_opponent": 100,
+    "legal_region_sets": 13,
+    "region_schedule": [
+      [
+        "black",
+        "blue",
+        "magenta"
+      ],
+      [
+        "black",
+        "blue",
+        "yellow"
+      ],
+      [
+        "black",
+        "cyan",
+        "yellow"
+      ],
+      [
+        "black",
+        "green",
+        "yellow"
+      ],
+      [
+        "black",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "blue",
+        "cyan",
+        "yellow"
+      ],
+      [
+        "blue",
+        "green",
+        "magenta"
+      ],
+      [
+        "blue",
+        "green",
+        "yellow"
+      ],
+      [
+        "blue",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "cyan",
+        "green",
+        "magenta"
+      ],
+      [
+        "cyan",
+        "green",
+        "yellow"
+      ],
+      [
+        "cyan",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "green",
+        "magenta",
+        "yellow"
+      ]
+    ],
+    "timing": "perf_counter_ns around choose_intent including normal AI logging; no rendering; serial",
+    "rl_checkpoint": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz",
+    "rl_label": "NN RL V1 (v 2.01)"
+  },
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 13:50:33) [Clang 22.1.3 ]",
+    "numpy": "2.3.5",
+    "platform": "macOS-15.5-arm64-arm-64bit",
+    "cpu": "arm",
+    "git_head": "cfb95135056a8a2069a5d65b3a5e74778ec598c3",
+    "git_status_before": "?? artifacts/ai_ratings/humanexp_v1_20260922/\n",
+    "thread_limits": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    }
+  },
+  "source_hashes": {
+    "src/powergrid/__init__.py": "33f1b944d65c780a9b24bfc22fdcbe04bf4c683088f68509d36f46a0b0b55807",
+    "src/powergrid/ai/__init__.py": "c2e4486c4701eb2137f85b009fde9cadda9cdfd8afc04a20e33478c446d5650e",
+    "src/powergrid/ai/base.py": "9167a8192fa81557881e5e99e724e052f3f3bfac723120cb6663070b1fcdfc8e",
+    "src/powergrid/ai/deterministic.py": "c7d71f26c60ae11aec4b394a4806c4fedef90b58e88d4d5f012011d6d6c82bfd",
+    "src/powergrid/ai/evaluation.py": "213f7ce3c184ed1a913378fc28ccab6c6a0297a2eeb89a18fe3cb51695d132f5",
+    "src/powergrid/ai/humanexp.py": "f00e823b325cb8e7f524bfc52f8b44ea2284b03adf32eb05c066fdb0f39cac23",
+    "src/powergrid/ai/nn_rank_value/__init__.py": "c556a964eff84bedfab6efd5ffb981d0155dcbe2ec76164a53adb297e06b476c",
+    "src/powergrid/ai/nn_rank_value/candidates.py": "ec76ab671ab7a9eb22cabcf0f339e501f652ab003294ca1b3fb11da608bebd05",
+    "src/powergrid/ai/nn_rank_value/controller.py": "e8e309ab16a6233e333ea8039206853e4061adac118f65129114269d9d6d894b",
+    "src/powergrid/ai/nn_rank_value/dataset.py": "3395521b4de43922bb027dd013dc6a857b88a90211c676e3fc5fc5aed3beea8a",
+    "src/powergrid/ai/nn_rank_value/model.py": "4e51607a7599b07897adcbef8eaba08189ea9514f713e82e356018cf965124f4",
+    "src/powergrid/ai/nn_rank_value/observation.py": "701707552e73d7f7b7d430f1c193c3c2ddb58bdbceb5463c8c8e85a2d96dce16",
+    "src/powergrid/ai/nn_rank_value/resource_metrics.py": "52949c2511e6871cfba02c54d4fd81087f0ad2302ae0882cf62f9ac4fa267606",
+    "src/powergrid/ai/nn_rank_value/training.py": "bf3f3e154926e1a8a1b71af9e9f26dc0ba03501531317d3a828fac55ca4cb882",
+    "src/powergrid/ai/nn_rl_based/__init__.py": "76497aac61cb9606da07a1cb8a5eb39f1161401114b52b195472e6f037a81a85",
+    "src/powergrid/ai/nn_rl_based/controller.py": "26fc17933157ae5b1e656dffea251ea08fad810347c9c6901afaaac3943d12d2",
+    "src/powergrid/ai/nn_rl_based/dataset.py": "5d62d6fa92e0ab30475ec4cc3237848b60a43d9e0aa3d6fac12a15043d87a620",
+    "src/powergrid/ai/nn_rl_based/model.py": "5464c5b9273b652d98f58a2819b68f645f8f4c0fd623e2df677fa8570a225dac",
+    "src/powergrid/ai/nn_rl_based/search.py": "b699663a539f791de281baaffe1bad950fa8c8d814d31453232f6b21a1451947",
+    "src/powergrid/ai/nn_rl_based/training.py": "ced62cd919ae45da35e80e450a62ca71793be572b121e81629b0959530f59887",
+    "src/powergrid/ai/profiled_deterministic.py": "a18e6dbf6901c3fbe3593456a73d26dbcf6fe1bb6a6e404a78f405a0184e35e2",
+    "src/powergrid/ai/strategic.py": "37d9aa3148b93cd038566d7055f599b9c08eb9c70b36be27be7c459989d1bd8e",
+    "src/powergrid/board_layout.py": "48c9c0165025115877e270ff9c190f7d2e38bdd75e81eab6767f160925831a15",
+    "src/powergrid/cli.py": "19336443619f78dc1b7330e8238149c72b364b804794d35a381bb9c2e67b05bb",
+    "src/powergrid/gui/__init__.py": "1cdb74c2e58bb8aac3dc5a89f4e2ac506bc857ff4f10f84c9bdfc055ecfb4c0a",
+    "src/powergrid/gui/app.py": "9987258b0f3d2149a63896c7ea118da7cd5e1037bc78cb008b511c87af4bef08",
+    "src/powergrid/gui/board_view.py": "696764b5734de7cbbd568e4359720046e4c6cf9289f07c1d0c15cce395403f90",
+    "src/powergrid/gui/components.py": "3b5e7737d8928f1041f0b1d47314842db7a6323de31f46a75a7d01e40d6d9d33",
+    "src/powergrid/gui/panels.py": "c970c0ff217a148386bdcc2cdc473ded5eebd7f46554f47640d3eb76a3ada26f",
+    "src/powergrid/model.py": "c9540589b28d1046b9e5e6ca36f59082786dbc5c2e59d6d7d28410f00b8f8962",
+    "src/powergrid/rules_data.py": "410e627deaf3557e4802d8020e54b21d0393fd1cf03cf521e1ff1990283e0428",
+    "src/powergrid/scenarios.py": "c683004f47e5a21d5b269e1b130e963491762199aec8f51c17b094782a000241",
+    "src/powergrid/session.py": "26e337a65bb3dcdd65c0f8d743736be1dc46b5cc2fcf7a11d6637a4c82fcf428",
+    "src/powergrid/session_types.py": "a9c9e8f9feb6fbe884dc080e6e24909c5fe5f62299b8f4774086309ccdd67692",
+    "src/powergrid/tools/__init__.py": "4bdae0d9a668430762dc9d8101819c575f2b7e28d34581632888a0d774d7755f",
+    "src/powergrid/tools/analyze_nn_rl_checkpoint_losses.py": "82c2a7c2686116493fe88ee296a8aeb1b7b5fa6cf55d64bcaadf447ede7f9474",
+    "src/powergrid/tools/analyze_strategy_logs.py": "63f1555fbe8c7db8f23583564489d3616c0c17740cb2d1f6acf1b81501a0d011",
+    "src/powergrid/tools/evaluate_ai_ratings.py": "8389371bf2510f9b0c1c0e7278482673c05f54f2bdc18616eae62674e55b3aca",
+    "src/powergrid/tools/evaluate_nn_rl_checkpoint_duel.py": "06b7cec2db884288dad62d2430fee5354c86f414458b18a8380bf118e549a1c7",
+    "src/powergrid/tools/evaluate_nn_rl_deterministic_suite.py": "01a437e312a915a96bfcb56bcc485eceae75502230a8e406711fe38b04f5503b",
+    "src/powergrid/tools/evaluate_nn_rl_paired_rollouts.py": "3dc4ccb4e73872db40760afe8df5a675c3cba6462180614d415980812bc0fc1c",
+    "src/powergrid/tools/generate_nn_rank_value_dataset.py": "a8069d46f172b63d823540d5029b452f248096ac59827a8dcf55c035888c2530",
+    "src/powergrid/tools/generate_nn_rl_based_dataset.py": "d6c9caefd13b9e6e0f00771e2d4d8a5a952b6255f919754dc8496f4a1dd589dc",
+    "src/powergrid/tools/play_cli_game.py": "a41f9d1a1fa0868f3736def632eaf94b105a054df4538bc8e199e74fefbd1a74",
+    "src/powergrid/tools/play_tkinter_gui.py": "83ed9973f13d7fdda61959c19d1cb3c47a539f64a61abeb8c532a1bc3fe59ee3",
+    "src/powergrid/tools/play_web_gui.py": "f85746fca93e2824ef0a783fc64f4ccac0d8feb381aa5268b1946d53e99806a0",
+    "src/powergrid/tools/run_ai_game.py": "d81de0f1ce11b2462b0ce735fb370036d3ab119fdad9cd12bcf62d3e6416b9a4",
+    "src/powergrid/tools/run_auction_scenario.py": "88e07d519712957ba6c432a71d2682a344a06f94b6b1936ef9ea10ade5c39185",
+    "src/powergrid/tools/show_initial_state.py": "bd00b2a7a32baad8e7d37aeeeeff58e57a60d6b23f6dbe43ca1fc5d859b3ef13",
+    "src/powergrid/tools/train_nn_rank_value.py": "ec064508d43ba9231c86eae0b449c9c720000f07bbc4b94b3213469ce8760cfe",
+    "src/powergrid/tools/train_nn_rl_based.py": "d375dc72fc0c299372661bdab9efa69cf42d26b7e30936017480e66390faa2f3",
+    "src/powergrid/tools/validate_nn_candidates.py": "d2aded0c475499c780ed075e048d3c7bc99fbe6494941a52b625fa3373016941",
+    "src/powergrid/tools/validate_nn_controller.py": "3caa654d297110db78eb3dc065929873a6908b70dabc547bddc23a9102e082c6",
+    "src/powergrid/tools/validate_nn_dataset.py": "1ee50ac7ccb8d91baf7b35070f3bca34f9850ade62d8fc16828d69928fd8b070",
+    "src/powergrid/tools/validate_nn_model.py": "7e54457f100f02b972f643f0ac4489f66bec7a8e8d40bc64398e53d6503c60a9",
+    "src/powergrid/tools/validate_nn_observation.py": "045b61bbbfef2fa94621d404c909afb3d9d4a963c7f424d12b6379913a936951",
+    "src/powergrid/tools/validate_nn_rl_based.py": "b1dcfba5e4400bbdd1932206aa9c74151f5262feed45214904961c734f16b1e2",
+    "src/powergrid/tools/validate_nn_training.py": "d92cf3fdec5979c5ac4c66ef3dd230fea87f11b50e60409f0a2c4c5b40c62b8d",
+    "src/powergrid/tools/validate_profiled_deterministic_ai.py": "1f10b4a4faa55a485cf8d1d7c848a64e96ca620b52be65f26830567c2d5ab9d1",
+    "src/powergrid/tools/validate_static_data.py": "7008e0d0c4713c4a20dbefb943b22112b92ff4b59949cda9f331c229413ac099",
+    "src/powergrid/web/__init__.py": "47fd0b8d2733e00b850b318e321f50922d83787c1af067ba7b03e2206fca1d2d",
+    "src/powergrid/web/server.py": "6a4a634a0c97cd61793fec6e6d481298c966c43f466bd4d45802bd61892bc770",
+    "src/powergrid/data/gui_layouts/board_layout_placeholders.json": "cd33227c1326dd7580618585bbe91e5063a96a5a1cee04c44b6517cb64f1993f",
+    "src/powergrid/data/maps/germany.json": "aebcbcdda9e23ac4bd08c06e90c4be6d39805b3b09937200729b5e244ffaaef3",
+    "src/powergrid/data/maps/test.json": "8f182e7ab0f943e14a5b308285ed328005a687467e2d7c967cd26f0f7913907a",
+    "src/powergrid/data/maps/usa.json": "47bce4e1ab6d3f03c061f18dcccb61aa3986b2e80c52cc718b1c82a9508e9f35",
+    "src/powergrid/data/rules/power_plants.json": "86658975596260074af6abea17b3c70f457f5db73a5370aaa11a0793a55cff10",
+    "src/powergrid/data/rules/rule_tables.json": "8e877830fbb7e7a7bd96e52e8a657d99d867027c77ddfe5f60b2caadf8246839",
+    "src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz": "466d8d507c406215014f222de8d5720ebd96bcbb8465b3b7e1d8061284a5bc0c",
+    "artifacts/ai_ratings/humanexp_v1_20260922/run_benchmark.py": "4e0bc88191d764a0dd722c9f9363ddcdb237e64a2bb597e871db9a830d9b290e"
+  },
+  "completed_games": 0,
+  "failed_games": 0,
+  "opponents": {}
+}

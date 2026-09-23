@@ -258,6 +258,8 @@ Use these when validating user-facing behavior:
   - `PYTHONPATH=src python -m powergrid.tools.run_ai_game --controllers ai_deterministic ai_heuristics ai_deterministic`
 - AI Elo evaluation:
   - `PYTHONPATH=src python -m powergrid.tools.evaluate_ai_ratings --games-per-lineup 20 --seed-start 1`
+- Human-experience AI benchmark:
+  - `artifacts/ai_ratings/humanexp_v1_20260922/report.md` records 100 games per deterministic/RL opponent and decision timings; its adjacent script reproduces the run with fresh per-seat controllers.
 - Static data validation:
   - `PYTHONPATH=src python -m powergrid.tools.validate_static_data`
 - Neural AI design/training/validation:

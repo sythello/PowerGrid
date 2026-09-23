@@ -1,0 +1,1121 @@
+{
+  "format": "powergrid.humanexp_benchmark.v1",
+  "started_at_utc": "2026-09-22T07:44:42.222106+00:00",
+  "configuration": {
+    "new_controller": "ai_humanexp_heuristics_v1",
+    "opponents": [
+      "ai_deterministic",
+      "ai_deterministic_efficiency",
+      "ai_deterministic_expansion",
+      "ai_deterministic_reserve",
+      "ai_nn_rl_based_v1"
+    ],
+    "map": "germany",
+    "players": 3,
+    "seed_start": 920001,
+    "seed_pairs": 50,
+    "games_per_opponent": 100,
+    "legal_region_sets": 13,
+    "region_schedule": [
+      [
+        "black",
+        "blue",
+        "magenta"
+      ],
+      [
+        "black",
+        "blue",
+        "yellow"
+      ],
+      [
+        "black",
+        "cyan",
+        "yellow"
+      ],
+      [
+        "black",
+        "green",
+        "yellow"
+      ],
+      [
+        "black",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "blue",
+        "cyan",
+        "yellow"
+      ],
+      [
+        "blue",
+        "green",
+        "magenta"
+      ],
+      [
+        "blue",
+        "green",
+        "yellow"
+      ],
+      [
+        "blue",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "cyan",
+        "green",
+        "magenta"
+      ],
+      [
+        "cyan",
+        "green",
+        "yellow"
+      ],
+      [
+        "cyan",
+        "magenta",
+        "yellow"
+      ],
+      [
+        "green",
+        "magenta",
+        "yellow"
+      ]
+    ],
+    "timing": "perf_counter_ns around choose_intent including normal AI logging; no rendering; serial",
+    "rl_checkpoint": "/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz",
+    "rl_label": "NN RL V1 (v 2.01)"
+  },
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 13:50:33) [Clang 22.1.3 ]",
+    "numpy": "2.3.5",
+    "platform": "macOS-15.5-arm64-arm-64bit",
+    "cpu": "arm",
+    "git_head": "cfb95135056a8a2069a5d65b3a5e74778ec598c3",
+    "git_status_before": "?? artifacts/ai_ratings/humanexp_v1_20260922/\n",
+    "thread_limits": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    }
+  },
+  "source_hashes": {
+    "src/powergrid/__init__.py": "33f1b944d65c780a9b24bfc22fdcbe04bf4c683088f68509d36f46a0b0b55807",
+    "src/powergrid/ai/__init__.py": "c2e4486c4701eb2137f85b009fde9cadda9cdfd8afc04a20e33478c446d5650e",
+    "src/powergrid/ai/base.py": "9167a8192fa81557881e5e99e724e052f3f3bfac723120cb6663070b1fcdfc8e",
+    "src/powergrid/ai/deterministic.py": "c7d71f26c60ae11aec4b394a4806c4fedef90b58e88d4d5f012011d6d6c82bfd",
+    "src/powergrid/ai/evaluation.py": "213f7ce3c184ed1a913378fc28ccab6c6a0297a2eeb89a18fe3cb51695d132f5",
+    "src/powergrid/ai/humanexp.py": "f00e823b325cb8e7f524bfc52f8b44ea2284b03adf32eb05c066fdb0f39cac23",
+    "src/powergrid/ai/nn_rank_value/__init__.py": "c556a964eff84bedfab6efd5ffb981d0155dcbe2ec76164a53adb297e06b476c",
+    "src/powergrid/ai/nn_rank_value/candidates.py": "ec76ab671ab7a9eb22cabcf0f339e501f652ab003294ca1b3fb11da608bebd05",
+    "src/powergrid/ai/nn_rank_value/controller.py": "e8e309ab16a6233e333ea8039206853e4061adac118f65129114269d9d6d894b",
+    "src/powergrid/ai/nn_rank_value/dataset.py": "3395521b4de43922bb027dd013dc6a857b88a90211c676e3fc5fc5aed3beea8a",
+    "src/powergrid/ai/nn_rank_value/model.py": "4e51607a7599b07897adcbef8eaba08189ea9514f713e82e356018cf965124f4",
+    "src/powergrid/ai/nn_rank_value/observation.py": "701707552e73d7f7b7d430f1c193c3c2ddb58bdbceb5463c8c8e85a2d96dce16",
+    "src/powergrid/ai/nn_rank_value/resource_metrics.py": "52949c2511e6871cfba02c54d4fd81087f0ad2302ae0882cf62f9ac4fa267606",
+    "src/powergrid/ai/nn_rank_value/training.py": "bf3f3e154926e1a8a1b71af9e9f26dc0ba03501531317d3a828fac55ca4cb882",
+    "src/powergrid/ai/nn_rl_based/__init__.py": "76497aac61cb9606da07a1cb8a5eb39f1161401114b52b195472e6f037a81a85",
+    "src/powergrid/ai/nn_rl_based/controller.py": "26fc17933157ae5b1e656dffea251ea08fad810347c9c6901afaaac3943d12d2",
+    "src/powergrid/ai/nn_rl_based/dataset.py": "5d62d6fa92e0ab30475ec4cc3237848b60a43d9e0aa3d6fac12a15043d87a620",
+    "src/powergrid/ai/nn_rl_based/model.py": "5464c5b9273b652d98f58a2819b68f645f8f4c0fd623e2df677fa8570a225dac",
+    "src/powergrid/ai/nn_rl_based/search.py": "b699663a539f791de281baaffe1bad950fa8c8d814d31453232f6b21a1451947",
+    "src/powergrid/ai/nn_rl_based/training.py": "ced62cd919ae45da35e80e450a62ca71793be572b121e81629b0959530f59887",
+    "src/powergrid/ai/profiled_deterministic.py": "a18e6dbf6901c3fbe3593456a73d26dbcf6fe1bb6a6e404a78f405a0184e35e2",
+    "src/powergrid/ai/strategic.py": "37d9aa3148b93cd038566d7055f599b9c08eb9c70b36be27be7c459989d1bd8e",
+    "src/powergrid/board_layout.py": "48c9c0165025115877e270ff9c190f7d2e38bdd75e81eab6767f160925831a15",
+    "src/powergrid/cli.py": "19336443619f78dc1b7330e8238149c72b364b804794d35a381bb9c2e67b05bb",
+    "src/powergrid/gui/__init__.py": "1cdb74c2e58bb8aac3dc5a89f4e2ac506bc857ff4f10f84c9bdfc055ecfb4c0a",
+    "src/powergrid/gui/app.py": "9987258b0f3d2149a63896c7ea118da7cd5e1037bc78cb008b511c87af4bef08",
+    "src/powergrid/gui/board_view.py": "696764b5734de7cbbd568e4359720046e4c6cf9289f07c1d0c15cce395403f90",
+    "src/powergrid/gui/components.py": "3b5e7737d8928f1041f0b1d47314842db7a6323de31f46a75a7d01e40d6d9d33",
+    "src/powergrid/gui/panels.py": "c970c0ff217a148386bdcc2cdc473ded5eebd7f46554f47640d3eb76a3ada26f",
+    "src/powergrid/model.py": "c9540589b28d1046b9e5e6ca36f59082786dbc5c2e59d6d7d28410f00b8f8962",
+    "src/powergrid/rules_data.py": "410e627deaf3557e4802d8020e54b21d0393fd1cf03cf521e1ff1990283e0428",
+    "src/powergrid/scenarios.py": "c683004f47e5a21d5b269e1b130e963491762199aec8f51c17b094782a000241",
+    "src/powergrid/session.py": "26e337a65bb3dcdd65c0f8d743736be1dc46b5cc2fcf7a11d6637a4c82fcf428",
+    "src/powergrid/session_types.py": "a9c9e8f9feb6fbe884dc080e6e24909c5fe5f62299b8f4774086309ccdd67692",
+    "src/powergrid/tools/__init__.py": "4bdae0d9a668430762dc9d8101819c575f2b7e28d34581632888a0d774d7755f",
+    "src/powergrid/tools/analyze_nn_rl_checkpoint_losses.py": "82c2a7c2686116493fe88ee296a8aeb1b7b5fa6cf55d64bcaadf447ede7f9474",
+    "src/powergrid/tools/analyze_strategy_logs.py": "63f1555fbe8c7db8f23583564489d3616c0c17740cb2d1f6acf1b81501a0d011",
+    "src/powergrid/tools/evaluate_ai_ratings.py": "8389371bf2510f9b0c1c0e7278482673c05f54f2bdc18616eae62674e55b3aca",
+    "src/powergrid/tools/evaluate_nn_rl_checkpoint_duel.py": "06b7cec2db884288dad62d2430fee5354c86f414458b18a8380bf118e549a1c7",
+    "src/powergrid/tools/evaluate_nn_rl_deterministic_suite.py": "01a437e312a915a96bfcb56bcc485eceae75502230a8e406711fe38b04f5503b",
+    "src/powergrid/tools/evaluate_nn_rl_paired_rollouts.py": "3dc4ccb4e73872db40760afe8df5a675c3cba6462180614d415980812bc0fc1c",
+    "src/powergrid/tools/generate_nn_rank_value_dataset.py": "a8069d46f172b63d823540d5029b452f248096ac59827a8dcf55c035888c2530",
+    "src/powergrid/tools/generate_nn_rl_based_dataset.py": "d6c9caefd13b9e6e0f00771e2d4d8a5a952b6255f919754dc8496f4a1dd589dc",
+    "src/powergrid/tools/play_cli_game.py": "a41f9d1a1fa0868f3736def632eaf94b105a054df4538bc8e199e74fefbd1a74",
+    "src/powergrid/tools/play_tkinter_gui.py": "83ed9973f13d7fdda61959c19d1cb3c47a539f64a61abeb8c532a1bc3fe59ee3",
+    "src/powergrid/tools/play_web_gui.py": "f85746fca93e2824ef0a783fc64f4ccac0d8feb381aa5268b1946d53e99806a0",
+    "src/powergrid/tools/run_ai_game.py": "d81de0f1ce11b2462b0ce735fb370036d3ab119fdad9cd12bcf62d3e6416b9a4",
+    "src/powergrid/tools/run_auction_scenario.py": "88e07d519712957ba6c432a71d2682a344a06f94b6b1936ef9ea10ade5c39185",
+    "src/powergrid/tools/show_initial_state.py": "bd00b2a7a32baad8e7d37aeeeeff58e57a60d6b23f6dbe43ca1fc5d859b3ef13",
+    "src/powergrid/tools/train_nn_rank_value.py": "ec064508d43ba9231c86eae0b449c9c720000f07bbc4b94b3213469ce8760cfe",
+    "src/powergrid/tools/train_nn_rl_based.py": "d375dc72fc0c299372661bdab9efa69cf42d26b7e30936017480e66390faa2f3",
+    "src/powergrid/tools/validate_nn_candidates.py": "d2aded0c475499c780ed075e048d3c7bc99fbe6494941a52b625fa3373016941",
+    "src/powergrid/tools/validate_nn_controller.py": "3caa654d297110db78eb3dc065929873a6908b70dabc547bddc23a9102e082c6",
+    "src/powergrid/tools/validate_nn_dataset.py": "1ee50ac7ccb8d91baf7b35070f3bca34f9850ade62d8fc16828d69928fd8b070",
+    "src/powergrid/tools/validate_nn_model.py": "7e54457f100f02b972f643f0ac4489f66bec7a8e8d40bc64398e53d6503c60a9",
+    "src/powergrid/tools/validate_nn_observation.py": "045b61bbbfef2fa94621d404c909afb3d9d4a963c7f424d12b6379913a936951",
+    "src/powergrid/tools/validate_nn_rl_based.py": "b1dcfba5e4400bbdd1932206aa9c74151f5262feed45214904961c734f16b1e2",
+    "src/powergrid/tools/validate_nn_training.py": "d92cf3fdec5979c5ac4c66ef3dd230fea87f11b50e60409f0a2c4c5b40c62b8d",
+    "src/powergrid/tools/validate_profiled_deterministic_ai.py": "1f10b4a4faa55a485cf8d1d7c848a64e96ca620b52be65f26830567c2d5ab9d1",
+    "src/powergrid/tools/validate_static_data.py": "7008e0d0c4713c4a20dbefb943b22112b92ff4b59949cda9f331c229413ac099",
+    "src/powergrid/web/__init__.py": "47fd0b8d2733e00b850b318e321f50922d83787c1af067ba7b03e2206fca1d2d",
+    "src/powergrid/web/server.py": "6a4a634a0c97cd61793fec6e6d481298c966c43f466bd4d45802bd61892bc770",
+    "src/powergrid/data/gui_layouts/board_layout_placeholders.json": "cd33227c1326dd7580618585bbe91e5063a96a5a1cee04c44b6517cb64f1993f",
+    "src/powergrid/data/maps/germany.json": "aebcbcdda9e23ac4bd08c06e90c4be6d39805b3b09937200729b5e244ffaaef3",
+    "src/powergrid/data/maps/test.json": "8f182e7ab0f943e14a5b308285ed328005a687467e2d7c967cd26f0f7913907a",
+    "src/powergrid/data/maps/usa.json": "47bce4e1ab6d3f03c061f18dcccb61aa3986b2e80c52cc718b1c82a9508e9f35",
+    "src/powergrid/data/rules/power_plants.json": "86658975596260074af6abea17b3c70f457f5db73a5370aaa11a0793a55cff10",
+    "src/powergrid/data/rules/rule_tables.json": "8e877830fbb7e7a7bd96e52e8a657d99d867027c77ddfe5f60b2caadf8246839",
+    "src/powergrid/data/ai_models/ai_nn_rl_based_v1.npz": "466d8d507c406215014f222de8d5720ebd96bcbb8465b3b7e1d8061284a5bc0c",
+    "artifacts/ai_ratings/humanexp_v1_20260922/run_benchmark.py": "4e0bc88191d764a0dd722c9f9363ddcdb237e64a2bb597e871db9a830d9b290e"
+  },
+  "completed_games": 500,
+  "failed_games": 0,
+  "opponents": {
+    "ai_deterministic": {
+      "games": 100,
+      "outright_controller_wins": 86,
+      "shared_controller_wins": 0,
+      "losses": 14,
+      "new_win_credit": 86.0,
+      "new_win_rate": 0.86,
+      "opponent_win_rate": 0.14,
+      "pairwise_wins": 158,
+      "pairwise_draws": 0,
+      "pairwise_losses": 42,
+      "pairwise_score": 0.79,
+      "new_seat_appearances": 150,
+      "new_seat_win_rate": 0.5733333333333334,
+      "new_mean_place": 1.6133333333333333,
+      "new_mean_powered_cities": 12.813333333333333,
+      "mean_game_seconds": 0.10938800509029534,
+      "compositions": {
+        "HOO": {
+          "games": 50,
+          "outright_controller_wins": 41,
+          "shared_controller_wins": 0,
+          "losses": 9,
+          "new_win_credit": 41.0,
+          "new_win_rate": 0.82,
+          "opponent_win_rate": 0.18,
+          "pairwise_wins": 87,
+          "pairwise_draws": 0,
+          "pairwise_losses": 13,
+          "pairwise_score": 0.87,
+          "new_seat_appearances": 50,
+          "new_seat_win_rate": 0.82,
+          "new_mean_place": 1.26,
+          "new_mean_powered_cities": 14.66,
+          "mean_game_seconds": 0.08949276838102378
+        },
+        "HHO": {
+          "games": 50,
+          "outright_controller_wins": 45,
+          "shared_controller_wins": 0,
+          "losses": 5,
+          "new_win_credit": 45.0,
+          "new_win_rate": 0.9,
+          "opponent_win_rate": 0.1,
+          "pairwise_wins": 71,
+          "pairwise_draws": 0,
+          "pairwise_losses": 29,
+          "pairwise_score": 0.71,
+          "new_seat_appearances": 100,
+          "new_seat_win_rate": 0.45,
+          "new_mean_place": 1.79,
+          "new_mean_powered_cities": 11.89,
+          "mean_game_seconds": 0.1292832417995669
+        }
+      },
+      "pairwise_score_95_ci_seed_bootstrap": [
+        0.715,
+        0.855
+      ],
+      "new_win_rate_95_ci_seed_bootstrap": [
+        0.78,
+        0.93
+      ],
+      "timing_by_category": {
+        "opening_auction_start": {
+          "count": 187,
+          "total_ms": 9.258129,
+          "mean_ms": 0.049508711229946524,
+          "median_ms": 0.043708,
+          "p95_ms": 0.08479999999999993,
+          "max_ms": 0.309584,
+          "mean_cpu_ms": 0.05019786096256685
+        },
+        "opening_auction_bid": {
+          "count": 416,
+          "total_ms": 8.907097,
+          "mean_ms": 0.021411290865384618,
+          "median_ms": 0.0186875,
+          "p95_ms": 0.03220825,
+          "max_ms": 0.234292,
+          "mean_cpu_ms": 0.02203605769230769
+        },
+        "later_auction_start": {
+          "count": 1945,
+          "total_ms": 3333.290795,
+          "mean_ms": 1.7137741876606682,
+          "median_ms": 1.7335,
+          "p95_ms": 2.160325,
+          "max_ms": 7.011458,
+          "mean_cpu_ms": 1.709842673521851
+        },
+        "later_auction_bid": {
+          "count": 2240,
+          "total_ms": 2117.79353,
+          "mean_ms": 0.9454435401785714,
+          "median_ms": 0.9605205,
+          "p95_ms": 1.2412725999999998,
+          "max_ms": 4.555833,
+          "mean_cpu_ms": 0.944090625
+        },
+        "resource_plan": {
+          "count": 1491,
+          "total_ms": 1269.477349,
+          "mean_ms": 0.85142679342723,
+          "median_ms": 0.699083,
+          "p95_ms": 1.966604,
+          "max_ms": 4.895833,
+          "mean_cpu_ms": 0.8508256203890007
+        },
+        "resource_cached": {
+          "count": 902,
+          "total_ms": 7.944989999999999,
+          "mean_ms": 0.008808192904656318,
+          "median_ms": 0.008708,
+          "p95_ms": 0.01,
+          "max_ms": 0.03825,
+          "mean_cpu_ms": 0.009584257206208426
+        },
+        "build_houses": {
+          "count": 3937,
+          "total_ms": 815.521499,
+          "mean_ms": 0.20714287503175005,
+          "median_ms": 0.194375,
+          "p95_ms": 0.3360166,
+          "max_ms": 3.170666,
+          "mean_cpu_ms": 0.20720370840741684
+        },
+        "bureaucracy": {
+          "count": 1510,
+          "total_ms": 80.658013,
+          "mean_ms": 0.05341590264900662,
+          "median_ms": 0.0503125,
+          "p95_ms": 0.10198154999999999,
+          "max_ms": 4.487041,
+          "mean_cpu_ms": 0.05390794701986755
+        },
+        "discard_power_plant": {
+          "count": 374,
+          "total_ms": 4.150206999999999,
+          "mean_ms": 0.011096810160427805,
+          "median_ms": 0.010417,
+          "p95_ms": 0.012181349999999999,
+          "max_ms": 0.264542,
+          "mean_cpu_ms": 0.011794117647058823
+        },
+        "discard_hybrid_resources": {
+          "count": 0,
+          "mean_ms": null,
+          "median_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        }
+      }
+    },
+    "ai_deterministic_efficiency": {
+      "games": 100,
+      "outright_controller_wins": 80,
+      "shared_controller_wins": 0,
+      "losses": 20,
+      "new_win_credit": 80.0,
+      "new_win_rate": 0.8,
+      "opponent_win_rate": 0.2,
+      "pairwise_wins": 153,
+      "pairwise_draws": 0,
+      "pairwise_losses": 47,
+      "pairwise_score": 0.765,
+      "new_seat_appearances": 150,
+      "new_seat_win_rate": 0.5333333333333333,
+      "new_mean_place": 1.6466666666666667,
+      "new_mean_powered_cities": 13.78,
+      "mean_game_seconds": 0.12129456549941096,
+      "compositions": {
+        "HOO": {
+          "games": 50,
+          "outright_controller_wins": 42,
+          "shared_controller_wins": 0,
+          "losses": 8,
+          "new_win_credit": 42.0,
+          "new_win_rate": 0.84,
+          "opponent_win_rate": 0.16,
+          "pairwise_wins": 92,
+          "pairwise_draws": 0,
+          "pairwise_losses": 8,
+          "pairwise_score": 0.92,
+          "new_seat_appearances": 50,
+          "new_seat_win_rate": 0.84,
+          "new_mean_place": 1.16,
+          "new_mean_powered_cities": 15.16,
+          "mean_game_seconds": 0.10015309924259781
+        },
+        "HHO": {
+          "games": 50,
+          "outright_controller_wins": 38,
+          "shared_controller_wins": 0,
+          "losses": 12,
+          "new_win_credit": 38.0,
+          "new_win_rate": 0.76,
+          "opponent_win_rate": 0.24,
+          "pairwise_wins": 61,
+          "pairwise_draws": 0,
+          "pairwise_losses": 39,
+          "pairwise_score": 0.61,
+          "new_seat_appearances": 100,
+          "new_seat_win_rate": 0.38,
+          "new_mean_place": 1.89,
+          "new_mean_powered_cities": 13.09,
+          "mean_game_seconds": 0.1424360317562241
+        }
+      },
+      "pairwise_score_95_ci_seed_bootstrap": [
+        0.7,
+        0.825
+      ],
+      "new_win_rate_95_ci_seed_bootstrap": [
+        0.72,
+        0.87
+      ],
+      "timing_by_category": {
+        "opening_auction_start": {
+          "count": 208,
+          "total_ms": 9.727530999999999,
+          "mean_ms": 0.046766975961538455,
+          "median_ms": 0.043854,
+          "p95_ms": 0.056743749999999996,
+          "max_ms": 0.107958,
+          "mean_cpu_ms": 0.047365384615384615
+        },
+        "opening_auction_bid": {
+          "count": 402,
+          "total_ms": 8.613165000000002,
+          "mean_ms": 0.021425783582089557,
+          "median_ms": 0.0184795,
+          "p95_ms": 0.034081249999999993,
+          "max_ms": 0.090625,
+          "mean_cpu_ms": 0.022037313432835822
+        },
+        "later_auction_start": {
+          "count": 2103,
+          "total_ms": 3652.8852050000005,
+          "mean_ms": 1.7369877341892537,
+          "median_ms": 1.766209,
+          "p95_ms": 2.2751664,
+          "max_ms": 7.000459,
+          "mean_cpu_ms": 1.733940561103186
+        },
+        "later_auction_bid": {
+          "count": 2647,
+          "total_ms": 2553.7697610000005,
+          "mean_ms": 0.9647789047978845,
+          "median_ms": 0.970834,
+          "p95_ms": 1.2865463,
+          "max_ms": 6.277167,
+          "mean_cpu_ms": 0.9628065734794106
+        },
+        "resource_plan": {
+          "count": 1558,
+          "total_ms": 1510.149348,
+          "mean_ms": 0.9692871296534017,
+          "median_ms": 0.8080005,
+          "p95_ms": 2.1422910999999987,
+          "max_ms": 5.062291,
+          "mean_cpu_ms": 0.9678222079589217
+        },
+        "resource_cached": {
+          "count": 1249,
+          "total_ms": 11.295034999999999,
+          "mean_ms": 0.00904326261008807,
+          "median_ms": 0.008875,
+          "p95_ms": 0.010400199999999997,
+          "max_ms": 0.07525,
+          "mean_cpu_ms": 0.00989991993594876
+        },
+        "build_houses": {
+          "count": 4052,
+          "total_ms": 846.824337,
+          "mean_ms": 0.2089892243336624,
+          "median_ms": 0.19716650000000002,
+          "p95_ms": 0.33366235,
+          "max_ms": 4.077,
+          "mean_cpu_ms": 0.2085533070088845
+        },
+        "bureaucracy": {
+          "count": 1571,
+          "total_ms": 82.806471,
+          "mean_ms": 0.052709402291534056,
+          "median_ms": 0.052208,
+          "p95_ms": 0.10514599999999999,
+          "max_ms": 0.411083,
+          "mean_cpu_ms": 0.053152768936982814
+        },
+        "discard_power_plant": {
+          "count": 421,
+          "total_ms": 4.543652999999999,
+          "mean_ms": 0.010792524940617575,
+          "median_ms": 0.010666,
+          "p95_ms": 0.012125,
+          "max_ms": 0.084958,
+          "mean_cpu_ms": 0.011382422802850357
+        },
+        "discard_hybrid_resources": {
+          "count": 1,
+          "total_ms": 0.014792,
+          "mean_ms": 0.014792,
+          "median_ms": 0.014792,
+          "p95_ms": 0.014792,
+          "max_ms": 0.014792,
+          "mean_cpu_ms": 0.015
+        }
+      }
+    },
+    "ai_deterministic_expansion": {
+      "games": 100,
+      "outright_controller_wins": 75,
+      "shared_controller_wins": 0,
+      "losses": 25,
+      "new_win_credit": 75.0,
+      "new_win_rate": 0.75,
+      "opponent_win_rate": 0.25,
+      "pairwise_wins": 135,
+      "pairwise_draws": 0,
+      "pairwise_losses": 65,
+      "pairwise_score": 0.675,
+      "new_seat_appearances": 150,
+      "new_seat_win_rate": 0.5,
+      "new_mean_place": 1.7666666666666666,
+      "new_mean_powered_cities": 13.093333333333334,
+      "mean_game_seconds": 0.11839222998067271,
+      "compositions": {
+        "HOO": {
+          "games": 50,
+          "outright_controller_wins": 42,
+          "shared_controller_wins": 0,
+          "losses": 8,
+          "new_win_credit": 42.0,
+          "new_win_rate": 0.84,
+          "opponent_win_rate": 0.16,
+          "pairwise_wins": 87,
+          "pairwise_draws": 0,
+          "pairwise_losses": 13,
+          "pairwise_score": 0.87,
+          "new_seat_appearances": 50,
+          "new_seat_win_rate": 0.84,
+          "new_mean_place": 1.26,
+          "new_mean_powered_cities": 13.78,
+          "mean_game_seconds": 0.0963884574198164
+        },
+        "HHO": {
+          "games": 50,
+          "outright_controller_wins": 33,
+          "shared_controller_wins": 0,
+          "losses": 17,
+          "new_win_credit": 33.0,
+          "new_win_rate": 0.66,
+          "opponent_win_rate": 0.34,
+          "pairwise_wins": 48,
+          "pairwise_draws": 0,
+          "pairwise_losses": 52,
+          "pairwise_score": 0.48,
+          "new_seat_appearances": 100,
+          "new_seat_win_rate": 0.33,
+          "new_mean_place": 2.02,
+          "new_mean_powered_cities": 12.75,
+          "mean_game_seconds": 0.140396002541529
+        }
+      },
+      "pairwise_score_95_ci_seed_bootstrap": [
+        0.605,
+        0.745
+      ],
+      "new_win_rate_95_ci_seed_bootstrap": [
+        0.68,
+        0.82
+      ],
+      "timing_by_category": {
+        "opening_auction_start": {
+          "count": 204,
+          "total_ms": 11.061219,
+          "mean_ms": 0.05422166176470588,
+          "median_ms": 0.0450835,
+          "p95_ms": 0.100133,
+          "max_ms": 0.335583,
+          "mean_cpu_ms": 0.05475
+        },
+        "opening_auction_bid": {
+          "count": 363,
+          "total_ms": 7.686712000000001,
+          "mean_ms": 0.021175515151515154,
+          "median_ms": 0.019,
+          "p95_ms": 0.032833,
+          "max_ms": 0.076625,
+          "mean_cpu_ms": 0.021895316804407716
+        },
+        "later_auction_start": {
+          "count": 2023,
+          "total_ms": 3493.183419,
+          "mean_ms": 1.7267342654473554,
+          "median_ms": 1.760667,
+          "p95_ms": 2.2743664,
+          "max_ms": 6.224166,
+          "mean_cpu_ms": 1.7244824518042512
+        },
+        "later_auction_bid": {
+          "count": 2614,
+          "total_ms": 2485.5890010000003,
+          "mean_ms": 0.950875669854629,
+          "median_ms": 0.9582919999999999,
+          "p95_ms": 1.2623166499999998,
+          "max_ms": 5.317875,
+          "mean_cpu_ms": 0.9498794950267789
+        },
+        "resource_plan": {
+          "count": 1539,
+          "total_ms": 1432.013438,
+          "mean_ms": 0.9304830656270305,
+          "median_ms": 0.801375,
+          "p95_ms": 2.017716599999999,
+          "max_ms": 4.223208,
+          "mean_cpu_ms": 0.9302852501624431
+        },
+        "resource_cached": {
+          "count": 1214,
+          "total_ms": 10.814757,
+          "mean_ms": 0.008908366556836902,
+          "median_ms": 0.008875,
+          "p95_ms": 0.010098349999999996,
+          "max_ms": 0.038417,
+          "mean_cpu_ms": 0.009703459637561779
+        },
+        "build_houses": {
+          "count": 4077,
+          "total_ms": 860.2055849999999,
+          "mean_ms": 0.2109898417954378,
+          "median_ms": 0.199083,
+          "p95_ms": 0.338525,
+          "max_ms": 4.579,
+          "mean_cpu_ms": 0.21151729212656364
+        },
+        "bureaucracy": {
+          "count": 1554,
+          "total_ms": 85.920624,
+          "mean_ms": 0.05528997683397684,
+          "median_ms": 0.053125,
+          "p95_ms": 0.10433334999999999,
+          "max_ms": 4.2495,
+          "mean_cpu_ms": 0.05578957528957529
+        },
+        "discard_power_plant": {
+          "count": 420,
+          "total_ms": 4.507865999999999,
+          "mean_ms": 0.010733014285714283,
+          "median_ms": 0.010791,
+          "p95_ms": 0.01225,
+          "max_ms": 0.037959,
+          "mean_cpu_ms": 0.01139047619047619
+        },
+        "discard_hybrid_resources": {
+          "count": 0,
+          "mean_ms": null,
+          "median_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        }
+      }
+    },
+    "ai_deterministic_reserve": {
+      "games": 100,
+      "outright_controller_wins": 99,
+      "shared_controller_wins": 0,
+      "losses": 1,
+      "new_win_credit": 99.0,
+      "new_win_rate": 0.99,
+      "opponent_win_rate": 0.01,
+      "pairwise_wins": 196,
+      "pairwise_draws": 0,
+      "pairwise_losses": 4,
+      "pairwise_score": 0.98,
+      "new_seat_appearances": 150,
+      "new_seat_win_rate": 0.66,
+      "new_mean_place": 1.36,
+      "new_mean_powered_cities": 15.086666666666666,
+      "mean_game_seconds": 0.11031432831892744,
+      "compositions": {
+        "HOO": {
+          "games": 50,
+          "outright_controller_wins": 49,
+          "shared_controller_wins": 0,
+          "losses": 1,
+          "new_win_credit": 49.0,
+          "new_win_rate": 0.98,
+          "opponent_win_rate": 0.02,
+          "pairwise_wins": 99,
+          "pairwise_draws": 0,
+          "pairwise_losses": 1,
+          "pairwise_score": 0.99,
+          "new_seat_appearances": 50,
+          "new_seat_win_rate": 0.98,
+          "new_mean_place": 1.02,
+          "new_mean_powered_cities": 16.28,
+          "mean_game_seconds": 0.08603777164360508
+        },
+        "HHO": {
+          "games": 50,
+          "outright_controller_wins": 50,
+          "shared_controller_wins": 0,
+          "losses": 0,
+          "new_win_credit": 50.0,
+          "new_win_rate": 1.0,
+          "opponent_win_rate": 0.0,
+          "pairwise_wins": 97,
+          "pairwise_draws": 0,
+          "pairwise_losses": 3,
+          "pairwise_score": 0.97,
+          "new_seat_appearances": 100,
+          "new_seat_win_rate": 0.5,
+          "new_mean_place": 1.53,
+          "new_mean_powered_cities": 14.49,
+          "mean_game_seconds": 0.1345908849942498
+        }
+      },
+      "pairwise_score_95_ci_seed_bootstrap": [
+        0.96,
+        0.995
+      ],
+      "new_win_rate_95_ci_seed_bootstrap": [
+        0.97,
+        1.0
+      ],
+      "timing_by_category": {
+        "opening_auction_start": {
+          "count": 186,
+          "total_ms": 10.385703,
+          "mean_ms": 0.0558371129032258,
+          "median_ms": 0.045,
+          "p95_ms": 0.10039575,
+          "max_ms": 0.585708,
+          "mean_cpu_ms": 0.05653225806451613
+        },
+        "opening_auction_bid": {
+          "count": 416,
+          "total_ms": 8.95409,
+          "mean_ms": 0.02152425480769231,
+          "median_ms": 0.0196875,
+          "p95_ms": 0.032719250000000005,
+          "max_ms": 0.103417,
+          "mean_cpu_ms": 0.02215625
+        },
+        "later_auction_start": {
+          "count": 1910,
+          "total_ms": 3446.4970319999998,
+          "mean_ms": 1.804448707853403,
+          "median_ms": 1.8387085,
+          "p95_ms": 2.22535785,
+          "max_ms": 6.779084,
+          "mean_cpu_ms": 1.8019115183246073
+        },
+        "later_auction_bid": {
+          "count": 2135,
+          "total_ms": 2092.3216730000004,
+          "mean_ms": 0.9800101512880564,
+          "median_ms": 1.002458,
+          "p95_ms": 1.2900498,
+          "max_ms": 4.930583,
+          "mean_cpu_ms": 0.9787718969555035
+        },
+        "resource_plan": {
+          "count": 1436,
+          "total_ms": 1293.7747920000002,
+          "mean_ms": 0.9009573760445684,
+          "median_ms": 0.7415205,
+          "p95_ms": 1.96632275,
+          "max_ms": 5.423833,
+          "mean_cpu_ms": 0.9007144846796658
+        },
+        "resource_cached": {
+          "count": 897,
+          "total_ms": 8.024953,
+          "mean_ms": 0.008946435897435897,
+          "median_ms": 0.008916,
+          "p95_ms": 0.01025,
+          "max_ms": 0.040375,
+          "mean_cpu_ms": 0.00972129319955407
+        },
+        "build_houses": {
+          "count": 3965,
+          "total_ms": 849.8216789999999,
+          "mean_ms": 0.21433081437578813,
+          "median_ms": 0.20075,
+          "p95_ms": 0.344917,
+          "max_ms": 5.249458,
+          "mean_cpu_ms": 0.21475334174022698
+        },
+        "bureaucracy": {
+          "count": 1441,
+          "total_ms": 86.626611,
+          "mean_ms": 0.06011562179042332,
+          "median_ms": 0.054417,
+          "p95_ms": 0.107666,
+          "max_ms": 7.237458,
+          "mean_cpu_ms": 0.06050381679389313
+        },
+        "discard_power_plant": {
+          "count": 431,
+          "total_ms": 4.699382,
+          "mean_ms": 0.010903438515081207,
+          "median_ms": 0.010791,
+          "p95_ms": 0.012354,
+          "max_ms": 0.087541,
+          "mean_cpu_ms": 0.011475638051044084
+        },
+        "discard_hybrid_resources": {
+          "count": 0,
+          "mean_ms": null,
+          "median_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        }
+      }
+    },
+    "ai_nn_rl_based_v1": {
+      "games": 100,
+      "outright_controller_wins": 81,
+      "shared_controller_wins": 0,
+      "losses": 19,
+      "new_win_credit": 81.0,
+      "new_win_rate": 0.81,
+      "opponent_win_rate": 0.19,
+      "pairwise_wins": 149,
+      "pairwise_draws": 0,
+      "pairwise_losses": 51,
+      "pairwise_score": 0.745,
+      "new_seat_appearances": 150,
+      "new_seat_win_rate": 0.54,
+      "new_mean_place": 1.6733333333333333,
+      "new_mean_powered_cities": 12.7,
+      "mean_game_seconds": 0.19076981087273454,
+      "compositions": {
+        "HOO": {
+          "games": 50,
+          "outright_controller_wins": 33,
+          "shared_controller_wins": 0,
+          "losses": 17,
+          "new_win_credit": 33.0,
+          "new_win_rate": 0.66,
+          "opponent_win_rate": 0.34,
+          "pairwise_wins": 76,
+          "pairwise_draws": 0,
+          "pairwise_losses": 24,
+          "pairwise_score": 0.76,
+          "new_seat_appearances": 50,
+          "new_seat_win_rate": 0.66,
+          "new_mean_place": 1.48,
+          "new_mean_powered_cities": 13.58,
+          "mean_game_seconds": 0.20781776592135429
+        },
+        "HHO": {
+          "games": 50,
+          "outright_controller_wins": 48,
+          "shared_controller_wins": 0,
+          "losses": 2,
+          "new_win_credit": 48.0,
+          "new_win_rate": 0.96,
+          "opponent_win_rate": 0.04,
+          "pairwise_wins": 73,
+          "pairwise_draws": 0,
+          "pairwise_losses": 27,
+          "pairwise_score": 0.73,
+          "new_seat_appearances": 100,
+          "new_seat_win_rate": 0.48,
+          "new_mean_place": 1.77,
+          "new_mean_powered_cities": 12.26,
+          "mean_game_seconds": 0.17372185582411476
+        }
+      },
+      "pairwise_score_95_ci_seed_bootstrap": [
+        0.67,
+        0.815
+      ],
+      "new_win_rate_95_ci_seed_bootstrap": [
+        0.73,
+        0.88
+      ],
+      "timing_by_category": {
+        "opening_auction_start": {
+          "count": 188,
+          "total_ms": 9.555083,
+          "mean_ms": 0.050824909574468086,
+          "median_ms": 0.046896,
+          "p95_ms": 0.05796470000000001,
+          "max_ms": 0.403917,
+          "mean_cpu_ms": 0.051728723404255314
+        },
+        "opening_auction_bid": {
+          "count": 399,
+          "total_ms": 9.53383,
+          "mean_ms": 0.023894310776942356,
+          "median_ms": 0.02275,
+          "p95_ms": 0.03610029999999998,
+          "max_ms": 0.120791,
+          "mean_cpu_ms": 0.025010025062656642
+        },
+        "later_auction_start": {
+          "count": 1956,
+          "total_ms": 3478.335224,
+          "mean_ms": 1.7782899918200408,
+          "median_ms": 1.807646,
+          "p95_ms": 2.2541255000000002,
+          "max_ms": 7.058917,
+          "mean_cpu_ms": 1.7758691206543966
+        },
+        "later_auction_bid": {
+          "count": 2241,
+          "total_ms": 2203.459778,
+          "mean_ms": 0.9832484506916555,
+          "median_ms": 0.995792,
+          "p95_ms": 1.289375,
+          "max_ms": 7.539834,
+          "mean_cpu_ms": 0.9825113788487283
+        },
+        "resource_plan": {
+          "count": 1493,
+          "total_ms": 1341.404235,
+          "mean_ms": 0.8984623141326189,
+          "median_ms": 0.724542,
+          "p95_ms": 2.060382999999997,
+          "max_ms": 6.31075,
+          "mean_cpu_ms": 0.8980616208975217
+        },
+        "resource_cached": {
+          "count": 936,
+          "total_ms": 8.671910999999998,
+          "mean_ms": 0.009264862179487177,
+          "median_ms": 0.009166,
+          "p95_ms": 0.010375,
+          "max_ms": 0.03525,
+          "mean_cpu_ms": 0.009990384615384615
+        },
+        "build_houses": {
+          "count": 3980,
+          "total_ms": 855.546779,
+          "mean_ms": 0.21496150226130653,
+          "median_ms": 0.20125,
+          "p95_ms": 0.34575834999999994,
+          "max_ms": 6.275625,
+          "mean_cpu_ms": 0.21551733668341708
+        },
+        "bureaucracy": {
+          "count": 1515,
+          "total_ms": 87.390642,
+          "mean_ms": 0.057683592079207924,
+          "median_ms": 0.053542,
+          "p95_ms": 0.1088999,
+          "max_ms": 5.697125,
+          "mean_cpu_ms": 0.05826468646864686
+        },
+        "discard_power_plant": {
+          "count": 370,
+          "total_ms": 4.12955,
+          "mean_ms": 0.011160945945945947,
+          "median_ms": 0.011375,
+          "p95_ms": 0.01268955,
+          "max_ms": 0.016625,
+          "mean_cpu_ms": 0.012113513513513514
+        },
+        "discard_hybrid_resources": {
+          "count": 0,
+          "mean_ms": null,
+          "median_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        }
+      }
+    }
+  },
+  "elapsed_seconds": 65.26878716697684,
+  "source_unchanged_during_run": true,
+  "timing_by_category": {
+    "opening_auction_start": {
+      "count": 973,
+      "total_ms": 49.987665,
+      "mean_ms": 0.05137478417266187,
+      "median_ms": 0.045125,
+      "p95_ms": 0.08671699999999997,
+      "max_ms": 0.585708,
+      "mean_cpu_ms": 0.05205344295991778
+    },
+    "opening_auction_bid": {
+      "count": 1996,
+      "total_ms": 43.694894000000005,
+      "mean_ms": 0.02189122945891784,
+      "median_ms": 0.0198335,
+      "p95_ms": 0.03385475,
+      "max_ms": 0.234292,
+      "mean_cpu_ms": 0.022630260521042084
+    },
+    "later_auction_start": {
+      "count": 9937,
+      "total_ms": 17404.191675000002,
+      "mean_ms": 1.7514533234376575,
+      "median_ms": 1.7805,
+      "p95_ms": 2.2459252,
+      "max_ms": 7.058917,
+      "mean_cpu_ms": 1.7486162825802556
+    },
+    "later_auction_bid": {
+      "count": 11877,
+      "total_ms": 11452.933743,
+      "mean_ms": 0.9642951707501894,
+      "median_ms": 0.975958,
+      "p95_ms": 1.2745577999999997,
+      "max_ms": 7.539834,
+      "mean_cpu_ms": 0.9630195335522438
+    },
+    "resource_plan": {
+      "count": 7517,
+      "total_ms": 6846.819162,
+      "mean_ms": 0.9108446404150592,
+      "median_ms": 0.755833,
+      "p95_ms": 2.04175,
+      "max_ms": 6.31075,
+      "mean_cpu_ms": 0.9102552880138354
+    },
+    "resource_cached": {
+      "count": 5198,
+      "total_ms": 46.751646,
+      "mean_ms": 0.00899416044632551,
+      "median_ms": 0.008875,
+      "p95_ms": 0.01025,
+      "max_ms": 0.07525,
+      "mean_cpu_ms": 0.009784724894190073
+    },
+    "build_houses": {
+      "count": 20011,
+      "total_ms": 4227.919879,
+      "mean_ms": 0.211279790065464,
+      "median_ms": 0.198417,
+      "p95_ms": 0.339896,
+      "max_ms": 6.275625,
+      "mean_cpu_ms": 0.2115052221278297
+    },
+    "bureaucracy": {
+      "count": 7591,
+      "total_ms": 423.40236100000004,
+      "mean_ms": 0.055776888552232916,
+      "median_ms": 0.052667,
+      "p95_ms": 0.1053955,
+      "max_ms": 7.237458,
+      "mean_cpu_ms": 0.05625846397049137
+    },
+    "discard_power_plant": {
+      "count": 2016,
+      "total_ms": 22.030657999999995,
+      "mean_ms": 0.010927905753968252,
+      "median_ms": 0.010791,
+      "p95_ms": 0.012458,
+      "max_ms": 0.264542,
+      "mean_cpu_ms": 0.011614583333333334
+    },
+    "discard_hybrid_resources": {
+      "count": 1,
+      "total_ms": 0.014792,
+      "mean_ms": 0.014792,
+      "median_ms": 0.014792,
+      "p95_ms": 0.014792,
+      "max_ms": 0.014792,
+      "mean_cpu_ms": 0.015
+    }
+  },
+  "timing_by_request_type": {
+    "auction_bid": {
+      "count": 13873,
+      "total_ms": 11496.628637,
+      "mean_ms": 0.8287053007280328,
+      "median_ms": 0.9225,
+      "p95_ms": 1.2616172,
+      "max_ms": 7.539834,
+      "mean_cpu_ms": 0.8277195271390471
+    },
+    "auction_start": {
+      "count": 10910,
+      "total_ms": 17454.179340000002,
+      "mean_ms": 1.5998331200733273,
+      "median_ms": 1.7418545,
+      "p95_ms": 2.2324935999999997,
+      "max_ms": 7.058917,
+      "mean_cpu_ms": 1.5973096241979834
+    },
+    "build_houses": {
+      "count": 20011,
+      "total_ms": 4227.919879,
+      "mean_ms": 0.211279790065464,
+      "median_ms": 0.198417,
+      "p95_ms": 0.339896,
+      "max_ms": 6.275625,
+      "mean_cpu_ms": 0.2115052221278297
+    },
+    "bureaucracy": {
+      "count": 7591,
+      "total_ms": 423.40236100000004,
+      "mean_ms": 0.055776888552232916,
+      "median_ms": 0.052667,
+      "p95_ms": 0.1053955,
+      "max_ms": 7.237458,
+      "mean_cpu_ms": 0.05625846397049137
+    },
+    "buy_resources": {
+      "count": 12715,
+      "total_ms": 6893.570808,
+      "mean_ms": 0.542160503971687,
+      "median_ms": 0.429458,
+      "p95_ms": 1.7355750999999995,
+      "max_ms": 6.31075,
+      "mean_cpu_ms": 0.5421352732992528
+    },
+    "discard_hybrid_resources": {
+      "count": 1,
+      "total_ms": 0.014792,
+      "mean_ms": 0.014792,
+      "median_ms": 0.014792,
+      "p95_ms": 0.014792,
+      "max_ms": 0.014792,
+      "mean_cpu_ms": 0.015
+    },
+    "discard_power_plant": {
+      "count": 2016,
+      "total_ms": 22.030657999999995,
+      "mean_ms": 0.010927905753968252,
+      "median_ms": 0.010791,
+      "p95_ms": 0.012458,
+      "max_ms": 0.264542,
+      "mean_cpu_ms": 0.011614583333333334
+    }
+  },
+  "timing_overall": {
+    "count": 67117,
+    "total_ms": 40517.746475,
+    "mean_ms": 0.6036882827748559,
+    "median_ms": 0.265,
+    "p95_ms": 1.933583,
+    "max_ms": 7.539834,
+    "mean_cpu_ms": 0.6032118539267249
+  },
+  "new_seat_game_mean_decision_ms": 54.023661966666666
+}

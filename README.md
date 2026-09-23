@@ -204,6 +204,10 @@ Output:
 - prints a compact leaderboard
 - writes JSON under `artifacts/ai_ratings/`
 
+经验启发式 v1 对 4 个 deterministic 版本及 RL v2.01 各 100 局的实测结果、
+逐次决策耗时和复跑命令见
+[评测报告](artifacts/ai_ratings/humanexp_v1_20260922/report.md)。
+
 ## Configuration Model
 
 The runtime configuration objects are:

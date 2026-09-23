@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "games": 500,
+  "new_ai_decisions": 67117,
+  "games_per_opponent": {
+    "ai_deterministic": 100,
+    "ai_deterministic_efficiency": 100,
+    "ai_deterministic_expansion": 100,
+    "ai_deterministic_reserve": 100,
+    "ai_nn_rl_based_v1": 100
+  },
+  "checks": [
+    "all games have winners matching final rule tuples",
+    "50 games per composition per opponent",
+    "equal seat exposure at every seat",
+    "50 paired seeds per opponent",
+    "raw decision counts and nanosecond totals match each game",
+    "timing category means recomputed from CSV",
+    "source and checkpoint SHA-256 unchanged"
+  ]
+}
