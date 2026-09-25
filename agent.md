@@ -111,6 +111,11 @@ The most important architectural boundary is:
   - `ai_humanexp_heuristics_v1`, shown as `经验启发式v1` in Web/Tkinter
   - public-information opening probabilities, seeded bid caps, economy forecasts,
     resource subset enumeration, contested-city priority, and maximum generation
+  - resource planning detects fuel-reserved opponent endgame threats, prioritizes
+    final-round power without stockpiling, and otherwise separates marginal refuel
+    costs from full-cost stockpile eligibility with profitable-first inventory
+  - a per-round random 50%–75% own-demand share limit suppresses extra stockpiling
+    per resource; hybrids count wholly toward the currently cheaper resource
 - [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value)
   - public observation and candidate encoding
   - terminal-label dataset/counterfactual rollout generation
@@ -241,6 +246,19 @@ Important current format traits:
 - per-entry `state_snapshot` omits repeated config/map/rules payloads
 
 AI controllers can append custom analysis state through `GameSnapshot.analysis_log`.
+
+The Web event list resolves each event's `player_id` to its player name and omits
+the redundant AI prefix on automated action messages; stored event data is unchanged.
+
+The Web GUI's **导出排查日志** control pauses local AI scheduling, waits for pending
+browser requests, and downloads `GET /api/game-log`. The Web controller captures
+the existing v2 log and `debug_snapshot` (full state and active request) under its
+session lock; the browser adds `browser_context` with the displayed state and
+pending selections. Full deck data is exported only through this explicit debug
+route, not `/api/state`. No server-side export file or save-game import is added.
+Validate with `PYTHONPATH=src python -m unittest discover -s tests -p 'test_web.py'`
+and `node --test tests/test_web_export.js` (Node is only needed for this browser
+workflow test, not the Web server).
 
 ### 6. The `test` map is development-oriented
 

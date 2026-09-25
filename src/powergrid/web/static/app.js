@@ -45,6 +45,8 @@
     aiPaused: false,
     aiTimer: null,
     aiWorking: false,
+    exportingLog: false,
+    pendingRequests: new Set(),
     toastTimer: null,
     plantPreviewTarget: null,
     globalParametersInvoker: null,
@@ -221,6 +223,7 @@
 
   async function startGame(event) {
     event.preventDefault();
+    if (ui.exportingLog) return;
     captureSeatDrafts();
     const count = Number(refs.playerCount.value);
     const players = ui.seatDrafts.slice(0, count);
@@ -290,7 +293,7 @@
       ui.buildQuote = null;
       ui.runs = {};
     }
-    if (!snapshot.needs_ai_advance) {
+    if (!snapshot.needs_ai_advance && !ui.exportingLog) {
       ui.aiPaused = false;
     }
   }
@@ -343,6 +346,13 @@
         : "正在推进回合状态…";
     refs.aiToggle.hidden = ui.layoutEditor.active || !ui.snapshot.needs_ai_advance;
     refs.aiToggle.textContent = ui.aiPaused ? "继续 AI" : "暂停 AI";
+    refs.aiToggle.disabled = ui.exportingLog;
+    refs.newGameButton.disabled = ui.exportingLog;
+    refs.actionConsole.inert = ui.exportingLog;
+    document.querySelectorAll('[data-action="export-game-log"]').forEach((button) => {
+      button.disabled = ui.exportingLog;
+      button.textContent = ui.exportingLog ? "正在抓取…" : "导出排查日志";
+    });
     refs.layoutEditorButton.disabled = ui.layoutEditor.active;
     refs.layoutEditorButton.textContent = ui.layoutEditor.active ? "正在调整坐标" : "调整城市坐标";
     refs.layoutEditorButton.classList.toggle("active", ui.layoutEditor.active);
@@ -960,10 +970,16 @@
   function renderEvents() {
     const events = ui.snapshot.events.slice(-24).reverse();
     refs.eventList.innerHTML = events.length
-      ? events.map((event) => `
+      ? events.map((event) => {
+          const actor = event.player_id ? ` · ${escapeHtml(playerName(event.player_id))}` : "";
+          const message = event.event_type === "intent_applied" && event.payload?.auto_generated
+            ? event.message.replace(/^AI /, "")
+            : event.message;
+          return `
           <li class="${event.level === "error" ? "error" : ""}">
-            <time>R${event.round_number ?? "–"} · S${event.step ?? "–"}</time>${escapeHtml(event.message)}
-          </li>`).join("")
+            <time>R${event.round_number ?? "–"} · S${event.step ?? "–"}${actor}</time>${escapeHtml(message)}
+          </li>`;
+        }).join("")
       : "<li>对局开始后，关键事件会显示在这里。</li>";
   }
 
@@ -989,6 +1005,11 @@
 
   async function handleClick(event) {
     const control = event.target.closest("[data-action]");
+    if (control?.dataset.action === "export-game-log") {
+      await exportGameLog();
+      return;
+    }
+    if (ui.exportingLog) return;
     if (event.target === refs.globalParametersDialog) {
       closeGlobalParameters();
       return;
@@ -1388,6 +1409,7 @@
   }
 
   async function submitCurrentIntent(intentType, payload, options = {}) {
+    if (ui.exportingLog) return;
     const request = ui.snapshot.request;
     if (!request) return;
     const result = await api("/api/intent", {
@@ -1454,7 +1476,7 @@
   }
 
   function toggleAi() {
-    if (ui.layoutEditor.active) return;
+    if (ui.layoutEditor.active || ui.exportingLog) return;
     ui.aiPaused = !ui.aiPaused;
     clearTimeout(ui.aiTimer);
     renderHeader();
@@ -1464,13 +1486,13 @@
 
   function scheduleAi() {
     clearTimeout(ui.aiTimer);
-    if (ui.layoutEditor.active || !ui.snapshot?.needs_ai_advance || ui.aiPaused || ui.aiWorking || ui.snapshot.winner) return;
+    if (ui.exportingLog || ui.layoutEditor.active || !ui.snapshot?.needs_ai_advance || ui.aiPaused || ui.aiWorking || ui.snapshot.winner) return;
     const delay = ui.snapshot.request ? 720 : 80;
     ui.aiTimer = setTimeout(advanceAi, delay);
   }
 
   async function advanceAi() {
-    if (ui.aiWorking || ui.aiPaused) return;
+    if (ui.exportingLog || ui.aiWorking || ui.aiPaused) return;
     ui.aiWorking = true;
     try {
       const result = await api("/api/advance", { method: "POST", body: {} });
@@ -1491,6 +1513,56 @@
     ui.zoom = clamp(value, 0.58, 1.84);
     refs.boardCanvas.style.width = `${Math.round(ui.zoom * 100)}%`;
     refs.zoomOutput.textContent = `${Math.round(ui.zoom * 100)}%`;
+  }
+
+  async function exportGameLog() {
+    if (!ui.snapshot?.has_game || ui.exportingLog) return;
+    // Preserve what the player saw, even if an in-flight action finishes below.
+    const browserContext = JSON.parse(JSON.stringify({
+      captured_at_utc: new Date().toISOString(),
+      displayed_snapshot: ui.snapshot,
+      ai_paused: ui.aiPaused,
+      ai_working: ui.aiWorking,
+      pending_request_count: ui.pendingRequests.size,
+      selections: {
+        auction_plant: ui.auctionPlant, bid: ui.bidValue,
+        resource_amount: ui.resourceAmount, build_cities: ui.buildCities,
+        build_quote: ui.buildQuote, runs: ui.runs,
+      },
+      layout_editor: { active: ui.layoutEditor.active, draft: ui.layoutEditor.draft },
+    }));
+    ui.exportingLog = true;
+    ui.aiPaused = true;
+    // Exiting the coordinate editor must not resume AI after this capture.
+    ui.layoutEditor.resumeAi = false;
+    clearTimeout(ui.aiTimer);
+    renderHeader();
+    renderActionConsole();
+    try {
+      await Promise.allSettled([...ui.pendingRequests]);
+      const payload = await api("/api/game-log");
+      payload.browser_context = browserContext;
+      const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = payload.download_filename;
+      document.body.append(link);
+      try {
+        link.click();
+      } finally {
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      showToast("排查日志已生成，请查看浏览器下载。AI 保持暂停。");
+    } catch (error) {
+      showToast(`导出失败：${error.message}。可以再次点击重试。`);
+    } finally {
+      ui.exportingLog = false;
+      ui.aiPaused = true;
+      renderHeader();
+      renderActionConsole();
+    }
   }
 
   function quoteResourceCost(resource, amount) {
@@ -1545,6 +1617,16 @@
   }
 
   async function api(path, options = {}) {
+    const pending = fetchPayload(path, options);
+    ui.pendingRequests.add(pending);
+    try {
+      return await pending;
+    } finally {
+      ui.pendingRequests.delete(pending);
+    }
+  }
+
+  async function fetchPayload(path, options) {
     const fetchOptions = { method: options.method || "GET", headers: {} };
     if (options.body !== undefined) {
       fetchOptions.headers["Content-Type"] = "application/json";

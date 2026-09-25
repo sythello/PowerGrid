@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import random
 import unittest
 from unittest.mock import patch
 
 from powergrid.ai import HumanExpHeuristicsAiController, build_ai_controller
 from powergrid.ai.humanexp import (
-    CONTROLLER, BuildProjection, Competition, _build_projection, _can_overbuild, _catalog,
+    CONTROLLER, BuildProjection, Competition, _build_projection, _can_overbuild, _can_stockpile, _catalog,
     _competition, _contest_adjustments, _endgame_plant, _estimated_market,
-    _fuel_options, _opening_priority, _opening_range, _portfolio_after_purchase, _replacement_plant,
-    _with_player, _worst,
+    _fuel_options, _opening_priority, _opening_range, _opponent_endgame_threats,
+    _portfolio_after_purchase, _prioritized_inventory, _replacement_plant,
+    _stockpile_demand_shares, _with_player, _worst,
 )
 from powergrid.model import (
     AuctionState, GameConfig, ResourceStorage, SeatConfig,
@@ -166,6 +168,52 @@ class OpeningTests(unittest.TestCase):
 
 
 class EconomyTests(unittest.TestCase):
+    def test_endgame_threat_reserves_fuel_and_uses_map_build_cost(self):
+        state = player(state_for(map_id="test"), "p2", plants=(4,), money=15,
+                       cities=("amber_falls",))
+        rules = replace(state.rules, player_count_rules={
+            **state.rules.player_count_rules,
+            3: {**state.rules.player_count_rules[3], "end_game_cities": 2},
+        })
+        state = replace(state, rules=rules, phase="buy_resources", auction_state=None)
+        state = player(state, "p3", money=0)
+        # The next city costs 14; two coal cost 2, so 15 is insufficient.
+        self.assertEqual(_opponent_endgame_threats(state, "p1"), [])
+        state = _with_player(state, replace(state.players[1], elektro=16))
+        self.assertEqual(_opponent_endgame_threats(state, "p1"), [
+            {"player_id": "p2", "fuel_cost": 2, "projected_cities": 2, "build_cost": 14},
+        ])
+        state = _with_player(state, replace(state.players[1], elektro=14,
+                                           resource_storage=ResourceStorage(coal=2)))
+        self.assertEqual(_opponent_endgame_threats(state, "p1")[0]["fuel_cost"], 0)
+
+    def test_endgame_threat_excludes_self_and_requires_reachable_cities(self):
+        state = player(state_for(map_id="test"), "p1", plants=(50,), money=1000)
+        state = player(state, "p2", money=0)
+        state = player(state, "p3", money=0)
+        self.assertEqual(_opponent_endgame_threats(state, "p1"), [])
+        # The test map cannot reach the normal 17-city threshold, even with cash.
+        state = player(state, "p2", plants=(50,), money=1000)
+        self.assertEqual(_opponent_endgame_threats(state, "p1"), [])
+
+    def test_stockpile_capacity_excludes_unproductive_plants(self):
+        state = player(state_for(), "p1", plants=(4,8,9), storage={"coal":4, "oil":2})
+        holder = state.players[0]
+        # #8's six extra coal spaces must not count; unrelated retained oil
+        # must not prevent a valid coal purchase when coal space is available.
+        self.assertFalse(_can_stockpile(holder, (PLANTS[4],), "coal"))
+        self.assertTrue(_can_stockpile(holder, (PLANTS[8],), "coal"))
+        self.assertFalse(_can_stockpile(holder, (PLANTS[4],), "oil"))
+        self.assertEqual(holder.resource_storage.resource_totals()["oil"], 2)
+
+    def test_stockpile_capacity_shares_coal_oil_space_in_eligible_hybrid_plants(self):
+        state = player(state_for(), "p1", plants=(5,7), storage={"hybrid_coal":2,"oil":2})
+        self.assertFalse(_can_stockpile(state.players[0], (PLANTS[5],), "coal"))
+        self.assertFalse(_can_stockpile(state.players[0], (PLANTS[5],), "oil"))
+        holder = replace(state.players[0], resource_storage=ResourceStorage(hybrid_coal=1, oil=2))
+        self.assertTrue(_can_stockpile(holder, (PLANTS[5],), "coal"))
+        self.assertTrue(_can_stockpile(holder, (PLANTS[5],), "oil"))
+
     def test_fuel_allocation_does_not_double_use_coal_between_hybrid_and_coal_plant(self):
         state = player(state_for(), "p1", plants=(4,5), storage={"coal":2})
         owner = state.players[0]
@@ -418,6 +466,206 @@ class EconomyTests(unittest.TestCase):
         second = choose(controller,awarded)
         self.assertEqual(first,second)
         self.assertEqual(first.payload,{"plant_price":7})
+
+
+class ResourceMarginalTests(unittest.TestCase):
+    def plan(self, state, *, cities, last_round=False):
+        curve = BuildProjection(tuple(str(i) for i in range(cities)), (1,) * cities, 0)
+        threats = [{"player_id": "p1", "projected_cities": 17}] if last_round else []
+        with patch("powergrid.ai.humanexp._build_projection", return_value=curve), \
+             patch("powergrid.ai.humanexp._opponent_endgame_threats", return_value=threats):
+            return HumanExpHeuristicsAiController()._plan_resources(
+                state, "p2", ("coal", "oil", "garbage", "uranium"),
+            )
+
+    def coal_state(self, stock=0):
+        state = player(state_for(), "p2", plants=(4,25), money=100, storage={"coal":stock})
+        state = player(state, "p1", plants=(8,20), money=0)
+        return replace(state, phase="buy_resources", round_number=6, auction_state=None)
+
+    def test_demand_share_blocks_only_extra_stock_above_threshold(self):
+        state = player(state_for(), "p2", plants=(8,25), money=100)
+        state = player(state, "p1", plants=(4,), money=0)
+        for threshold, blocked in ((0.5, True), (5/7, False), (0.75, False)):
+            with self.subTest(threshold=threshold), patch.object(
+                HumanExpHeuristicsAiController, "_stockpile_share_threshold", return_value=threshold,
+            ):
+                basket, details = self.plan(state, cities=8)
+                self.assertEqual(details["fuel_basket"]["coal"], 5)
+                self.assertEqual(basket["coal"], 5 if blocked else 10)
+                self.assertEqual(details["stockpile_demand_shares"]["coal"],
+                                 {"own": 5, "total": 7, "share": 5/7, "blocked": blocked})
+                self.assertEqual(details["stockpile_share_threshold"], threshold)
+                json.dumps(details, allow_nan=False)
+
+    def test_high_coal_share_does_not_block_oil_stockpiling(self):
+        state = player(state_for(), "p2", plants=(20,16), money=100)
+        state = player(state, "p1", plants=(4,7), money=0)
+        with patch.object(HumanExpHeuristicsAiController, "_stockpile_share_threshold", return_value=0.5):
+            basket, details = self.plan(state, cities=8)
+        self.assertEqual(basket["coal"], details["fuel_basket"]["coal"])
+        self.assertGreater(basket["oil"], details["fuel_basket"]["oil"])
+        self.assertTrue(details["stockpile_demand_shares"]["coal"]["blocked"])
+        self.assertFalse(details["stockpile_demand_shares"]["oil"]["blocked"])
+
+    def test_demand_share_counts_all_plants_without_subtracting_inventory(self):
+        state = self.coal_state(stock=6)
+        _, details = self.plan(state, cities=5)
+        self.assertEqual(details["stockpile_plants"], [25])
+        self.assertEqual(details["stockpile_demand_shares"]["coal"]["own"], 4)
+        self.assertEqual(details["stockpile_demand_shares"]["coal"]["total"], 10)
+        self.assertEqual(details["stockpile_demand_shares"]["uranium"]["share"], 0)
+
+    def test_hybrid_demand_goes_wholly_to_current_cheaper_track(self):
+        state = player(state_for(), "p2", plants=(5,))
+        state = player(state, "p1", plants=(12,))
+        for removed, expected in ((0, "coal"), (6, "coal"), (9, "oil"), (24, "oil")):
+            with self.subTest(removed=removed):
+                current = replace(state, resource_market=state.resource_market.remove_from_market("coal", removed))
+                shares, resource = _stockpile_demand_shares(current, "p2")
+                self.assertEqual(resource, expected)
+                self.assertEqual(shares[expected], {"own": 2, "total": 4, "share": 0.5})
+                self.assertEqual(shares["oil" if expected == "coal" else "coal"]["total"], 0)
+        empty = state.resource_market.remove_from_market("coal",24).remove_from_market("oil",18)
+        shares, resource = _stockpile_demand_shares(replace(state, resource_market=empty), "p2")
+        self.assertEqual(resource, "coal")
+        self.assertEqual(shares["coal"]["total"], 4)
+        # Even if a mixed purchase would be cheaper, demand classification uses
+        # the next unit's price and never splits a hybrid across both tracks.
+        uneven = replace(state.resource_market, market={
+            **state.resource_market.market, "coal": {1: 1, 8: 3},
+        })
+        shares, resource = _stockpile_demand_shares(replace(state, resource_market=uneven), "p2")
+        self.assertEqual(resource, "coal")
+        self.assertEqual(shares["coal"]["total"], 4)
+        self.assertEqual(shares["oil"]["total"], 0)
+
+    def test_stockpile_threshold_is_reproducible_varies_by_round_and_preserves_global_rng(self):
+        controller = HumanExpHeuristicsAiController()
+        state = state_for()
+        before = random.getstate()
+        draws = [controller._stockpile_share_threshold(replace(state, round_number=i), "p2")
+                 for i in range(1, 21)]
+        self.assertTrue(all(0.5 <= value <= 0.75 for value in draws))
+        self.assertEqual(len(set(draws)), 20)
+        self.assertEqual(draws[0], controller._stockpile_share_threshold(state, "p2"))
+        self.assertNotEqual(draws[0], controller._stockpile_share_threshold(state, "p1"))
+        self.assertEqual(random.getstate(), before)
+
+    def test_zero_marginal_plant_is_not_refueled_or_counted_for_stockpiling(self):
+        basket, details = self.plan(self.coal_state(), cities=5)
+        margins = {row["plant"]: row for row in details["plant_margins"]}
+        self.assertEqual(margins[4]["marginal_income"], 0)
+        self.assertFalse(margins[4]["refuel_eligible"])
+        self.assertFalse(margins[4]["stockpile_eligible"])
+        self.assertEqual(details["plants"], [25])
+        self.assertEqual(details["fuel_basket"]["coal"], 2)
+        self.assertEqual(basket["coal"], 4)  # Only #25's storage, not #4's extra four.
+        self.assertGreater(details["resource_gaps"]["coal"], 0)
+
+    def test_shared_inventory_fills_productive_storage_before_the_other_plant(self):
+        state = self.coal_state(stock=4)
+        state = replace(state, resource_market=state.resource_market.remove_from_market("coal",20))
+        basket, details = self.plan(state, cities=6)
+        margins = {row["plant"]: row for row in details["plant_margins"]}
+        self.assertEqual(details["inventory_allocation"][0]["stored"]["coal"], 4)
+        self.assertEqual(details["inventory_allocation"][1]["stored"]["coal"], 0)
+        self.assertEqual(margins[4]["marginal_income"], 9)
+        self.assertEqual(margins[4]["refuel_cost"], 15)
+        self.assertFalse(margins[4]["refuel_eligible"])
+        self.assertEqual(details["plants"], [25])
+        self.assertEqual(basket["coal"], 0)
+
+    def test_surplus_stock_can_make_refueling_profitable_without_allowing_stockpiling(self):
+        state = self.coal_state(stock=5)
+        state = replace(state, resource_market=state.resource_market.remove_from_market("coal",20))
+        basket, details = self.plan(state, cities=6)
+        margins = {row["plant"]: row for row in details["plant_margins"]}
+        self.assertEqual(details["inventory_allocation"][0]["stored"]["coal"], 4)
+        self.assertEqual(details["inventory_allocation"][1]["stored"]["coal"], 1)
+        self.assertEqual(margins[4]["full_run_cost"], 15)
+        self.assertEqual(margins[4]["refuel_cost"], 7)
+        self.assertTrue(margins[4]["refuel_eligible"])
+        self.assertFalse(margins[4]["stockpile_eligible"])
+        self.assertEqual(details["plants"], [4,25])
+        self.assertEqual(basket["coal"], 1)
+
+    def test_existing_stock_does_not_give_a_zero_marginal_plant_stockpile_capacity(self):
+        basket, details = self.plan(self.coal_state(stock=6), cities=5)
+        margins = {row["plant"]: row for row in details["plant_margins"]}
+        self.assertEqual(margins[4]["refuel_cost"], 0)
+        self.assertTrue(margins[4]["refuel_eligible"])
+        self.assertFalse(margins[4]["stockpile_eligible"])
+        self.assertEqual(details["stockpile_plants"], [25])
+        self.assertEqual(basket["coal"], 0)
+
+    def test_prioritized_hybrid_allocation_keeps_all_existing_resources(self):
+        state = player(state_for(), "p2", plants=(4,5), storage={"coal":4, "hybrid_oil":4})
+        groups = _prioritized_inventory(state.players[1], (PLANTS[5],))
+        # Putting coal in the productive hybrid would strand four oil in #4.
+        self.assertEqual(groups[0][1]["oil"], 4)
+        self.assertEqual(groups[0][1]["coal"], 0)
+        self.assertEqual(groups[1][1]["coal"], 4)
+
+    def test_final_round_buys_expensive_generation_even_if_net_income_is_lower(self):
+        state = player(state_for(), "p2", plants=(7,13), money=100)
+        state = replace(state, phase="buy_resources", auction_state=None,
+                        resource_market=state.resource_market.remove_from_market("oil",15))
+        regular, normal_details = self.plan(state, cities=3)
+        final, final_details = self.plan(state, cities=3, last_round=True)
+        self.assertEqual(regular["oil"], 0)
+        self.assertEqual(normal_details["powered_cities"], 1)
+        self.assertEqual(final["oil"], 3)
+        self.assertEqual(final_details["powered_cities"], 3)
+        self.assertEqual(final_details["resource_mode"], "final_round")
+        self.assertLess(final_details["net_income"], normal_details["net_income"])
+        self.assertEqual(final_details["stockpile_plants"], [])
+
+    def test_final_round_only_refuels_once_despite_scarcity_and_spare_money(self):
+        state = self.coal_state()
+        regular, _ = self.plan(state, cities=5)
+        final, details = self.plan(state, cities=5, last_round=True)
+        self.assertEqual(regular["coal"], 4)
+        self.assertEqual(final["coal"], 2)
+        self.assertEqual(final, details["fuel_basket"])
+        self.assertEqual(details["plants"], [25])
+        self.assertGreater(details["cash_after_income"], 0)
+
+    def test_real_endgame_projection_switches_resource_plan_to_final_round(self):
+        state = player(state_for(map_id="test"), "p2", plants=(4,), money=15)
+        state = player(state, "p1", plants=(4,), money=16, cities=("amber_falls",))
+        state = player(state, "p3", plants=(8,20), money=0)
+        rules = replace(state.rules, player_count_rules={
+            **state.rules.player_count_rules,
+            3: {**state.rules.player_count_rules[3], "end_game_cities": 2},
+        })
+        state = replace(state, rules=rules, phase="buy_resources", auction_state=None)
+        basket, details = HumanExpHeuristicsAiController()._plan_resources(
+            state, "p2", ("coal", "oil", "garbage", "uranium"),
+        )
+        self.assertEqual(details["resource_mode"], "final_round")
+        self.assertEqual(details["endgame_threats"], [
+            {"player_id": "p1", "fuel_cost": 2, "projected_cities": 2, "build_cost": 14},
+        ])
+        self.assertEqual(basket["coal"], 2)
+
+    def test_full_cost_equal_to_marginal_income_is_not_excluded_from_stockpiling(self):
+        state = self.coal_state()
+        state = replace(state, resource_market=state.resource_market.remove_from_market("coal",11))
+        _, details = self.plan(state, cities=6)
+        margin = next(row for row in details["plant_margins"] if row["plant"] == 4)
+        self.assertEqual(margin["full_run_cost"], 9)
+        self.assertEqual(margin["marginal_income"], 9)
+        self.assertTrue(margin["stockpile_eligible"])
+
+    def test_unavailable_market_cost_is_logged_as_null_even_with_enough_stored_fuel(self):
+        state = self.coal_state(stock=6)
+        state = replace(state, resource_market=state.resource_market.remove_from_market("coal",24))
+        basket, details = self.plan(state, cities=6)
+        self.assertTrue(all(row["full_run_cost"] is None for row in details["plant_margins"]))
+        self.assertEqual(details["stockpile_plants"], [])
+        self.assertEqual(basket["coal"], 0)
+        json.dumps(details, allow_nan=False)
 
 
 class BuildAndIntegrationTests(unittest.TestCase):

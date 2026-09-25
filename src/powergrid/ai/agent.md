@@ -64,6 +64,9 @@ This means the core contract is:
 - [profiled_deterministic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/profiled_deterministic.py): three no-lookahead, strength-calibrated data-generation policies
 - [strategic.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/strategic.py): stronger heuristic AI
 - [humanexp.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/humanexp.py): human-experience rules, with `经验启发式v1` labels in both UIs
+  - Resource planning checks opponents' fuel-reserved endgame reachability. In a likely final round it maximizes powered cities, then remaining cash, and never stockpiles.
+  - Otherwise it fixes marginal income against the original best plan's city target, distinguishes full run cost (stockpile eligibility) from inventory-adjusted incremental refueling cost, and fills profitable plants' storage before assigning surplus inventory to other plants.
+  - Resource decision logs include endgame threats, per-plant margins/costs, inventory allocation, eligible stockpile plants, and the demand-share threshold and per-resource blocking decisions.
 - [nn_rank_value/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rank_value): public observation, candidates, dataset generation, NumPy MLP/training, and neural controller
 - [nn_rl_based/](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/nn_rl_based): listwise Policy/vector-Q model, full-action semantic search and paired terminal Monte Carlo labels, decision-grouped dataset/training, and Policy-only controller
 - [evaluation.py](/Users/mac/Desktop/syt/Projects/PowerGrid/src/powergrid/ai/evaluation.py): offline AI rating/evaluation subsystem
@@ -174,9 +177,15 @@ Current shipped AIs:
   Hypothetical portfolios never enter this history. Midgame scenarios without
   controller history initialize from the available owned-plant order only.
 - Resource buying enumerates plant subsets and all aggregate hybrid fuel splits,
-  maximizes income minus fuel cost, then stockpiles positive resource deficits.
+  maximizes income minus fuel cost (powered cities first in a likely final round),
+  then stockpiles positive resource deficits outside the final round.
   A complete basket is cached across the session's fixed resource-type sequence;
   the selected construction budget is reserved before stockpiling.
+  A private seed/seat/round RNG draws one uniform 50%–75% threshold for that basket.
+  Extra stockpiling is blocked per resource when own demand / all players' demand
+  strictly exceeds it. Demand counts every plant for one run without subtracting
+  inventory; hybrids count wholly toward the cheaper next available unit (coal on
+  ties), for both scarcity gaps and shares. Required refueling is unaffected.
 - Construction applies additive opponent-city discounts and obeys capacity,
   except when the current first player can retain first place next round.
 - Generation reuses the deterministic exhaustive legal generator; discard and

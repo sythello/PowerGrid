@@ -10,6 +10,21 @@ These scripts are useful when we want to:
 - verify that illegal actions are rejected with a clear explanation
 - inspect intermediate game state after each human-entered action
 
+## Web GUI Diagnostic Export
+
+Run `PYTHONPATH=src python -m powergrid.tools.play_web_gui --open` and start a game.
+
+- During a human or AI turn, click **导出排查日志** in the top bar. Confirm that a
+  timestamped JSON downloads and AI remains paused until **继续 AI** is clicked.
+- Capture while an AI request is running: the export should wait for that action,
+  preserve the pre-click display in `browser_context.displayed_snapshot`, and
+  contain the resulting authoritative state in `debug_snapshot.state`.
+- Check that `game_log` includes earlier actions and AI analysis, `event_log`
+  includes any rejected-action errors, and `debug_snapshot.active_request`
+  identifies the current decision. UI selections are in `browser_context.selections`.
+- After the game ends, use the same button in the final standings dialog and
+  confirm the downloaded file includes `winner_result`.
+
 ## Session Layer Manual Test
 
 Run:

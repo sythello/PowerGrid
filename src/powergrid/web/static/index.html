@@ -87,6 +87,7 @@
           <div class="topbar-actions">
             <button id="ai-toggle" class="tool-button" type="button" hidden>暂停 AI</button>
             <button class="tool-button" type="button" data-action="show-global-parameters">全局参数</button>
+            <button class="tool-button" type="button" data-action="export-game-log" title="暂停 AI 并下载当前状态和完整游戏日志">导出排查日志</button>
             <button id="new-game-button" class="tool-button" type="button">新游戏</button>
           </div>
         </header>
@@ -174,6 +175,7 @@
         <p class="eyebrow">FINAL GRID REPORT</p>
         <h2 id="winner-title">电网结算完成</h2>
         <div id="winner-content"></div>
+        <button class="tool-button" type="button" data-action="export-game-log">导出排查日志</button>
         <button class="primary-button" type="button" data-action="return-launcher">开始新游戏</button>
       </section>
     </div>

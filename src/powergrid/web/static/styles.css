@@ -474,11 +474,14 @@ select {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 7px;
 }
 
 .tool-button,
 .zoom-controls button {
+  white-space: nowrap;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid #667071;
@@ -1859,6 +1862,11 @@ select {
 
   .tool-button {
     padding: 0 8px;
+  }
+
+  .topbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .reference-backdrop {

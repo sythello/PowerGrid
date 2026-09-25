@@ -74,6 +74,17 @@ bundled board artwork, and all base power-plant cards have matched artwork. The
 top bar includes a global-rule reference for payouts, step-specific resource
 refills, the current step, the Step 2 city threshold, and the game-end city
 threshold; the plant market also shows the top card's back.
+The on-screen game log identifies player actions by player name, including AI seats.
+
+Click **导出排查日志** in the top bar or final standings to download a diagnostic
+JSON file. This pauses AI in the current browser, waits for outstanding requests,
+and captures the full current state, complete game/AI/error logs, and the browser's
+displayed state and unsubmitted selections. The file name includes the map, seed,
+round, phase, and UTC timestamp. Resume with **继续 AI** when ready.
+The export extends the existing v2 game-log format with `debug_snapshot` (full
+rules state, including deck order) and `browser_context`; it is a diagnostic
+capture, not a save-game import feature. Direct downloads are also available at
+`GET /api/game-log` while a game is active or finished.
 Human players may submit multiple build batches before choosing `结束建设`. The
 Web bureaucracy panel first selects all zero-fuel plants, then greedily selects
 fueled plants from the highest number down only until every connected city can
@@ -96,6 +107,13 @@ PYTHONPATH=src python -m powergrid.tools.run_ai_game --controllers ai_humanexp_h
 
 See [the implementation conventions](docs/ai_humanexp_heuristics_v1.md) for the
 interpretations used where the original strategy leaves details unspecified.
+Resource planning stops stockpiling when an opponent can reach the ending city
+threshold after refueling, and then prioritizes maximum power generation. In other
+rounds, plant marginal income controls refueling and eligible stockpile capacity;
+existing fuel fills profitable plants' storage first. Extra stockpiling also stops
+for resources whose own share of all players' demand exceeds a per-round random
+50%–75% threshold (hybrids count toward the currently cheaper resource). These calculations are
+included in the exported AI decision logs.
 
 ### 2. Play a full game in the Tkinter GUI
 

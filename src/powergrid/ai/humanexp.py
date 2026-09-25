@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from itertools import combinations
+from itertools import combinations, product
 from math import ceil, inf
 import random
 
 from ..model import (
     RESOURCE_TYPES, GameState, ModelValidationError, PlayerState, PowerPlantCard,
-    ResourceMarket, add_power_plant_to_player, build_city, can_store_resources,
+    ResourceMarket, ResourceStorage, add_power_plant_to_player, build_city, can_store_resources,
     discard_resources_to_fit_storage, legal_build_targets, pay_income,
     purchase_resources, remove_power_plant_from_player,
 )
@@ -115,6 +115,26 @@ def _demand_purchase(
     ))
 
 
+def _stockpile_demand_shares(state: GameState, player_id: str):
+    """One full run of every owned plant; hybrids belong to the cheaper track."""
+    prices = {r: state.resource_market.available_unit_prices(r) for r in ("coal", "oil")}
+    hybrid_resource = min(("coal", "oil"), key=lambda r: prices[r][0] if prices[r] else inf)
+    total = dict.fromkeys(RESOURCE_TYPES, 0)
+    own = dict.fromkeys(RESOURCE_TYPES, 0)
+    for player in state.players:
+        for plant in player.power_plants:
+            if not plant.resource_types:
+                continue
+            resource = hybrid_resource if plant.is_hybrid else plant.resource_types[0]
+            total[resource] += plant.resource_cost
+            if player.player_id == player_id:
+                own[resource] += plant.resource_cost
+    return {
+        r: {"own": own[r], "total": total[r], "share": own[r] / total[r] if total[r] else 0.0}
+        for r in RESOURCE_TYPES
+    }, hybrid_resource
+
+
 def _contest_adjustments(state: GameState, player_id: str) -> dict[str, int]:
     adjustments: dict[str, int] = {}
     for opponent in state.players:
@@ -179,6 +199,89 @@ def _can_overbuild(state: GameState, player_id: str, final_city_count: int) -> b
     return all((final_city_count, player.largest_power_plant) >=
                (other.connected_city_count, other.largest_power_plant)
                for other in state.players if other.player_id != player_id)
+
+
+def _opponent_endgame_threats(state: GameState, player_id: str) -> list[dict[str, object]]:
+    """Estimate who can reach the ending threshold after one full refuel."""
+    threshold = state.rules.player_count_rules[len(state.players)]["end_game_cities"]
+    threats = []
+    for opponent in state.players:
+        if opponent.player_id == player_id:
+            continue
+        if opponent.connected_city_count >= threshold:
+            threats.append({"player_id": opponent.player_id, "fuel_cost": 0,
+                            "projected_cities": opponent.connected_city_count, "build_cost": 0})
+            continue
+        fuel_cost = min((cost for _, cost in _fuel_options(
+            opponent, opponent.power_plants, state.resource_market,
+        )), default=inf)
+        if fuel_cost > opponent.elektro:
+            continue
+        budget = int(opponent.elektro - fuel_cost)
+        curve = _build_projection(state, opponent.player_id, budget=budget)
+        cities, build_cost = curve.affordable(budget, threshold)
+        if cities >= threshold:
+            threats.append({"player_id": opponent.player_id, "fuel_cost": fuel_cost,
+                            "projected_cities": cities, "build_cost": build_cost})
+    return threats
+
+
+def _can_stockpile(
+    player: PlayerState, plants: tuple[PowerPlantCard, ...], resource: str,
+) -> bool:
+    """Limit new stock to productive plants, without discarding existing fuel."""
+    relevant = ({"coal", "oil"} if resource in {"coal", "oil"} and
+                any(plant.is_hybrid for plant in plants) else {resource})
+    totals = player.resource_storage.resource_totals()
+    mix = {r: totals[r] for r in relevant}
+    mix[resource] += 1
+    capacity_view = replace(player, power_plants=plants, resource_storage=ResourceStorage())
+    return can_store_resources(capacity_view, mix)
+
+
+def _prioritized_inventory(player: PlayerState, productive: tuple[PowerPlantCard, ...]):
+    """Fill productive storage first, keeping the remaining allocation legal."""
+    productive_ids = {plant.price for plant in productive}
+    other = tuple(plant for plant in player.power_plants if plant.price not in productive_ids)
+    views = tuple(replace(player, power_plants=plants, resource_storage=ResourceStorage())
+                  for plants in (productive, other))
+    totals = player.resource_storage.resource_totals()
+    # Garbage/uranium have no shared storage; coal/oil can share hybrid slots.
+    fixed = {r: min(totals[r], sum(p.max_storage for p in productive if r in p.resource_types))
+             for r in ("garbage", "uranium")}
+    best = None
+    for coal in range(totals["coal"] + 1):
+        for oil in range(totals["oil"] + 1):
+            reserved = {**fixed, "coal": coal, "oil": oil}
+            remaining = {r: totals[r] - reserved[r] for r in RESOURCE_TYPES}
+            if not can_store_resources(views[0], reserved) or not can_store_resources(views[1], remaining):
+                continue
+            key = (sum(reserved.values()), coal, oil)
+            if best is None or key > best[0]:
+                best = (key, reserved, remaining)
+    if best is None:
+        raise ModelValidationError("cannot allocate existing fuel between productive and other plants")
+    return ((productive, best[1]), (other, best[2]))
+
+
+def _allocated_fuel_options(player, plants, market, available, inventory_groups):
+    selected = {plant.price for plant in plants}
+    choices = []
+    for group, stored in inventory_groups:
+        choices.append(tuple(
+            {r: max(0, demand[r] - stored[r]) for r in RESOURCE_TYPES}
+            for demand in _fuel_demands(tuple(p for p in group if p.price in selected))
+        ))
+    seen = set()
+    for parts in product(*choices):
+        basket = {r: sum(part[r] for part in parts) for r in RESOURCE_TYPES}
+        key = tuple(basket.values())
+        if key in seen or any(basket[r] and r not in available for r in RESOURCE_TYPES):
+            continue
+        seen.add(key)
+        cost = _quote(market, basket)
+        if cost != inf and can_store_resources(player, basket):
+            yield basket, int(cost)
 
 
 def _hybrid_discard(state: GameState) -> tuple[int, int]:
@@ -349,6 +452,12 @@ class HumanExpHeuristicsAiController(BaseAiController):
     def _sample(self, state: GameState, player_id: str, key: str, low: int, high: int) -> int:
         # A private, reproducible stream per seat/plant; never touch deck RNG.
         return random.Random(f"{CONTROLLER}:{state.config.seed}:{player_id}:{key}").randint(low, high)
+
+    def _stockpile_share_threshold(self, state: GameState, player_id: str) -> float:
+        # The resource basket caches this draw across all resource prompts.
+        return random.Random(
+            f"{CONTROLLER}:{state.config.seed}:{player_id}:stockpile_share:{state.round_number}"
+        ).uniform(0.5, 0.75)
 
     def choose_intent(self, request: TurnRequest, snapshot: GameSnapshot) -> GuiIntent:
         state, pid = snapshot.state, request.player_id
@@ -538,16 +647,29 @@ class HumanExpHeuristicsAiController(BaseAiController):
 
     def _plan_resources(self, state: GameState, pid: str, available: tuple[str, ...]):
         player = _get_player(state, pid)
+        threats = _opponent_endgame_threats(state, pid)
+        last_round = bool(threats)
         adjustments = _contest_adjustments(state, pid)
         curves: dict[int, BuildProjection] = {}
-        best_key = None
-        best_basket: dict[str, int] = dict.fromkeys(RESOURCE_TYPES, 0)
-        best_details: dict[str, object] = {}
-        reserve = 0
-        for count in range(len(player.power_plants) + 1):
-            for plants in combinations(player.power_plants, count):
-                for basket, fuel_cost in _fuel_options(player, plants, state.resource_market, available=available):
+        subsets = tuple(plants for count in range(len(player.power_plants) + 1)
+                        for plants in combinations(player.power_plants, count))
+
+        def plant_key(plants):
+            return tuple(sorted(p.price for p in plants))
+
+        def select_plan(options, marginal_incomes=None):
+            cheapest = {key: min((cost for _, cost in values), default=inf)
+                        for key, values in options.items()}
+            best_key = None
+            best = None
+            for plants in subsets:
+                for basket, fuel_cost in options[plant_key(plants)]:
                     if fuel_cost > player.elektro:
+                        continue
+                    if marginal_incomes is not None and any(
+                        fuel_cost - cheapest[plant_key(tuple(p for p in plants if p != plant))]
+                        > marginal_incomes[plant.price] for plant in plants
+                    ):
                         continue
                     cash = player.elektro - fuel_cost
                     if cash not in curves:
@@ -559,33 +681,94 @@ class HumanExpHeuristicsAiController(BaseAiController):
                     cities, build_cost = curve.affordable(cash, limit)
                     powered = min(cities, _capacity(plants))
                     income = pay_income(state.rules, powered)
-                    key = (income - fuel_cost, -fuel_cost, cities, -sum(basket.values()), tuple(-basket[r] for r in RESOURCE_TYPES))
+                    cash_after_income = cash - build_cost + income
+                    objective = ((powered, cash_after_income, cities, -fuel_cost) if last_round else
+                                 (income - fuel_cost, -fuel_cost, cities))
+                    key = (*objective, -sum(basket.values()), tuple(-basket[r] for r in RESOURCE_TYPES))
                     if best_key is None or key > best_key:
-                        best_key, best_basket, reserve = key, basket, build_cost
-                        best_details = {"plants": [p.price for p in plants], "fuel_cost": fuel_cost,
-                                        "projected_cities": cities, "income": income, "build_reserve": reserve,
-                                        "net_income": income - fuel_cost}
+                        best_key = key
+                        best = (plants, basket, {
+                            "plants": [p.price for p in plants], "fuel_cost": fuel_cost,
+                            "projected_cities": cities, "powered_cities": powered,
+                            "income": income, "build_reserve": build_cost,
+                            "net_income": income - fuel_cost, "cash_after_income": cash_after_income,
+                        })
+            assert best is not None  # The empty, zero-cost plan is always available.
+            return best
+
+        options = {plant_key(plants): tuple(_fuel_options(
+            player, plants, state.resource_market, available=available,
+        )) for plants in subsets}
+        baseline_plants, best_basket, details = select_plan(options)
+        details.update({"resource_mode": "final_round" if last_round else "normal",
+                        "endgame_threats": threats})
+        if last_round:
+            # Final scoring values powered cities before money. Never stockpile.
+            return best_basket, {**details, "fuel_basket": dict(best_basket),
+                                 "basket": dict(best_basket), "stockpile_plants": []}
+
+        city_target = details["projected_cities"]
+        marginal_incomes = {}
+        full_costs = {}
+        for plant in player.power_plants:
+            others = tuple(p for p in baseline_plants if p != plant)
+            without = pay_income(state.rules, min(city_target, _capacity(others)))
+            with_plant = pay_income(state.rules, min(city_target, _capacity(others) + plant.output_cities))
+            marginal_incomes[plant.price] = with_plant - without
+            full_costs[plant.price] = min((_quote(state.resource_market, demand)
+                                          for demand in _fuel_demands((plant,))), default=inf)
+        productive = tuple(p for p in player.power_plants if full_costs[p.price] <= marginal_incomes[p.price])
+        inventory_groups = _prioritized_inventory(player, productive)
+        options = {plant_key(plants): tuple(_allocated_fuel_options(
+            player, plants, state.resource_market, available, inventory_groups,
+        )) for plants in subsets}
+        selected_plants, best_basket, best_details = select_plan(options, marginal_incomes)
+        cheapest = {key: min((cost for _, cost in values), default=inf) for key, values in options.items()}
+        margins = []
+        for plant in player.power_plants:
+            others = tuple(p for p in selected_plants if p != plant)
+            with_cost = cheapest[plant_key((*others, plant))]
+            without_cost = cheapest[plant_key(others)]
+            supplement = max(0, with_cost - without_cost) if with_cost != inf and without_cost != inf else inf
+            margins.append({
+                "plant": plant.price, "marginal_income": marginal_incomes[plant.price],
+                "full_run_cost": full_costs[plant.price] if full_costs[plant.price] != inf else None,
+                "refuel_cost": supplement if supplement != inf else None,
+                "refuel_eligible": supplement <= marginal_incomes[plant.price],
+                "stockpile_eligible": plant in productive, "selected": plant in selected_plants,
+            })
+        reserve = best_details["build_reserve"]
         projected = purchase_resources(state, pid, best_basket) if any(best_basket.values()) else state
-        consumption = dict.fromkeys(RESOURCE_TYPES, 0)
-        for other in state.players:
-            demand = _demand_purchase(other.power_plants, state.resource_market, 1.0)
-            for resource in RESOURCE_TYPES:
-                consumption[resource] += demand[resource]
+        demand_shares, hybrid_resource = _stockpile_demand_shares(state, pid)
+        share_threshold = self._stockpile_share_threshold(state, pid)
+        for demand in demand_shares.values():
+            demand["blocked"] = demand["share"] > share_threshold
         refill = state.rules.player_count_rules[len(state.players)]["resource_refill"][f"step_{state.step}"]
-        gaps = {r: consumption[r] - int(refill[r]) for r in RESOURCE_TYPES}
+        gaps = {r: demand_shares[r]["total"] - int(refill[r]) for r in RESOURCE_TYPES}
         result = dict(best_basket)
         for resource in sorted(available, key=lambda r: (-gaps[r], RESOURCE_TYPES.index(r))):
-            if gaps[resource] <= 0:
+            if gaps[resource] <= 0 or demand_shares[resource]["blocked"]:
                 continue
             while True:
                 holder = _get_player(projected, pid)
                 prices = projected.resource_market.available_unit_prices(resource)
                 if (not prices or holder.elektro - reserve < prices[0] or
+                        not _can_stockpile(holder, productive, resource) or
                         not can_store_resources(holder, {resource: 1})):
                     break
                 projected = purchase_resources(projected, pid, {resource: 1})
                 result[resource] += 1
-        return result, {**best_details, "resource_gaps": gaps, "basket": dict(result)}
+        return result, {
+            **best_details, "resource_mode": "normal", "endgame_threats": threats,
+            "marginal_city_target": city_target, "marginal_reference_plants": [p.price for p in baseline_plants],
+            "plant_margins": margins, "stockpile_plants": [p.price for p in productive],
+            "inventory_allocation": [{"plants": [p.price for p in plants], "stored": stored}
+                                     for plants, stored in inventory_groups],
+            "fuel_basket": dict(best_basket), "resource_gaps": gaps, "basket": dict(result),
+            "stockpile_share_threshold": share_threshold,
+            "stockpile_hybrid_resource": hybrid_resource,
+            "stockpile_demand_shares": demand_shares,
+        }
 
     def _resources(self, state: GameState, request: TurnRequest):
         resource = str(request.metadata["resource"])

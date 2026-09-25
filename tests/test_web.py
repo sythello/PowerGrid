@@ -7,8 +7,9 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
-from powergrid.model import ModelValidationError
+from powergrid.model import GameState, ModelValidationError
 from powergrid.session import GameSession
 from powergrid.web.server import PowerGridWebController, STATIC_ROOT, make_server
 
@@ -33,6 +34,54 @@ class PowerGridWebControllerTests(unittest.TestCase):
         self.assertEqual(nn_option["name"], "NN RL V1 (v 2.01)")
         self.assertEqual(nn_option["supported_maps"], ["germany"])
         self.assertEqual(nn_option["supported_player_counts"], [3])
+
+    def test_export_requires_a_game(self) -> None:
+        with self.assertRaises(ModelValidationError):
+            self.controller.export_game_log()
+
+    def test_export_preserves_full_state_history_and_ai_analysis(self) -> None:
+        self.controller.new_game({
+            "map_id": "germany", "seed": 7,
+            "players": [{"controller": "ai_humanexp_heuristics_v1"} for _ in range(3)],
+        })
+        session = self.controller._session
+        for finished in (False, True):
+            if finished:
+                session.advance_until_blocked()
+            else:
+                session.advance_one_ai_action()
+            before = session.snapshot().state.to_dict()
+            expected_log = session.game_log_payload()
+            payload = json.loads(json.dumps(self.controller.export_game_log()))
+            with self.subTest(finished=finished):
+                self.assertEqual(payload["debug_snapshot"]["state"], before)
+                self.assertEqual(GameState.from_dict(payload["debug_snapshot"]["state"]).to_dict(), before)
+                self.assertEqual(session.snapshot().state.to_dict(), before)
+                for key, value in expected_log.items():
+                    self.assertEqual(payload[key], value)
+                self.assertTrue(any(entry["source"] == "ai" for entry in payload["game_log"]))
+                self.assertIn("power_plant_draw_stack", payload["debug_snapshot"]["state"])
+                self.assertNotIn("power_plant_draw_stack", self.controller.snapshot_payload()["state"])
+                self.assertIn("powergrid-germany-seed7-round", payload["download_filename"])
+                if finished:
+                    self.assertIsNotNone(payload["winner_result"])
+                    self.assertGreater(len(payload["event_log"]), 60)
+                    self.assertIsNone(payload["debug_snapshot"]["active_request"])
+                else:
+                    self.assertIsNotNone(payload["debug_snapshot"]["active_request"])
+
+    def test_export_includes_rejected_action_at_the_current_state(self) -> None:
+        self.controller._session = GameSession.from_scenario("build_test")
+        before = self.controller.snapshot_payload()
+        result = self.controller.submit_intent({
+            "player_id": before["request"]["player_id"],
+            "intent_type": "commit_build", "payload": {"city_ids": ["nonexistent-city"]},
+        })
+        self.assertIn("error", result)
+        payload = self.controller.export_game_log()
+        self.assertEqual(payload["event_log"][-1]["level"], "error")
+        self.assertEqual(payload["event_log"][-1]["message"], result["error"])
+        self.assertEqual(payload["debug_snapshot"]["active_request"]["player_id"], before["request"]["player_id"])
 
     def test_new_game_maps_nn_rl_v1_to_the_latest_release_controller(self) -> None:
         payload = self.controller.new_game(
@@ -387,6 +436,11 @@ class PowerGridWebHttpTests(unittest.TestCase):
                 body = response.read().decode("utf-8")
             self.assertIn("PowerGrid · 电力调度台", body)
 
+            with self.assertRaises(HTTPError) as missing_game:
+                urlopen(f"{base}/api/game-log", timeout=3)
+            self.assertEqual(missing_game.exception.code, 400)
+            self.assertIn("error", json.loads(missing_game.exception.read()))
+
             request = Request(
                 f"{base}/api/game",
                 data=json.dumps(
@@ -407,6 +461,15 @@ class PowerGridWebHttpTests(unittest.TestCase):
                 payload = json.loads(response.read())
             self.assertTrue(payload["has_game"])
             self.assertEqual(payload["state"]["players"][0]["name"], "One")
+            with urlopen(f"{base}/api/game-log", timeout=3) as response:
+                exported = json.loads(response.read())
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+                self.assertEqual(response.headers["Content-Disposition"],
+                    f'attachment; filename="{exported["download_filename"]}"')
+                self.assertEqual(response.headers.get_content_type(), "application/json")
+            self.assertEqual(exported["debug_snapshot"]["state"]["players"][0]["name"], "One")
+            self.assertEqual(exported["format_version"], 2)
+            self.assertTrue(exported["game_log"])
         finally:
             server.shutdown()
             server.server_close()

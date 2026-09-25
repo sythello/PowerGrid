@@ -5,6 +5,7 @@ import math
 import mimetypes
 import threading
 from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -189,6 +190,28 @@ class PowerGridWebController:
                 result["error"] = events[-1].message
             return result
 
+    def export_game_log(self) -> dict[str, Any]:
+        """Capture an untruncated diagnostic log at one locked session boundary."""
+        with self._lock:
+            session = self._require_session()
+            payload = session.game_log_payload()
+            snapshot = session.snapshot()
+            captured_at = datetime.now(timezone.utc)
+            payload["debug_snapshot"] = {
+                "format_version": 1,
+                "captured_at_utc": captured_at.isoformat(),
+                "state": snapshot.state.to_dict(),
+                "active_request": (
+                    snapshot.active_request.to_dict() if snapshot.active_request else None
+                ),
+            }
+            payload["download_filename"] = (
+                f"powergrid-{snapshot.state.config.map_id}-seed{snapshot.state.config.seed}"
+                f"-round{snapshot.state.round_number}-{snapshot.state.phase}"
+                f"-{captured_at.strftime('%Y%m%dT%H%M%S%fZ')}.json"
+            )
+            return payload
+
     def advance_one(self) -> dict[str, Any]:
         with self._lock:
             session = self._require_session()
@@ -345,6 +368,13 @@ class PowerGridRequestHandler(BaseHTTPRequestHandler):
         if route == "/api/state":
             self._write_json(self.controller.snapshot_payload())
             return
+        if route == "/api/game-log":
+            try:
+                payload = self.controller.export_game_log()
+                self._write_json(payload, download_filename=payload["download_filename"])
+            except ModelValidationError as exc:
+                self._write_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if route == "/":
             self._write_file(self.static_root / "index.html")
             return
@@ -386,12 +416,17 @@ class PowerGridRequestHandler(BaseHTTPRequestHandler):
             raise ValueError("request body must be a JSON object")
         return payload
 
-    def _write_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
+    def _write_json(
+        self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK,
+        *, download_filename: str | None = None,
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_response(status.value)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if download_filename is not None:
+            self.send_header("Content-Disposition", f'attachment; filename="{download_filename}"')
         self.end_headers()
         self.wfile.write(body)
 
